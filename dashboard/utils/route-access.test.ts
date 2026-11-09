@@ -29,4 +29,10 @@ describe("hasRouteAccess", () => {
     expect(hasRouteAccess("/conversations", "viewer")).toBe(true);
     expect(hasRouteAccess("/conversations", undefined)).toBe(false);
   });
+
+  it("keeps evidence packs to roles with the conversation export scope", () => {
+    expect(hasRouteAccess("/evidence", "member")).toBe(true);
+    expect(hasRouteAccess("/evidence", "viewer")).toBe(false);
+    expect(hasRouteAccess("/evidence", "agent")).toBe(false);
+  });
 });

@@ -21,6 +21,9 @@ export const roleProtectedRoutes: Record<string, string[]> = {
   // Insights - all except agent
   "/insights": ["owner", "admin", "contributor", "member", "viewer"],
 
+  // Evidence packs need the conversation export scope
+  "/evidence": ["owner", "admin", "contributor", "member"],
+
   // Content creation - contributor+
   "/playbooks/create": ["owner", "admin", "contributor"],
   "/playbooks/new": ["owner", "admin", "contributor"],
