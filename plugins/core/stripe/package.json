@@ -15,6 +15,12 @@
       "cron",
       "disputes"
     ],
+    "network": {
+      "egress": [
+        "api.stripe.com",
+        "files.stripe.com"
+      ]
+    },
     "setup": {
       "businessTypes": [
         "store",

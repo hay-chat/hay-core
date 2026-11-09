@@ -24,7 +24,14 @@
         "order_changes"
       ]
     },
-    "env": []
+    "env": [],
+    "network": {
+      "egress": [
+        {
+          "fromConfig": "siteUrl"
+        }
+      ]
+    }
   },
   "scripts": {
     "build": "npm run build:ui && tsc",

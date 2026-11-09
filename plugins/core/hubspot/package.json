@@ -26,6 +26,9 @@
       "HUBSPOT_CLIENT_ID",
       "HUBSPOT_CLIENT_SECRET"
     ],
+    "network": {
+      "egress": []
+    },
     "oauthHosts": [
       "mcp.hubspot.com"
     ]

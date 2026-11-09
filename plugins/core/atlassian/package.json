@@ -28,6 +28,15 @@
       "ATLASSIAN_CLIENT_ID",
       "ATLASSIAN_CLIENT_SECRET"
     ],
+    "network": {
+      "egress": [
+        "api.atlassian.com",
+        {
+          "fromConfig": "siteUrl",
+          "suffix": ".atlassian.net"
+        }
+      ]
+    },
     "oauthHosts": [
       "auth.atlassian.com"
     ],

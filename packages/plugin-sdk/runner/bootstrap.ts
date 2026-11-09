@@ -229,6 +229,23 @@ export function loadManifest(pluginPath: string): ValidatedManifest {
     }
   }
 
+  // Validate network.egress (optional)
+  if (manifest.network?.egress !== undefined) {
+    if (!Array.isArray(manifest.network.egress)) {
+      throw new Error('Invalid "network.egress" in hay-plugin manifest (must be an array)');
+    }
+    for (const entry of manifest.network.egress) {
+      const valid =
+        typeof entry === "string" ||
+        (typeof entry === "object" && entry !== null && typeof entry.fromConfig === "string");
+      if (!valid) {
+        throw new Error(
+          'Invalid "network.egress" entry in hay-plugin manifest (a host string or { fromConfig })',
+        );
+      }
+    }
+  }
+
   // Resolve entry path
   const entryPath = resolve(pluginPath, manifest.entry);
 

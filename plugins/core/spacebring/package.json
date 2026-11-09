@@ -13,6 +13,11 @@
       "mcp",
       "auth"
     ],
+    "network": {
+      "egress": [
+        "api.spacebring.com"
+      ]
+    },
     "setup": {
       "businessTypes": [
         "service"

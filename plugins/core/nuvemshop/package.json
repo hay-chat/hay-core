@@ -29,6 +29,11 @@
       "NUVEMSHOP_OAUTH_CLIENT_ID",
       "NUVEMSHOP_OAUTH_CLIENT_SECRET"
     ],
+    "network": {
+      "egress": [
+        "api.nuvemshop.com.br"
+      ]
+    },
     "oauthHosts": [
       "www.nuvemshop.com.br",
       "www.tiendanube.com"

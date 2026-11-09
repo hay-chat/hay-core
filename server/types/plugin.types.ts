@@ -1,6 +1,11 @@
 import type { ChannelRendering } from "@server/lib/channel-rendering";
+import type { EgressEntry } from "../plugin-host/egress-policy";
 import type { InactivityTiming } from "@server/lib/inactivity-timing";
 import type { PluginSetupHints } from "@server/types/setup.types";
+
+export interface PluginNetwork {
+  egress?: EgressEntry[];
+}
 
 export interface HayPluginManifest {
   id: string;
@@ -45,6 +50,8 @@ export interface HayPluginManifest {
   trpcRouter?: string;
   /** Hosts a server-managed OAuth client secret may be sent to (exact or `*.suffix`). */
   oauthHosts?: string[];
+  /** Outbound destinations the plugin's worker may reach (package.json hay-plugin.network). */
+  network?: PluginNetwork;
   services?: Array<{
     name: string;
     path: string;

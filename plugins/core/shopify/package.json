@@ -32,6 +32,14 @@
       "SHOPIFY_OAUTH_CLIENT_ID",
       "SHOPIFY_OAUTH_CLIENT_SECRET"
     ],
+    "network": {
+      "egress": [
+        {
+          "fromConfig": "shopDomain",
+          "suffix": ".myshopify.com"
+        }
+      ]
+    },
     "oauthHosts": [
       "*.myshopify.com"
     ]

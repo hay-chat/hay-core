@@ -27,6 +27,13 @@
       "META_MESSENGER_APP_SECRET",
       "META_VERIFY_TOKEN"
     ],
+    "network": {
+      "egress": [
+        "graph.facebook.com",
+        "*.fbcdn.net",
+        "*.fbsbx.com"
+      ]
+    },
     "oauthHosts": [
       "www.facebook.com",
       "graph.facebook.com"

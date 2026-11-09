@@ -135,6 +135,17 @@ export interface HayPluginManifest {
   env?: string[];
 
   /**
+   * Outbound network destinations the worker may reach. Everything else is
+   * refused by the egress proxy.
+   *
+   * @example
+   * { "egress": ["api.example.com", "*.cdn.example.com:8443", { "fromConfig": "baseUrl" }] }
+   */
+  network?: {
+    egress?: Array<string | { fromConfig: string; suffix?: string }>;
+  };
+
+  /**
    * When in-app setup should suggest this plugin, and what it can do for customers.
    *
    * @remarks

@@ -28,6 +28,11 @@
       "MERCADOPAGO_CLIENT_ID",
       "MERCADOPAGO_CLIENT_SECRET"
     ],
+    "network": {
+      "egress": [
+        "api.mercadopago.com"
+      ]
+    },
     "oauthHosts": [
       "auth.mercadopago.com",
       "api.mercadopago.com"

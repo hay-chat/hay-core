@@ -28,7 +28,13 @@
       "EMAIL_INBOUND_DOMAIN",
       "SMTP_FROM_EMAIL",
       "RESEND_WEBHOOK_SECRET"
-    ]
+    ],
+    "network": {
+      "egress": [
+        "api.resend.com",
+        "inbound-cdn.resend.com"
+      ]
+    }
   },
   "scripts": {
     "build": "npm run build:ui && tsc",

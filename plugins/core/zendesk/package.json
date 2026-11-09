@@ -26,7 +26,15 @@
       "ZENDESK_SUBDOMAIN",
       "ZENDESK_EMAIL",
       "ZENDESK_API_TOKEN"
-    ]
+    ],
+    "network": {
+      "egress": [
+        {
+          "fromConfig": "subdomain",
+          "suffix": ".zendesk.com"
+        }
+      ]
+    }
   },
   "scripts": {
     "build": "npm run build:ui && npm run build:mcp",
