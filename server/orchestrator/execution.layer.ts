@@ -12,6 +12,7 @@ import {
   renderDocument,
   truncate,
   renderPageTools,
+  fenceData,
 } from "../services/core/prompt-data";
 
 const logger = createLogger("execution");
@@ -384,18 +385,16 @@ export class ExecutionLayer {
         }
       }
 
-      // Inject conversation context into the prompt
-      const contextBlock = await this.buildContextPrompt(conversation);
-      if (contextBlock) {
-        finalPrompt = finalPrompt + contextBlock;
-      }
-
-      // Inject retrieved knowledge-base content so the model can ground its answer
-      // in the same source material the confidence guardrail later evaluates against.
-      const knowledgeBlock = await this.buildKnowledgePrompt(conversation);
-      if (knowledgeBlock) {
-        finalPrompt = finalPrompt + knowledgeBlock;
-      }
+      // Conversation context and the retrieved knowledge the confidence guardrail
+      // later evaluates against. Written by people outside the business's prompt
+      // authors, so a user turn at the head of the history, not the system prompt:
+      // the system prompt also stays stable for prompt caching.
+      const referenceBlocks =
+        (await this.buildContextPrompt(conversation)) +
+        (await this.buildKnowledgePrompt(conversation));
+      const referenceTurn = referenceBlocks
+        ? ({ type: MessageType.CUSTOMER, content: referenceBlocks.trim() } as Message)
+        : null;
 
       // A request for a person must beat the active playbook's first steps
       // ("ask for the order number and email"): the planner otherwise follows
@@ -431,7 +430,11 @@ export class ExecutionLayer {
       log.debug("Invoking LLM for execution planning");
 
       const response = await this.llmService.invoke({
-        history: pageToolsTurn ? [pageToolsTurn, ...messages] : messages,
+        history: [
+          ...(pageToolsTurn ? [pageToolsTurn] : []),
+          ...(referenceTurn ? [referenceTurn] : []),
+          ...messages,
+        ],
         prompt: finalPrompt,
         jsonSchema: this.buildPlannerSchema(allToolNames, quickCheck),
         organizationId: conversation.organization_id,
@@ -1758,7 +1761,7 @@ export class ExecutionLayer {
         .join("\n");
 
       const prompt = await this.promptService.getPrompt("execution/contextual-fallback", {
-        conversationHistory,
+        conversationHistory: fenceData(conversationHistory),
         targetLanguage,
       });
 
