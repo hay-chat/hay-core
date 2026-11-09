@@ -4,7 +4,16 @@
  * issued for allowlisted destinations, and only owners hand out the owner role.
  */
 import "reflect-metadata";
-import { describe, it, expect, beforeAll, beforeEach, afterAll, jest } from "@jest/globals";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterAll,
+  afterEach,
+  jest,
+} from "@jest/globals";
 import * as crypto from "crypto";
 import { In } from "typeorm";
 
@@ -20,10 +29,13 @@ jest.mock("../../services/default-plugins.service", () => ({
   enableDefaultPlugins: async () => undefined,
 }));
 const mockLimited = { value: false };
+const mockLimitedIpScopes = new Set<string>();
 jest.mock("../../services/rate-limit.service", () => ({
   rateLimitService: {
     checkKeyRateLimit: async () => ({ limited: mockLimited.value }),
-    checkIpRateLimit: async () => ({ limited: false }),
+    checkIpRateLimit: async (_ip: string, _max: number, _window: number, o: { scope: string }) => ({
+      limited: mockLimitedIpScopes.has(o.scope),
+    }),
     checkEmailRateLimit: async () => ({ limited: false }),
     resetRateLimit: async () => undefined,
   },
@@ -38,6 +50,7 @@ jest.mock("../../config/env", () => {
 });
 
 import { AppDataSource } from "../../database/data-source";
+import { config } from "../../config/env";
 import { User } from "../../entities/user.entity";
 import { Organization } from "../../entities/organization.entity";
 import { UserOrganization } from "../../entities/user-organization.entity";
@@ -370,6 +383,24 @@ describe("account access", () => {
     });
   });
 
+  describe("rate limits", () => {
+    afterEach(() => mockLimitedIpScopes.clear());
+
+    it("limits token refreshes by address", async () => {
+      mockLimitedIpScopes.add("refresh-token");
+      await expect(
+        authRouter.createCaller(publicCtx()).refreshToken({ refreshToken: "whatever" }),
+      ).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+    });
+
+    it("limits auth code exchanges by address", async () => {
+      mockLimitedIpScopes.add("exchange-auth-code");
+      await expect(
+        authRouter.createCaller(publicCtx()).exchangeAuthCode({ code: "whatever" }),
+      ).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+    });
+  });
+
   describe("auth codes", () => {
     it("are only issued for allowlisted destinations", async () => {
       const caller = authRouter.createCaller(await memberCtx(member.id));
@@ -395,6 +426,44 @@ describe("account access", () => {
         authRouter.createCaller(publicCtx()).exchangeAuthCode({ code }),
       ]);
       expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    });
+
+    describe("destination binding", () => {
+      const issue = async () => {
+        const caller = authRouter.createCaller(await memberCtx(member.id));
+        const { code } = await caller.generateAuthCode({
+          redirectUri: "https://billing.example.com/portal",
+        });
+        return code;
+      };
+      const exchange = (input: { code: string; redirectUri?: string }) =>
+        authRouter.createCaller(publicCtx()).exchangeAuthCode(input);
+
+      it("exchanges for the origin the code was issued to", async () => {
+        const code = await issue();
+        await expect(
+          exchange({ code, redirectUri: "https://billing.example.com/callback" }),
+        ).resolves.toBeTruthy();
+      });
+
+      it("refuses a different origin", async () => {
+        const code = await issue();
+        await expect(
+          exchange({ code, redirectUri: "https://elsewhere.example.org/callback" }),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      });
+
+      it("requires the destination once the setting is on", async () => {
+        const settings = config.authCodes as { requireRedirectUri: boolean };
+        settings.requireRedirectUri = true;
+        try {
+          await expect(exchange({ code: await issue() })).rejects.toMatchObject({
+            code: "BAD_REQUEST",
+          });
+        } finally {
+          settings.requireRedirectUri = false;
+        }
+      });
     });
 
     it("are refused once expired", async () => {

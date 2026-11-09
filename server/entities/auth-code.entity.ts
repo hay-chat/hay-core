@@ -16,6 +16,10 @@ export class AuthCode extends BaseEntity {
   @Column({ type: "varchar", length: 128 })
   codeHash!: string;
 
+  /** Origin of the destination the code was issued for. */
+  @Column({ type: "varchar", length: 512, nullable: true })
+  redirectOrigin!: string | null;
+
   @Column({ type: "timestamptz" })
   expiresAt!: Date;
 

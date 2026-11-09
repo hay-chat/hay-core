@@ -363,6 +363,12 @@ export const config = {
   // Server-to-server secret for the `internal.*` tRPC procedures (used by an
   // external operator, e.g. a hosted-plan backoffice, to suspend organizations).
   // Empty disables those procedures entirely — the default for self-hosting.
+  authCodes: {
+    // Refuse exchanges that do not name the destination the code was issued for.
+    // Enable once every app calling exchangeAuthCode sends redirectUri.
+    requireRedirectUri: process.env.AUTH_CODE_REQUIRE_REDIRECT_URI === "true",
+  },
+
   internal: {
     apiSecret: process.env.INTERNAL_API_SECRET || "",
     // Where core POSTs signed events the operator may need to act on (for

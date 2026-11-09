@@ -35,7 +35,7 @@ import {
 } from "@server/lib/auth/session-cookie";
 import type { Context } from "@server/trpc/context";
 import type { AuthTokens } from "@server/types/auth.types";
-import { rateLimitService } from "@server/services/rate-limit.service";
+import { rateLimitService, type RateLimitScope } from "@server/services/rate-limit.service";
 import { rateLimitMiddleware } from "@server/trpc/middleware/rate-limit";
 import { toAccessState } from "@server/services/organization-access.service";
 import {
@@ -180,13 +180,40 @@ function allowlistedRedirectUrl(redirectUri: string): URL {
   return redirectUrl;
 }
 
+/** Generous: offices share an address, and each open dashboard refreshes several times an hour. */
+const REFRESH_IP_LIMIT = { scope: "refresh-token", max: 300, windowSeconds: 15 * 60 } as const;
+const EXCHANGE_IP_LIMIT = { scope: "exchange-auth-code", max: 60, windowSeconds: 15 * 60 } as const;
+
+/** Allows the request when the limiter is unavailable, so an outage does not sign people out. */
+async function assertWithinIpLimit(
+  ipAddress: string | undefined,
+  limit: { scope: RateLimitScope; max: number; windowSeconds: number },
+): Promise<void> {
+  const { limited } = await rateLimitService.checkIpRateLimit(
+    ipAddress || "unknown",
+    limit.max,
+    limit.windowSeconds,
+    { scope: limit.scope },
+  );
+  if (limited) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: "Too many requests. Please try again later.",
+    });
+  }
+}
+
 /** A single-use, 10-minute auth code for the user. */
-async function createAuthCode(userId: string): Promise<{ code: string; expiresAt: Date }> {
+async function createAuthCode(
+  userId: string,
+  redirectOrigin: string,
+): Promise<{ code: string; expiresAt: Date }> {
   const code = generateSecureToken(32);
   const authCodeRepo = AppDataSource.getRepository(AuthCode);
   const authCode = authCodeRepo.create({
     userId,
     codeHash: await hashApiKey(code),
+    redirectOrigin,
     expiresAt: new Date(Date.now() + 10 * 60 * 1000),
     used: false,
   });
@@ -435,6 +462,7 @@ export const authRouter = t.router({
    * error (database down, ...) is transient and the client keeps its session.
    */
   refreshToken: publicProcedure.input(refreshTokenSchema).mutation(async ({ input, ctx }) => {
+    await assertWithinIpLimit(ctx.ipAddress, REFRESH_IP_LIMIT);
     const fromCookie = input.refreshToken ? undefined : readRefreshCookie(ctx.req);
     const refreshToken = input.refreshToken ?? fromCookie;
     if (!refreshToken) {
@@ -1621,8 +1649,7 @@ export const authRouter = t.router({
   generateAuthCode: protectedProcedureWithoutOrg
     .input(z.object({ redirectUri: z.string().url() }))
     .mutation(async ({ ctx, input }) => {
-      allowlistedRedirectUrl(input.redirectUri);
-      return createAuthCode(ctx.user!.id);
+      return createAuthCode(ctx.user!.id, allowlistedRedirectUrl(input.redirectUri).origin);
     }),
 
   // Issue a single-use auth code bound to an allowlisted external redirect URI.
@@ -1639,7 +1666,7 @@ export const authRouter = t.router({
     )
     .mutation(async ({ ctx, input }) => {
       const redirectUrl = allowlistedRedirectUrl(input.redirectUri);
-      const { code } = await createAuthCode(ctx.user!.id);
+      const { code } = await createAuthCode(ctx.user!.id, redirectUrl.origin);
 
       redirectUrl.searchParams.set("code", code);
       if (input.state) redirectUrl.searchParams.set("state", input.state);
@@ -1648,15 +1675,34 @@ export const authRouter = t.router({
     }),
 
   exchangeAuthCode: publicProcedure
-    .input(z.object({ code: z.string().min(1), useCookie: useCookieField }))
+    .input(
+      z.object({
+        code: z.string().min(1),
+        redirectUri: z.string().url().optional(),
+        useCookie: useCookieField,
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
+      await assertWithinIpLimit(ctx.ipAddress, EXCHANGE_IP_LIMIT);
+
+      if (!input.redirectUri && config.authCodes.requireRedirectUri) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "redirectUri is required" });
+      }
+      const redirectOrigin = input.redirectUri ? new URL(input.redirectUri).origin : null;
       const codeHash = await hashApiKey(input.code);
 
       // Claim the code in one statement so concurrent exchanges can't both succeed.
       const claimed = await AppDataSource.createQueryBuilder()
         .update(AuthCode)
         .set({ used: true })
-        .where("code_hash = :codeHash AND used = false AND expires_at > now()", { codeHash })
+        .where(
+          `code_hash = :codeHash AND used = false AND expires_at > now()${
+            redirectOrigin
+              ? " AND (redirect_origin IS NULL OR redirect_origin = :redirectOrigin)"
+              : ""
+          }`,
+          { codeHash, redirectOrigin },
+        )
         .returning("user_id")
         .execute();
       const userId = (claimed.raw as Array<{ user_id: string }>)[0]?.user_id;
