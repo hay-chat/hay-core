@@ -32,6 +32,7 @@ const router = Router();
 
 const SCIM_CONTENT_TYPE = "application/scim+json; charset=utf-8";
 const TOKEN_REQUESTS_PER_MINUTE = 600;
+const MAX_START_INDEX = 1_000_000_000;
 const BODY_LIMIT = "256kb";
 
 function send(res: Response, status: number, body?: unknown): void {
@@ -48,7 +49,7 @@ function actorOf(res: Response): ScimActor {
 
 type Handler = (req: Request, res: Response) => Promise<void>;
 
-/** Express 4 does not catch a rejected promise from a handler. */
+/** Hands a rejected handler promise to the error middleware below, in the SCIM shape. */
 function handle(handler: Handler) {
   return (req: Request, res: Response, next: NextFunction) => {
     handler(req, res).catch(next);
@@ -119,16 +120,17 @@ router.use(
 function pageOf(req: Request): ScimPage {
   const query = z
     .object({
-      startIndex: z.coerce.number().int().optional(),
-      count: z.coerce.number().int().optional(),
+      startIndex: z.coerce.number().finite().optional(),
+      count: z.coerce.number().finite().optional(),
       filter: z.string().max(1000).optional(),
     })
     .safeParse(req.query);
   if (!query.success)
-    throw new ScimError(400, "startIndex and count must be integers", "invalidValue");
+    throw new ScimError(400, "startIndex and count must be numbers", "invalidValue");
   return {
-    startIndex: Math.max(1, query.data.startIndex ?? 1),
-    count: Math.min(SCIM_MAX_PAGE, Math.max(0, query.data.count ?? 100)),
+    // Far beyond any real list, and inside what the database accepts as an offset.
+    startIndex: Math.min(MAX_START_INDEX, Math.max(1, Math.floor(query.data.startIndex ?? 1))),
+    count: Math.min(SCIM_MAX_PAGE, Math.max(0, Math.floor(query.data.count ?? 100))),
     filter: query.data.filter,
   };
 }

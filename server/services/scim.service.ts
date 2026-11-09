@@ -197,8 +197,11 @@ export class ScimService {
     try {
       const row = await AppDataSource.getRepository(ScimToken).findOne({
         where: { tokenHash: sha256(token) },
+        relations: ["organization"],
       });
       if (!row) return null;
+      // The same rule as API tokens: a deactivated or suspended organization is out of reach.
+      if (!row.organization?.isActive || row.organization.suspendedAt) return null;
       const stale =
         !row.lastUsedAt || Date.now() - row.lastUsedAt.getTime() > LAST_USED_RESOLUTION_MS;
       if (stale) {
@@ -452,13 +455,15 @@ export class ScimService {
       throw new ScimError(403, "Owners are managed in Hay, not through SCIM");
     }
 
-    const otherOrganizations = await this.activeOtherMemberships(organizationId, userId);
     const performed: string[] = [];
 
     try {
       await AppDataSource.transaction(async (manager) => {
         const users = manager.getRepository(User);
         const user = await users.findOneOrFail({ where: { id: userId } });
+        // Any other membership, active or suspended, means the account is not this organization's alone.
+        // Counted in the transaction that writes, so a membership added meanwhile is not missed.
+        const otherOrganizations = await this.otherMembershipRows(organizationId, userId, manager);
 
         if (changes.userName !== undefined) {
           const email = changes.userName.trim().toLowerCase();
@@ -534,6 +539,19 @@ export class ScimService {
       await this.audit(actor, "scim.user.update", userId, { fields: performed });
     }
     return this.getUser(organizationId, userId);
+  }
+
+  private async otherMembershipRows(
+    organizationId: string,
+    userId: string,
+    manager: EntityManager,
+  ): Promise<number> {
+    const [{ count }]: Array<{ count: string }> = await manager.query(
+      `SELECT count(*) AS count FROM user_organizations
+        WHERE user_id = $1 AND organization_id <> $2`,
+      [userId, organizationId],
+    );
+    return Number(count);
   }
 
   private async activeOtherMemberships(
@@ -616,12 +634,10 @@ export class ScimService {
       await manager
         .getRepository(UserOrganization)
         .update({ userId, organizationId }, { isActive: true });
-      const [{ count }]: Array<{ count: string }> = await manager.query(
-        `SELECT count(*) AS count FROM user_organizations WHERE user_id = $1 AND organization_id <> $2`,
-        [userId, organizationId],
-      );
-      if (Number(count) === 0)
+      // The same rule as deprovision: only memberships elsewhere that are still active count.
+      if ((await this.activeOtherMemberships(organizationId, userId, manager)) === 0) {
         await manager.getRepository(User).update({ id: userId }, { isActive: true });
+      }
     });
     await this.audit(actor, "scim.user.reactivate", userId, {});
   }
@@ -732,6 +748,7 @@ export class ScimService {
     input: { displayName: string; externalId?: string | null; members: string[] },
   ) {
     const organizationId = actor.organizationId;
+    const before = await this.groupNamesOf(organizationId, input.members);
     try {
       const group = await AppDataSource.transaction(async (manager) => {
         await this.assertMembers(manager, organizationId, input.members);
@@ -746,7 +763,7 @@ export class ScimService {
         await this.writeMembers(manager, organizationId, created.id, input.members);
         return created;
       });
-      await this.applyGroupRoles(actor, input.members);
+      await this.applyGroupRoles(actor, before);
       await this.audit(actor, "scim.group.create", group.id, {
         displayName: input.displayName,
         members: input.members.length,
@@ -778,6 +795,15 @@ export class ScimService {
   ) {
     const organizationId = actor.organizationId;
     const affected = new Set<string>();
+    const existing = await AppDataSource.getRepository(ScimGroupMember).find({
+      where: { groupId, organizationId },
+    });
+    const before = await this.groupNamesOf(organizationId, [
+      ...existing.map((row) => row.userId),
+      ...(changes.members ?? []),
+      ...(changes.add ?? []),
+      ...(changes.remove ?? []),
+    ]);
     try {
       await AppDataSource.transaction(async (manager) => {
         const groups = manager.getRepository(ScimGroup);
@@ -822,7 +848,7 @@ export class ScimService {
       }
       throw error;
     }
-    await this.applyGroupRoles(actor, [...affected]);
+    await this.applyGroupRoles(actor, before);
     await this.audit(actor, "scim.group.update", groupId, { affected: affected.size });
     return this.getGroup(organizationId, groupId);
   }
@@ -832,15 +858,16 @@ export class ScimService {
     const members = await AppDataSource.getRepository(ScimGroupMember).find({
       where: { groupId, organizationId },
     });
+    const before = await this.groupNamesOf(
+      organizationId,
+      members.map((member) => member.userId),
+    );
     const result = await AppDataSource.getRepository(ScimGroup).delete({
       id: groupId,
       organizationId,
     });
     if (!result.affected) throw new ScimError(404, "Group not found");
-    await this.applyGroupRoles(
-      actor,
-      members.map((member) => member.userId),
-    );
+    await this.applyGroupRoles(actor, before);
     await this.audit(actor, "scim.group.delete", groupId, { members: members.length });
   }
 
@@ -856,30 +883,47 @@ export class ScimService {
     }
   }
 
+  /** The names of the groups each person is in now, for comparing with what they are in after a change. */
+  private async groupNamesOf(organizationId: string, userIds: string[]) {
+    const unique = [...new Set(userIds)];
+    const groups = await this.groupsOf(organizationId, unique);
+    return new Map(
+      unique.map((id) => [id, (groups.get(id) ?? []).map((group) => group.displayName)]),
+    );
+  }
+
   /**
-   * Gives each person the role their groups map to, through the same mapping
-   * sign-in uses. Without a mapping groups never change a role. A person in no
-   * mapped group gets the default role. An owner is never changed.
+   * Gives a person the role their groups map to, through the same mapping sign-in
+   * uses, but only when the role their mapped groups give has changed. Someone
+   * promoted by hand who is pushed into an unrelated group keeps the role they
+   * have. Without a mapping groups never change a role. Someone who is no longer
+   * in any mapped group gets the default role. An owner is never changed.
+   * `before` is each person's group names from before the change.
    */
-  private async applyGroupRoles(actor: ScimActor, userIds: string[]): Promise<void> {
-    if (userIds.length === 0) return;
+  private async applyGroupRoles(actor: ScimActor, before: Map<string, string[]>): Promise<void> {
+    if (before.size === 0) return;
     const organizationId = actor.organizationId;
     const connection = await this.connectionOf(AppDataSource.manager, organizationId);
     if (!connection || Object.keys(connection.roleMapping).length === 0) return;
-    const groupsByUser = await this.groupsOf(organizationId, userIds);
-    for (const userId of new Set(userIds)) {
+    const after = await this.groupNamesOf(organizationId, [...before.keys()]);
+    for (const [userId, namesBefore] of before) {
+      const roleBefore = roleForGroups(connection.roleMapping, namesBefore);
+      const roleAfter = roleForGroups(connection.roleMapping, after.get(userId) ?? []);
+      if (roleBefore === roleAfter) continue;
       const membership = await AppDataSource.getRepository(UserOrganization).findOne({
         where: { userId, organizationId },
       });
       if (!membership || membership.role === "owner") continue;
-      const names = (groupsByUser.get(userId) ?? []).map((group) => group.displayName);
-      const role = roleForGroups(connection.roleMapping, names) ?? connection.defaultRole;
+      const role = roleAfter ?? connection.defaultRole;
       if (membership.role === role) continue;
-      const before = membership.role;
+      const previous = membership.role;
       membership.role = role;
       await AppDataSource.getRepository(UserOrganization).save(membership);
-      logger.info({ organizationId, userId, from: before, to: role }, "SCIM group changed a role");
-      await this.audit(actor, "scim.role.change", userId, { from: before, to: role });
+      logger.info(
+        { organizationId, userId, from: previous, to: role },
+        "SCIM group changed a role",
+      );
+      await this.audit(actor, "scim.role.change", userId, { from: previous, to: role });
     }
   }
 
