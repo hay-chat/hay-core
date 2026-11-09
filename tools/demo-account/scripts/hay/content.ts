@@ -6,7 +6,13 @@ import { readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { ROOT } from "../lib/data";
 import type { Locale, Platform } from "../lib/types";
-import { actionPlaceholders, markdownToTiptap, parseFrontMatter, type TiptapDoc } from "./markdown";
+import {
+  actionPlaceholders,
+  markdownToTiptap,
+  parseFrontMatter,
+  type ActionResolver,
+  type TiptapDoc,
+} from "./markdown";
 import { pluginIdForTool } from "./tools";
 
 export const PLATFORMS: Platform[] = ["shopify", "woocommerce", "nuvemshop"];
@@ -100,12 +106,21 @@ export function parseKnowledgeDoc(path: string, locale: Locale): KnowledgeDoc {
 
 export function loadKnowledge(platform: Platform, root = ROOT): KnowledgeDoc[] {
   const locale = LOCALE_BY_PLATFORM[platform];
-  return markdownFiles(join(root, "knowledge", locale))
-    .map((path) => parseKnowledgeDoc(path, locale))
-    .filter((doc) => doc.platforms.includes(platform));
+  return loadKnowledgeDir(join(root, "knowledge", locale), locale).filter((doc) =>
+    doc.platforms.includes(platform),
+  );
 }
 
-export function parsePlaybook(source: string, file: string): PlaybookFile {
+/** Every knowledge document (*.md except README) in a directory. */
+export function loadKnowledgeDir(dir: string, locale: Locale): KnowledgeDoc[] {
+  return markdownFiles(dir).map((path) => parseKnowledgeDoc(path, locale));
+}
+
+export function parsePlaybook(
+  source: string,
+  file: string,
+  resolve: ActionResolver = pluginIdForTool,
+): PlaybookFile {
   const { data, body } = parseFrontMatter(source);
   const approvalCategories = asList(data.approvalCategories) as ApprovalCategory[];
   for (const c of approvalCategories) {
@@ -121,13 +136,18 @@ export function parsePlaybook(source: string, file: string): PlaybookFile {
     description: asString(data.description, "description", file),
     approvalCategories,
     markdown: body,
-    instructions: markdownToTiptap(body, pluginIdForTool),
+    instructions: markdownToTiptap(body, resolve),
     actions: [...new Set(actionPlaceholders(body))],
   };
 }
 
 export function loadPlaybooks(platform: Platform, root = ROOT): PlaybookFile[] {
-  return markdownFiles(join(root, "playbooks", platform)).map((path) =>
-    parsePlaybook(readFileSync(path, "utf8"), basename(path)),
+  return loadPlaybooksDir(join(root, "playbooks", platform));
+}
+
+/** Every playbook (*.md except README) in a directory. */
+export function loadPlaybooksDir(dir: string, resolve?: ActionResolver): PlaybookFile[] {
+  return markdownFiles(dir).map((path) =>
+    parsePlaybook(readFileSync(path, "utf8"), basename(path), resolve),
   );
 }

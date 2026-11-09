@@ -5,8 +5,8 @@
  * credentials: every item is reported as "create". Playbook tool references are always also
  * checked offline against the plugin sources.
  */
-import type { Platform } from "../lib/types";
-import { assistantDefinition } from "./assistant";
+import type { Locale, Platform } from "../lib/types";
+import { assistantDefinition, type AssistantDefinition } from "./assistant";
 import {
   LOCALE_BY_PLATFORM,
   loadKnowledge,
@@ -14,7 +14,7 @@ import {
   type KnowledgeDoc,
   type PlaybookFile,
 } from "./content";
-import { markdownToTiptap } from "./markdown";
+import { markdownToTiptap, type ActionResolver } from "./markdown";
 import { listPluginTools, pluginIdForTool } from "./tools";
 
 /** The two tRPC calls the seed needs; HayApi from tools/hay-cli/src/api.ts fits. */
@@ -25,6 +25,26 @@ export interface TrpcClient {
 
 export type Step = "settings" | "assistant" | "docs" | "playbooks";
 export const STEPS: Step[] = ["settings", "assistant", "docs", "playbooks"];
+
+/**
+ * What one seed loads into an org. A Casa Aurora store builds it from tools/demo-account
+ * (`casaAuroraContent`); other callers, such as tools/hay-assistant, build their own and reuse
+ * `applySeed` so the create/update/dry-run logic exists once.
+ */
+export interface SeedContent {
+  /** Shown in the log line of the assistant step. */
+  locale: Locale;
+  /** Org time zone, language and team hours. Leave out to skip the settings step. */
+  settings?: { timezone: string; defaultLanguage: string; scheduleName: string };
+  /** Leave out to skip the assistant step. */
+  assistant?: AssistantDefinition;
+  /** Maps an {{action:tool}} name in the assistant instructions to its plugin id. */
+  resolveAction: ActionResolver;
+  docs: KnowledgeDoc[];
+  playbooks: PlaybookFile[];
+  /** Offline check that every playbook action names a real tool; returns warnings. */
+  checkActions: (playbooks: PlaybookFile[]) => string[];
+}
 
 export interface SeedOptions {
   platform: Platform;
@@ -107,10 +127,36 @@ export function offlineActionWarnings(platform: Platform, playbooks: PlaybookFil
   return warnings;
 }
 
-export async function seedHay(api: TrpcClient | null, options: SeedOptions): Promise<SeedReport> {
-  const log = options.log ?? ((line: string) => console.log(line));
-  const { platform, dryRun } = options;
+/** The Casa Aurora content of one store: its knowledge, playbooks, assistant and settings. */
+export function casaAuroraContent(platform: Platform, steps: Set<Step>): SeedContent {
   const locale = LOCALE_BY_PLATFORM[platform];
+  return {
+    locale,
+    settings: {
+      timezone: TIMEZONES[platform],
+      defaultLanguage: locale === "pt-BR" ? "pt" : "en",
+      scheduleName: SCHEDULE_NAME,
+    },
+    assistant: assistantDefinition(locale),
+    resolveAction: pluginIdForTool,
+    docs: steps.has("docs") ? loadKnowledge(platform) : [],
+    playbooks: steps.has("playbooks") ? loadPlaybooks(platform) : [],
+    checkActions: (playbooks) => offlineActionWarnings(platform, playbooks),
+  };
+}
+
+export async function seedHay(api: TrpcClient | null, options: SeedOptions): Promise<SeedReport> {
+  return applySeed(api, casaAuroraContent(options.platform, options.steps), options);
+}
+
+export async function applySeed(
+  api: TrpcClient | null,
+  content: SeedContent,
+  options: Pick<SeedOptions, "dryRun" | "playbookStatus" | "steps" | "quickCheck" | "log">,
+): Promise<SeedReport> {
+  const log = options.log ?? ((line: string) => console.log(line));
+  const { dryRun } = options;
+  const { locale, docs, playbooks } = content;
   const report: SeedReport = { created: [], updated: [], unchanged: [], actionWarnings: [] };
   if (!dryRun && !api) throw new Error("seedHay needs an API client unless dryRun is set");
   const client = api as TrpcClient;
@@ -119,22 +165,20 @@ export async function seedHay(api: TrpcClient | null, options: SeedOptions): Pro
     log(`  ${dryRun ? "[dry-run] would " : ""}${verb} ${what}`);
   };
 
-  const docs: KnowledgeDoc[] = options.steps.has("docs") ? loadKnowledge(platform) : [];
-  const playbooks: PlaybookFile[] = options.steps.has("playbooks") ? loadPlaybooks(platform) : [];
-
   // ---- settings: time zone, language, business hours, quick check
-  if (options.steps.has("settings")) {
-    log(`Settings (${TIMEZONES[platform]}, ${locale})`);
+  if (options.steps.has("settings") && content.settings) {
+    const { scheduleName } = content.settings;
+    log(`Settings (${content.settings.timezone}, ${locale})`);
     const settings = {
-      timezone: TIMEZONES[platform],
-      defaultLanguage: locale === "pt-BR" ? "pt" : "en",
+      timezone: content.settings.timezone,
+      defaultLanguage: content.settings.defaultLanguage,
     };
     if (!dryRun) await client.mutation("organizations.updateSettings", settings);
     write("update", `organization settings ${JSON.stringify(settings)}`);
 
     const schedule = {
-      name: SCHEDULE_NAME,
-      timezone: TIMEZONES[platform],
+      name: scheduleName,
+      timezone: content.settings.timezone,
       channels: [] as string[],
       weeklyHours: WEEKLY_HOURS,
     };
@@ -148,10 +192,10 @@ export async function seedHay(api: TrpcClient | null, options: SeedOptions): Pro
         id: existing.id,
         closures: existing.closures,
       });
-      write("update", `business hours "${SCHEDULE_NAME}" Mon–Fri 09:00–18:00`);
+      write("update", `business hours "${scheduleName}" Mon–Fri 09:00–18:00`);
     } else {
       if (!dryRun) await client.mutation("businessHours.create", { ...schedule, closures: [] });
-      write("create", `business hours "${SCHEDULE_NAME}" Mon–Fri 09:00–18:00`);
+      write("create", `business hours "${scheduleName}" Mon–Fri 09:00–18:00`);
     }
 
     if (options.quickCheck !== undefined) {
@@ -171,8 +215,8 @@ export async function seedHay(api: TrpcClient | null, options: SeedOptions): Pro
   }
 
   // ---- assistant (one per org: the org answers as Casa Aurora)
-  if (options.steps.has("assistant")) {
-    const definition = assistantDefinition(locale);
+  if (options.steps.has("assistant") && content.assistant) {
+    const definition = content.assistant;
     log(`Assistant "${definition.name}"`);
     if (!dryRun) {
       await client.mutation("organizations.assistant.update", {
@@ -180,7 +224,7 @@ export async function seedHay(api: TrpcClient | null, options: SeedOptions): Pro
         description: definition.description,
         tone: definition.tone,
         avoid: definition.avoid,
-        instructions: markdownToTiptap(definition.instructions, pluginIdForTool),
+        instructions: markdownToTiptap(definition.instructions, content.resolveAction),
       });
     }
     write("update", `assistant "${definition.name}"`);
@@ -254,7 +298,7 @@ export async function seedHay(api: TrpcClient | null, options: SeedOptions): Pro
         report.actionWarnings.push(`${playbook.title}: ${warning}`);
     }
     // Checked against the plugin sources too, so a typo shows even when the plugin isn't connected.
-    report.actionWarnings.push(...offlineActionWarnings(platform, playbooks));
+    report.actionWarnings.push(...content.checkActions(playbooks));
   }
 
   return report;

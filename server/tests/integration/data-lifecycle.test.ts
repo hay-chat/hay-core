@@ -46,11 +46,14 @@ import {
 import type { Organization } from "@server/entities/organization.entity";
 import { purgeAuditLogs } from "../helpers/audit-logs";
 
-const RETAINING = "c0000001-0000-4000-8000-0000000000a1";
-const OTHER_RETAINING = "c0000001-0000-4000-8000-0000000000a2";
-const NO_RETENTION = "c0000001-0000-4000-8000-0000000000b1";
-const ORGS = [RETAINING, OTHER_RETAINING, NO_RETENTION];
+let RETAINING = crypto.randomUUID();
+let OTHER_RETAINING = crypto.randomUUID();
+let NO_RETENTION = crypto.randomUUID();
+let ORGS = [RETAINING, OTHER_RETAINING, NO_RETENTION];
 const OLD = "2020-01-01T00:00:00Z";
+
+/** Erasure renames users, so they are only reachable by id. Test files share one database. */
+const seededUserIds: string[] = [];
 
 async function cleanup(): Promise<void> {
   await AppDataSource.query(
@@ -66,7 +69,8 @@ async function cleanup(): Promise<void> {
   await AppDataSource.query(`DELETE FROM documents WHERE organization_id = ANY($1)`, [ORGS]);
   await purgeAuditLogs(`organization_id = ANY($1) OR original_organization_id = ANY($1)`, [ORGS]);
   await AppDataSource.query(`DELETE FROM users WHERE email LIKE 'lifecycle-%@example.com'`);
-  await AppDataSource.query(`DELETE FROM users WHERE email LIKE 'deleted-%@deleted.local'`);
+  await AppDataSource.query(`DELETE FROM users WHERE id = ANY($1)`, [seededUserIds]);
+  seededUserIds.length = 0;
   await AppDataSource.query(`DELETE FROM organizations WHERE id = ANY($1)`, [ORGS]);
 }
 
@@ -200,6 +204,11 @@ describe("data lifecycle", () => {
 
   beforeEach(async () => {
     await cleanup();
+    // The erasure ledger is append-only: a deleted org's id seeded again reads as a restored org.
+    RETAINING = crypto.randomUUID();
+    OTHER_RETAINING = crypto.randomUUID();
+    NO_RETENTION = crypto.randomUUID();
+    ORGS = [RETAINING, OTHER_RETAINING, NO_RETENTION];
     deletedObjects.length = 0;
     deletedUploads.length = 0;
     deletedPublicUrls.length = 0;
@@ -390,6 +399,7 @@ describe("data lifecycle", () => {
       const [user] = await AppDataSource.query(
         `INSERT INTO users (email, password, is_active) VALUES ('lifecycle-a@example.com', 'x', true) RETURNING id`,
       );
+      seededUserIds.push(user.id);
       const avatar = await seedUpload(RETAINING, "avatars", { uploadedById: user.id });
       await AppDataSource.query(`UPDATE users SET avatar_url = $2 WHERE id = $1`, [
         user.id,
@@ -477,6 +487,7 @@ describe("data lifecycle", () => {
       `INSERT INTO users (email, password, is_active, avatar_url)
        VALUES ('lifecycle-e@example.com', 'x', true, 'https://cdn.test/avatars/a.png') RETURNING id`,
     );
+    seededUserIds.push(user.id);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (privacyService as any).executeDataDeletion(user.id);

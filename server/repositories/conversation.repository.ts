@@ -416,6 +416,12 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       });
     }
 
+    if (Array.isArray(filters.statuses) && filters.statuses.length > 0) {
+      queryBuilder.andWhere("entity.status IN (:...statuses)", {
+        statuses: filters.statuses,
+      });
+    }
+
     if (filters.playbookId) {
       queryBuilder.andWhere("entity.playbook_id = :playbookId", {
         playbookId: filters.playbookId,
