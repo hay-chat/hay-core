@@ -136,7 +136,7 @@ describe("disputes (D2-7, D2-8)", () => {
     expect(onDisputeOpened).toHaveBeenCalledTimes(1);
     expect(onDisputeOpened.mock.calls[0][0]).toMatchObject({
       organizationId: orgId,
-      url: `/evidence?dispute=${first.dispute.id}&org=${orgId}`,
+      url: `/${orgId}/evidence?dispute=${first.dispute.id}`,
     });
 
     const again = await report({ status: "needs_response" });

@@ -19,6 +19,7 @@ import {
   type AlertFacts,
 } from "./copy";
 import { workerFetch } from "@server/lib/worker-client";
+import { orgDashboardPath } from "@server/lib/dashboard-links";
 
 /**
  * Payment disputes (D2-7 / D2-8). Plugins with the `disputes` capability
@@ -268,7 +269,7 @@ export class DisputesService {
           ? formatZonedDateTime(dispute.evidenceDueBy, safeTimeZone(organization?.timezone))
           : null,
       };
-      const path = `/evidence?dispute=${dispute.id}&org=${organizationId}`;
+      const path = orgDashboardPath(organizationId, `/evidence?dispute=${dispute.id}`);
       const title = kind === "opened" ? copy.title : copy.reminderTitle;
       const subject = kind === "opened" ? copy.subject(facts) : copy.reminderSubject(facts);
       const message = kind === "opened" ? copy.message(facts) : copy.reminderMessage(facts);

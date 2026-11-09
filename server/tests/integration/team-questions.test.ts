@@ -183,7 +183,7 @@ describe("quick check with the team", () => {
     expect(mockSendToUser.mock.calls[0][1]).toMatchObject({
       kind: "team_question",
       tag: `team_question:${result.question.id}`,
-      url: `/inbox?question=${result.question.id}&org=${orgId}`,
+      url: `/${orgId}/inbox?question=${result.question.id}`,
     });
     expect(mockSendTemplateEmail).toHaveBeenCalledTimes(2);
     const email = mockSendTemplateEmail.mock.calls[0][0] as {

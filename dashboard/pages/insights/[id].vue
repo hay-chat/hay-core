@@ -487,7 +487,7 @@ const taskText = computed(() => {
       ...i.snippets.map((s) => `- ${s.text}`),
     );
   }
-  lines.push("", `${window.location.origin}/insights/${i.id}`);
+  lines.push("", `${window.location.origin}${router.resolve(`/insights/${i.id}`).href}`);
   return lines.join("\n");
 });
 

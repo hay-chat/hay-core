@@ -17,6 +17,7 @@ import { pushNotificationService, type PushPayload } from "./push-notification.s
 import { isWithinBusinessHours } from "./business-hours.service";
 import { organizationNotificationLocale, type NotificationLocale } from "./notification-locale";
 import { isSimulationConversation } from "./simulation/simulation-kind";
+import { orgDashboardPath } from "@server/lib/dashboard-links";
 
 const logger = createLogger("conversation-alerts");
 
@@ -262,8 +263,7 @@ const QUESTION_COPY: Record<
 };
 
 function conversationPath(conversation: Pick<Conversation, "id" | "organization_id">): string {
-  // `org` lets the dashboard switch to the right organization for multi-org users
-  return `/conversations/${conversation.id}?org=${conversation.organization_id}`;
+  return orgDashboardPath(conversation.organization_id, `/conversations/${conversation.id}`);
 }
 
 /** Notifications about one conversation replace each other on a device. */
@@ -398,7 +398,7 @@ class ConversationAlertService {
           kind: "team_question",
           title: copy.pushTitle,
           body: `${who}: ${excerpt(question.question)}`,
-          url: `/inbox?question=${question.id}&org=${conversation.organization_id}`,
+          url: orgDashboardPath(conversation.organization_id, `/inbox?question=${question.id}`),
           tag: `team_question:${question.id}`,
         },
         { title: "Hay.chat", body: copy.pushTitle },

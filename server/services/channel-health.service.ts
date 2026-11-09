@@ -4,6 +4,7 @@ import { pluginInstanceRepository } from "@server/repositories/plugin-instance.r
 import { getDashboardUrl } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
 import { organizationNotificationLocale, type NotificationLocale } from "./notification-locale";
+import { orgDashboardPath } from "@server/lib/dashboard-links";
 
 /**
  * Channel health (D13-11): one generic "channel failing" signal per channel
@@ -214,7 +215,10 @@ export const channelHealthService = {
     const locale = await organizationNotificationLocale(organizationId);
     const copy = COPY[locale];
     const reason = health.reason ?? "delivery_failures";
-    const path = `/integrations/plugins/${encodeURIComponent(pluginId)}?org=${organizationId}`;
+    const path = orgDashboardPath(
+      organizationId,
+      `/integrations/plugins/${encodeURIComponent(pluginId)}`,
+    );
     const message = copy.reasons[reason](health.detail ?? "");
 
     try {

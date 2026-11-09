@@ -152,7 +152,7 @@ describe("conversation alert ladder", () => {
     expect(payload).toMatchObject({
       title: "Um cliente precisa de um humano",
       body: "Refund: Wants a refund for a damaged item.",
-      url: `/conversations/${conversation.id}?org=${orgId}`,
+      url: `/${orgId}/conversations/${conversation.id}`,
     });
     expect(await steps(conversation.id)).toEqual(["initial:push:sent"]);
   });
@@ -165,7 +165,7 @@ describe("conversation alert ladder", () => {
       expect(payload).toMatchObject({
         title: "Hay.chat",
         body: "Um cliente precisa de um humano",
-        url: `/conversations/${conversation.id}?org=${orgId}`,
+        url: `/${orgId}/conversations/${conversation.id}`,
       });
       expect(JSON.stringify(payload)).not.toContain("refund");
     } finally {
@@ -220,7 +220,7 @@ describe("conversation alert ladder", () => {
     expect(email.locale).toBe("pt-BR");
     expect(email.subject).toBe("Refund ainda está esperando uma resposta");
     expect(email.variables.actionButton.url).toContain(
-      `/conversations/${conversation.id}?org=${orgId}`,
+      `/${orgId}/conversations/${conversation.id}`,
     );
 
     await backdate(conversation.id, 60);

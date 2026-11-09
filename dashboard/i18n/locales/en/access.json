@@ -41,5 +41,12 @@
     "usage_cap_reached": "Raise spend cap",
     "trial_grace": "Choose a plan",
     "manual_suspension_pending": "Contact Hay.chat"
+  },
+  "noAccess": {
+    "title": "You don't have access to this organization",
+    "description": "This link belongs to an organization your account is not part of. Ask one of its administrators to invite you.",
+    "signedInAs": "You are signed in as {email}.",
+    "goToMyOrganization": "Go to my organization",
+    "useAnotherAccount": "Sign in with another account"
   }
 }
