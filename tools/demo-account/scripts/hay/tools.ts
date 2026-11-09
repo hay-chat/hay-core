@@ -19,9 +19,8 @@ export const REPO_ROOT = join(ROOT, "..", "..");
 
 const REGISTRATION = /(?:server\.tool|server\.registerTool)\(\s*"([a-z0-9_]+)"/g;
 
-/** Tool names registered in plugins/core/<platform>/mcp/tools/*.js. */
-export function listPluginTools(platform: Platform): string[] {
-  const dir = join(REPO_ROOT, "plugins", "core", platform, "mcp", "tools");
+/** Tool names registered by the .js files of an MCP server directory (not recursive). */
+export function listToolsInDir(dir: string): string[] {
   const names = new Set<string>();
   for (const file of readdirSync(dir).filter((f) => f.endsWith(".js"))) {
     for (const match of readFileSync(join(dir, file), "utf8").matchAll(REGISTRATION)) {
@@ -29,6 +28,11 @@ export function listPluginTools(platform: Platform): string[] {
     }
   }
   return [...names].sort();
+}
+
+/** Tool names registered in plugins/core/<platform>/mcp/tools/*.js. */
+export function listPluginTools(platform: Platform): string[] {
+  return listToolsInDir(join(REPO_ROOT, "plugins", "core", platform, "mcp", "tools"));
 }
 
 /** Plugin id for a tool name, by its `<platform>_` prefix. Throws for a tool of no known plugin. */
