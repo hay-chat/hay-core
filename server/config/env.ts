@@ -131,13 +131,6 @@ export const config = {
     debug: process.env.DEBUG === "true",
   },
 
-  organization: {
-    extractionMethods: (process.env.ORGANIZATION_EXTRACTION_METHOD || "subdomain,header,jwt").split(
-      ",",
-    ),
-    defaultOrganization: process.env.DEFAULT_ORGANIZATION || "default",
-  },
-
   database: {
     type: "postgres" as const,
     host: process.env.DB_HOST || "localhost",
@@ -170,7 +163,6 @@ export const config = {
 
   jwt: {
     secret: process.env.JWT_SECRET || "",
-    expiresIn: process.env.JWT_EXPIRES_IN || "7d",
     refreshSecret: process.env.JWT_REFRESH_SECRET || "",
   },
 

@@ -53,7 +53,7 @@ export async function createAccount(
   const userRepository = manager.getRepository(User);
   const user = userRepository.create({
     email: input.email.toLowerCase(),
-    password: await hashPassword(input.password, "argon2"),
+    password: await hashPassword(input.password),
     firstName: input.firstName || undefined,
     lastName: input.lastName || undefined,
     isActive: true,

@@ -107,7 +107,7 @@ describe("Privacy DSAR Integration Tests", () => {
 
     // Create test user
     const userRepository = AppDataSource.getRepository(User);
-    const hashedPassword = await hashPassword("TestPassword123!", "argon2");
+    const hashedPassword = await hashPassword("TestPassword123!");
 
     testUser = userRepository.create({
       email: testEmail,
@@ -565,7 +565,7 @@ describe("Privacy DSAR Integration Tests", () => {
 
         // Recreate user for next test
         const userRepo = AppDataSource.getRepository(User);
-        const hashedPassword = await hashPassword("TestPassword123!", "argon2");
+        const hashedPassword = await hashPassword("TestPassword123!");
         testUser = userRepo.create({
           email: testEmail,
           password: hashedPassword,

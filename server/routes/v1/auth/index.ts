@@ -282,7 +282,7 @@ export const authRouter = t.router({
 
     // Older accounts hold bcrypt hashes; move them to argon2 while the password is at hand.
     if (user.password.startsWith("$2")) {
-      user.password = await hashPassword(password, "argon2");
+      user.password = await hashPassword(password);
       await userRepository.save(user);
     }
 
@@ -342,7 +342,7 @@ export const authRouter = t.router({
     });
     if (existingUser) {
       // Same work as a real signup so response time doesn't reveal the account.
-      await hashPassword(input.password, "argon2");
+      await hashPassword(input.password);
       return response;
     }
 
@@ -601,7 +601,7 @@ export const authRouter = t.router({
       await assertNewPasswordAllowed(user, input.newPassword);
 
       // Hash new password
-      user.password = await hashPassword(input.newPassword, "argon2");
+      user.password = await hashPassword(input.newPassword);
 
       // Invalidate all existing tokens by incrementing tokenVersion
       user.tokenVersion = (user.tokenVersion ?? 0) + 1;
@@ -866,7 +866,7 @@ export const authRouter = t.router({
       await assertNewPasswordAllowed(user, input.newPassword);
 
       // Hash new password and invalidate all existing tokens
-      user.password = await hashPassword(input.newPassword, "argon2");
+      user.password = await hashPassword(input.newPassword);
       user.tokenVersion = (user.tokenVersion ?? 0) + 1;
       await userRepository.save(user);
 

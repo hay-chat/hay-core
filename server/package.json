@@ -56,7 +56,6 @@
     "file-type": "^21.3.4",
     "helmet": "^8.3.0",
     "ioredis": "^5.8.1",
-    "jose": "^6.2.14",
     "jsonwebtoken": "^9.0.2",
     "jszip": "^3.10.2",
     "linkedom": "0.18.12",

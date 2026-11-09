@@ -3,26 +3,17 @@ import argon2 from "argon2";
 import crypto from "crypto";
 import { authConfig } from "@server/config/auth.config";
 
-// Type for selecting hashing algorithm
-export type HashAlgorithm = "bcrypt" | "argon2";
-
 /**
- * Hash a password using the specified algorithm
+ * Hash a password. New hashes are always argon2; bcrypt stays for verifying
+ * older accounts, which move to argon2 at their next sign-in.
  */
-export async function hashPassword(
-  password: string,
-  algorithm: HashAlgorithm = "argon2",
-): Promise<string> {
-  if (algorithm === "bcrypt") {
-    return bcrypt.hash(password, authConfig.bcrypt.saltRounds);
-  } else {
-    return argon2.hash(password, {
-      type: authConfig.argon2.type as 0 | 1 | 2,
-      memoryCost: authConfig.argon2.memoryCost,
-      timeCost: authConfig.argon2.timeCost,
-      parallelism: authConfig.argon2.parallelism,
-    });
-  }
+export async function hashPassword(password: string): Promise<string> {
+  return argon2.hash(password, {
+    type: authConfig.argon2.type as 0 | 1 | 2,
+    memoryCost: authConfig.argon2.memoryCost,
+    timeCost: authConfig.argon2.timeCost,
+    parallelism: authConfig.argon2.parallelism,
+  });
 }
 
 /**

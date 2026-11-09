@@ -88,27 +88,6 @@ export const withAdminAuth = async (
 };
 
 /**
- * Optional auth middleware (doesn't fail if not authenticated)
- */
-export const withOptionalAuth = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const user = await requireAuth(req);
-    const organizationId = parseOrganizationIdHeader(req.headers["x-organization-id"]);
-
-    req.user = user;
-    req.organizationId = organizationId;
-  } catch {
-    // Silently continue without auth
-  }
-
-  next();
-};
-
-/**
  * Express counterpart of the `requireMfaStepUp` tRPC middleware. Goes after
  * `withAuth` or `withAdminAuth`.
  */
