@@ -64,3 +64,10 @@ describe("proofClaimsError", () => {
     expect(proofClaimsError(claims, socket, NOW)).toBe("HTTP method mismatch");
   });
 });
+
+describe("dpop proof runtime dependency", () => {
+  // The verifier loads this package through a dynamic import that typecheck cannot see.
+  it("keeps the JWT library installed", () => {
+    expect(() => require.resolve("jose")).not.toThrow();
+  });
+});
