@@ -38,7 +38,7 @@ export async function provisionAppRole(
     `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "${role}"`,
     `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO "${role}"`,
     `REVOKE INSERT, UPDATE, DELETE ON migrations FROM "${role}"`,
-    `GRANT EXECUTE ON FUNCTION audit_logs_purge(timestamptz, timestamptz) TO "${role}"`,
+    `GRANT EXECUTE ON FUNCTION audit_logs_purge(timestamptz, timestamptz, boolean) TO "${role}"`,
     `GRANT EXECUTE ON FUNCTION audit_logs_verify_chain(uuid) TO "${role}"`,
     `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO "${role}"`,
     `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO "${role}"`,

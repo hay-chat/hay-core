@@ -10,6 +10,33 @@ const PERSONAL_CHANGES_ACTIONS = `ARRAY[
   'organization.member.remove'
 ]`;
 
+/** Roles other than the owner allowed to run the purge, which a signature change would drop. */
+async function purgeGrantees(queryRunner: QueryRunner): Promise<string[]> {
+  const rows: Array<{ rolname: string }> = await queryRunner.query(`
+    SELECT DISTINCT r.rolname
+    FROM pg_proc p
+    CROSS JOIN LATERAL aclexplode(p.proacl) a
+    JOIN pg_roles r ON r.oid = a.grantee
+    WHERE p.proname = 'audit_logs_purge'
+      AND a.privilege_type = 'EXECUTE'
+      AND a.grantee <> p.proowner
+  `);
+  return rows.map((row) => row.rolname);
+}
+
+async function grantPurge(
+  queryRunner: QueryRunner,
+  signature: string,
+  roles: string[],
+): Promise<void> {
+  for (const role of roles) {
+    const quoted = `"${role.replace(/"/g, '""')}"`;
+    await queryRunner.query(
+      `GRANT EXECUTE ON FUNCTION audit_logs_purge(${signature}) TO ${quoted}`,
+    );
+  }
+}
+
 /**
  * Outbox for shipping audit rows to append-only external storage.
  *
@@ -76,6 +103,7 @@ export class AddAuditLogOutbox1794300000000 implements MigrationInterface {
       ON CONFLICT (audit_log_id) DO NOTHING
     `);
 
+    const grantees = await purgeGrantees(queryRunner);
     await queryRunner.query(`DROP FUNCTION IF EXISTS audit_logs_purge(timestamptz, timestamptz)`);
     await queryRunner.query(`
       CREATE OR REPLACE FUNCTION audit_logs_purge(
@@ -138,9 +166,11 @@ export class AddAuditLogOutbox1794300000000 implements MigrationInterface {
     await queryRunner.query(
       `REVOKE EXECUTE ON FUNCTION audit_logs_purge(timestamptz, timestamptz, boolean) FROM PUBLIC`,
     );
+    await grantPurge(queryRunner, "timestamptz, timestamptz, boolean", grantees);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    const grantees = await purgeGrantees(queryRunner);
     await queryRunner.query(
       `DROP FUNCTION IF EXISTS audit_logs_purge(timestamptz, timestamptz, boolean)`,
     );
@@ -193,6 +223,7 @@ export class AddAuditLogOutbox1794300000000 implements MigrationInterface {
     await queryRunner.query(
       `REVOKE EXECUTE ON FUNCTION audit_logs_purge(timestamptz, timestamptz) FROM PUBLIC`,
     );
+    await grantPurge(queryRunner, "timestamptz, timestamptz", grantees);
     await queryRunner.query(`DROP TRIGGER IF EXISTS "audit_logs_outbox" ON "audit_logs"`);
     await queryRunner.query(`DROP FUNCTION IF EXISTS audit_logs_outbox_enqueue()`);
     await queryRunner.query(`DROP TABLE IF EXISTS "audit_log_outbox"`);

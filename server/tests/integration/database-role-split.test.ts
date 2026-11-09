@@ -4,6 +4,7 @@ import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
 import { DataSource } from "typeorm";
 import { AppDataSource } from "../../database/data-source";
 import { provisionAppRole } from "../../database/app-role";
+import { AddAuditLogOutbox1794300000000 } from "../../database/migrations/1794300000000-AddAuditLogOutbox";
 import { config } from "../../config/env";
 
 /** Runs against real Postgres: the guarantees are the database's own permission checks. */
@@ -51,6 +52,25 @@ describe("application database role", () => {
     await expect(
       app.query(`SELECT audit_logs_purge('1970-01-01'::timestamptz, '1970-01-01'::timestamptz)`),
     ).resolves.toBeDefined();
+    await expect(
+      app.query(
+        `SELECT audit_logs_purge('1970-01-01'::timestamptz, '1970-01-01'::timestamptz, true)`,
+      ),
+    ).resolves.toBeDefined();
+  });
+
+  it("keeps the right to run the purge when a migration changes its signature", async () => {
+    const purge = `SELECT audit_logs_purge('1970-01-01'::timestamptz, '1970-01-01'::timestamptz)`;
+    const migration = new AddAuditLogOutbox1794300000000();
+    const runner = AppDataSource.createQueryRunner();
+    try {
+      await migration.down(runner);
+      await expect(app.query(purge)).resolves.toBeDefined();
+    } finally {
+      await migration.up(runner);
+      await runner.release();
+    }
+    await expect(app.query(purge)).resolves.toBeDefined();
   });
 
   it.each([
