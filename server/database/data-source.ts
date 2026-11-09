@@ -54,7 +54,7 @@ import { TeamQuestion } from "./entities/team-question.entity";
 import { MessageDelivery } from "./entities/message-delivery.entity";
 import { OrderLinkMessageSubscriber } from "./subscribers/order-link-message.subscriber";
 import { SnakeNamingStrategy } from "./naming-strategy";
-import { config } from "../config/env";
+import { config, databaseTlsError } from "../config/env";
 import { createLogger } from "@server/lib/logger";
 import "reflect-metadata";
 
@@ -63,12 +63,16 @@ const logger = createLogger("database");
 /**
  * TLS options for the Postgres connection. With DB_SSL_CA (PEM text or a path
  * to a PEM file) the server certificate is verified; without it the link is
- * encrypted but unverified, which validateProductionConfig warns about.
+ * encrypted but unverified, which only local and private-network hosts allow.
  */
 export function buildSslOptions(
   ssl: boolean,
   sslCa: string,
 ): false | { rejectUnauthorized: boolean; ca?: string } {
+  const tlsError = databaseTlsError();
+  if (tlsError) {
+    throw new Error(tlsError);
+  }
   if (!ssl) {
     return false;
   }
@@ -79,12 +83,26 @@ export function buildSslOptions(
   return { rejectUnauthorized: true, ca };
 }
 
+/** The TypeORM migration CLI and migration:check load this file too; they need the owner role and no query limits. */
+const isMigrationProcess = process.argv.some(
+  (arg) => arg.startsWith("migration:") || /ensure-migrations\.[jt]s$/.test(arg),
+);
+const useMigratorRole = isMigrationProcess && !!config.database.migratorUsername;
+
+const connectionOptions = ["-c hnsw.iterative_scan=relaxed_order"];
+if (!isMigrationProcess) {
+  connectionOptions.push(
+    `-c statement_timeout=${config.database.statementTimeoutMs}`,
+    `-c idle_in_transaction_session_timeout=${config.database.idleInTransactionTimeoutMs}`,
+  );
+}
+
 export const AppDataSource = new DataSource({
   type: config.database.type,
   host: config.database.host,
   port: config.database.port,
-  username: config.database.username,
-  password: config.database.password,
+  username: useMigratorRole ? config.database.migratorUsername : config.database.username,
+  password: useMigratorRole ? config.database.migratorPassword : config.database.password,
   database: config.database.database,
   synchronize: false, // IMPORTANT: Never use synchronize in production, always use migrations
   logging: false, // Disable verbose logging
@@ -95,7 +113,7 @@ export const AppDataSource = new DataSource({
   // post-filter (e.g. WHERE organization_id = ...). Required for correct top-K
   // results on small tenants. Available in pgvector ≥ 0.8.
   extra: {
-    options: "-c hnsw.iterative_scan=relaxed_order",
+    options: connectionOptions.join(" "),
   },
   entities: [
     User,
@@ -166,13 +184,7 @@ export async function initializeDatabase(maxRetries = 3, retryDelay = 2000) {
     try {
       logger.info({ attempt, maxRetries }, "Attempting database connection");
       await AppDataSource.initialize();
-
-      // Enable required extensions if not already enabled
-      logger.info("Enabling database extensions");
-      await AppDataSource.query("CREATE EXTENSION IF NOT EXISTS vector");
-      await AppDataSource.query("CREATE EXTENSION IF NOT EXISTS pgcrypto");
-
-      logger.info("Database connection established, pgvector and pgcrypto extensions enabled");
+      logger.info("Database connection established");
       return true;
     } catch (error) {
       lastError = error;

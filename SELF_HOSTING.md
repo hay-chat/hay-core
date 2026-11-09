@@ -36,6 +36,7 @@ Edit `selfhost/.env` and fill in the **REQUIRED** block:
 | ----------------------- | ------------------------------------------------------------ |
 | `HAY_DOMAIN`            | The domain Hay will be served on, e.g. `support.example.com` |
 | `DB_PASSWORD`           | Any strong password (`openssl rand -hex 32`)                 |
+| `DB_APP_PASSWORD`       | Another strong password, for the app's limited database role |
 | `REDIS_PASSWORD`        | Any strong password                                          |
 | `RABBITMQ_PASSWORD`     | Any strong password                                          |
 | `JWT_SECRET`            | 32+ random characters                                        |

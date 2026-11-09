@@ -7,6 +7,31 @@
 # Full guide: ../SELF_HOSTING.md
 name: hay
 
+x-hay-env: &hay-env
+  NODE_ENV: production
+  # The server reads PORT; the dashboard (Nitro) prefers NITRO_PORT.
+  PORT: "3001"
+  NITRO_PORT: "3000"
+  NITRO_HOST: 0.0.0.0
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  # The application connects as a role that can only read and write rows.
+  # The `migrate` service creates it and is the only one with the owner password.
+  DB_USERNAME: hay_app
+  DB_PASSWORD: ${DB_APP_PASSWORD:-${DB_PASSWORD:?set DB_PASSWORD in .env}}
+  DB_NAME: ${DB_NAME:-hay}
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+  RABBITMQ_URL: amqp://${RABBITMQ_USER:-hay}:${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}@rabbitmq:5672/
+  LOCAL_UPLOAD_PATH: /data/uploads
+  # Caddy is the one proxy in front of the server.
+  TRUST_PROXY: ${TRUST_PROXY:-1}
+  CHROME_REMOTE_URL: http://browser:9223
+  API_DOMAIN: ${HAY_DOMAIN:?set HAY_DOMAIN in .env}
+  DASHBOARD_DOMAIN: ${HAY_DOMAIN}
+  BASE_DOMAIN: ${HAY_DOMAIN}
+
 x-hay: &hay
   image: hay:local
   build:
@@ -14,27 +39,7 @@ x-hay: &hay
     dockerfile: Dockerfile
   restart: unless-stopped
   env_file: .env
-  environment:
-    NODE_ENV: production
-    # The server reads PORT; the dashboard (Nitro) prefers NITRO_PORT.
-    PORT: "3001"
-    NITRO_PORT: "3000"
-    NITRO_HOST: 0.0.0.0
-    DB_HOST: postgres
-    DB_PORT: "5432"
-    DB_USERNAME: ${DB_USERNAME:-hay}
-    DB_NAME: ${DB_NAME:-hay}
-    REDIS_HOST: redis
-    REDIS_PORT: "6379"
-    REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
-    RABBITMQ_URL: amqp://${RABBITMQ_USER:-hay}:${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}@rabbitmq:5672/
-    LOCAL_UPLOAD_PATH: /data/uploads
-    # Caddy is the one proxy in front of the server.
-    TRUST_PROXY: ${TRUST_PROXY:-1}
-    CHROME_REMOTE_URL: http://browser:9223
-    API_DOMAIN: ${HAY_DOMAIN:?set HAY_DOMAIN in .env}
-    DASHBOARD_DOMAIN: ${HAY_DOMAIN}
-    BASE_DOMAIN: ${HAY_DOMAIN}
+  environment: *hay-env
 
 services:
   postgres:
@@ -82,12 +87,20 @@ services:
       timeout: 10s
       retries: 10
 
-  # One-shot: applies pending database migrations, then exits. The server
-  # waits for it, so `docker compose up -d --build` is also the upgrade command.
+  # One-shot: applies pending database migrations as the owner role, keeps the
+  # application role's grants current, then exits. The server waits for it, so
+  # `docker compose up -d --build` is also the upgrade command.
   migrate:
     <<: *hay
     restart: "no"
-    command: ["npx", "typeorm", "migration:run", "-d", "dist/database/data-source.js"]
+    environment:
+      <<: *hay-env
+      DB_MIGRATOR_USERNAME: ${DB_USERNAME:-hay}
+      DB_MIGRATOR_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    command:
+      - sh
+      - -c
+      - npx typeorm migration:run -d dist/database/data-source.js && node dist/scripts/provision-app-role.js
     depends_on:
       postgres: { condition: service_healthy }
 

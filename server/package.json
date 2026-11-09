@@ -4,8 +4,8 @@
   "private": true,
   "main": "main.ts",
   "scripts": {
-    "dev": "nodemon main.ts",
-    "dev:clean": "nodemon main.ts",
+    "dev": "NODE_ENV=development nodemon main.ts",
+    "dev:clean": "NODE_ENV=development nodemon main.ts",
     "build": "npm run build:plugins && tsc && tsc-alias && npm run copy:templates",
     "copy:templates": "cp -r templates dist/ && cp -r i18n dist/ && cp -r assets dist/",
     "build:plugins": "cd .. && ./scripts/build-plugins.sh",
@@ -30,7 +30,8 @@
     "plugins:enable-defaults": "tsx scripts/enable-default-plugins.ts",
     "dev:account": "tsx scripts/create-dev-account.ts",
     "documents:privatize-images": "tsx scripts/privatize-document-images.ts",
-    "privacy:replay-erasures": "tsx scripts/replay-erasures.ts"
+    "privacy:replay-erasures": "tsx scripts/replay-erasures.ts",
+    "db:provision-app-role": "tsx scripts/provision-app-role.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

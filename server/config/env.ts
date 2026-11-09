@@ -142,6 +142,14 @@ export const config = {
     // database server when DB_SSL=true. Without it the connection is encrypted
     // but the server certificate is not verified.
     sslCa: process.env.DB_SSL_CA || "",
+    // Owner role for migrations. Unset: migrations run as DB_USERNAME (one role for everything).
+    migratorUsername: process.env.DB_MIGRATOR_USERNAME || "",
+    migratorPassword: process.env.DB_MIGRATOR_PASSWORD || "",
+    statementTimeoutMs: parseInt(process.env.DB_STATEMENT_TIMEOUT_MS || "30000", 10),
+    idleInTransactionTimeoutMs: parseInt(
+      process.env.DB_IDLE_IN_TRANSACTION_TIMEOUT_MS || "60000",
+      10,
+    ),
     synchronize: false, // Never use synchronize in production
     logging: process.env.DB_LOGGING === "true",
     maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || "10", 10),
@@ -542,6 +550,23 @@ export function validateJwtSecrets(): void {
 const MIN_SECRET_LENGTH = 32;
 const DEFAULT_DB_PASSWORD = "hay_password";
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+const PRIVATE_IPV4 = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/;
+
+/** A host reached over a network we don't control: not loopback, a private IP or a bare container name. */
+export function isRemoteHost(host: string): boolean {
+  return !LOCAL_HOSTS.has(host) && !PRIVATE_IPV4.test(host) && host.includes(".");
+}
+
+/** What is wrong with the database TLS settings for this environment, or null. */
+export function databaseTlsError(): string | null {
+  if (config.env === "development" || config.env === "test") return null;
+  if (!isRemoteHost(config.database.host)) return null;
+  if (!config.database.ssl) return "DB_SSL must be true for a remote database host.";
+  if (!config.database.sslCa) {
+    return "DB_SSL_CA (PEM text or a path to a PEM file) is required for a remote database host.";
+  }
+  return null;
+}
 
 /**
  * Validates the configuration a production server needs. Throws on settings
@@ -550,6 +575,12 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
  * Should be called at application startup.
  */
 export function validateProductionConfig(): string[] {
+  if (!process.env.NODE_ENV) {
+    throw new Error(
+      "NODE_ENV must be set (production, development or test): production checks depend on it.",
+    );
+  }
+
   // JWT secrets are validated in all environments (except test)
   validateJwtSecrets();
 
@@ -599,6 +630,14 @@ export function validateProductionConfig(): string[] {
     );
   }
 
+  const tlsError = databaseTlsError();
+  if (tlsError) {
+    errors.push(tlsError);
+  }
+  if (!config.redis.password && isRemoteHost(config.redis.host)) {
+    errors.push("REDIS_PASSWORD is required for a remote Redis host.");
+  }
+
   if (missingVars.length > 0) {
     errors.unshift(`Missing required environment variables: ${missingVars.join(", ")}`);
   }
@@ -613,14 +652,8 @@ export function validateProductionConfig(): string[] {
   if (config.logging.level === "debug" || config.logging.level === "trace") {
     warnings.push(`LOG_LEVEL=${config.logging.level} is verbose and may log customer data.`);
   }
-  if (!config.database.ssl && !LOCAL_HOSTS.has(config.database.host)) {
-    warnings.push("DB_SSL is off for a remote database host; database traffic is unencrypted.");
-  }
   if (config.database.ssl && !config.database.sslCa) {
     warnings.push("DB_SSL is on without DB_SSL_CA; the database certificate is not verified.");
-  }
-  if (!config.redis.password && !LOCAL_HOSTS.has(config.redis.host)) {
-    warnings.push("REDIS_PASSWORD is not set for a remote Redis host.");
   }
   if (process.env.TRUST_PROXY === undefined) {
     warnings.push(

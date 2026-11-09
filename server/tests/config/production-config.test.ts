@@ -65,18 +65,45 @@ describe("validateProductionConfig", () => {
     );
   });
 
-  it("warns about debug logging and unverified or missing transport security", () => {
+  it("warns about debug logging and unverified TLS on a private network", () => {
     const warnings = load({
       LOG_LEVEL: "debug",
-      DB_HOST: "db.internal",
-      REDIS_HOST: "redis.internal",
+      DB_HOST: "postgres",
+      DB_SSL: "true",
+      REDIS_HOST: "redis",
     }).validateProductionConfig();
     expect(warnings.join("\n")).toMatch(/LOG_LEVEL=debug/);
-    expect(warnings.join("\n")).toMatch(/DB_SSL is off/);
-    expect(warnings.join("\n")).toMatch(/REDIS_PASSWORD/);
+    expect(warnings.join("\n")).toMatch(/DB_SSL_CA/);
+  });
 
-    const sslWithoutCa = load({ DB_SSL: "true" }).validateProductionConfig();
-    expect(sslWithoutCa.join("\n")).toMatch(/DB_SSL_CA/);
+  it.each([
+    ["no TLS to a remote database", { DB_HOST: "db.example.com" }, "DB_SSL"],
+    ["no CA for a remote database", { DB_HOST: "db.example.com", DB_SSL: "true" }, "DB_SSL_CA"],
+    ["no password for a remote Redis", { REDIS_HOST: "redis.example.com" }, "REDIS_PASSWORD"],
+  ])("refuses to start with %s", (_label, overrides, variable) => {
+    expect(() => load(overrides).validateProductionConfig()).toThrow(variable);
+  });
+
+  it("accepts a remote database with TLS and a CA", () => {
+    expect(
+      load({
+        DB_HOST: "db.example.com",
+        DB_SSL: "true",
+        DB_SSL_CA: "-----BEGIN CERTIFICATE-----",
+      }).validateProductionConfig(),
+    ).toEqual([]);
+  });
+
+  it("refuses to start when NODE_ENV is unset", () => {
+    expect(() => load({ NODE_ENV: undefined }).validateProductionConfig()).toThrow("NODE_ENV");
+  });
+
+  it("treats loopback, private and container hosts as not remote", () => {
+    const { isRemoteHost } = load({});
+    expect(
+      ["localhost", "10.0.0.5", "172.20.0.2", "192.168.1.9", "postgres"].some(isRemoteHost),
+    ).toBe(false);
+    expect(isRemoteHost("db-do-user.b.db.ondigitalocean.com")).toBe(true);
   });
 
   it("skips the production checks in development", () => {
