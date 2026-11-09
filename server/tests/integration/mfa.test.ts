@@ -104,7 +104,7 @@ async function createMember(local: string, role: "owner" | "member"): Promise<Us
   const user = await users.save(
     users.create({
       email: `${local}@${DOMAIN}`,
-      password: await hashPassword(PASSWORD, "argon2"),
+      password: await hashPassword(PASSWORD),
       isActive: true,
       emailVerified: true,
     }),

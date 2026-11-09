@@ -7,9 +7,6 @@ export const authConfig = {
     expiresIn: "15m",
     algorithm: "HS256" as const,
   },
-  bcrypt: {
-    saltRounds: 12,
-  },
   argon2: {
     type: 2,
     memoryCost: 65536,

@@ -332,11 +332,11 @@ const settingsForm = ref({
   pageToolsOrigins: "",
 });
 
-const allowedDomainsText = ref("*");
+const allowedDomainsText = ref("");
 type WebchatSettingsSnapshot = (typeof settingsForm)["value"] & { allowedDomains: string[] };
 const originalSettings = ref<WebchatSettingsSnapshot>({
   ...settingsForm.value,
-  allowedDomains: ["*"],
+  allowedDomains: [],
 });
 const isSaving = ref(false);
 
@@ -473,7 +473,7 @@ async function toggleUnderAttack() {
 // Reset form
 function resetForm() {
   settingsForm.value = { ...originalSettings.value };
-  allowedDomainsText.value = originalSettings.value.allowedDomains?.join("\n") || "*";
+  allowedDomainsText.value = originalSettings.value.allowedDomains?.join("\n") ?? "";
 }
 
 // Copy installation code

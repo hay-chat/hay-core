@@ -1,4 +1,4 @@
-import { hasRouteAccess } from "@/middleware/auth.global";
+import { hasRouteAccess } from "@/utils/route-access";
 import { useUserStore } from "@/stores/user";
 
 /** Links out of the setup board, filtered by what the current role may open. */

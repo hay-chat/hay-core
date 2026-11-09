@@ -25,7 +25,7 @@ vi.mock("@/utils/api", () => ({
   },
   HayApi: {},
 }));
-vi.mock("@/middleware/auth.global", async () => ({
+vi.mock("@/utils/route-access", async () => ({
   hasRouteAccess: (await import("./fixtures")).hasRouteAccess,
 }));
 vi.mock("@/components/setup/SetupTestChat.vue", async () => {

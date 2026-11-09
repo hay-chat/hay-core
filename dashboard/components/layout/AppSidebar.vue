@@ -62,7 +62,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useAppStore } from "@/stores/app";
 import { useSetupStore } from "@/stores/setup";
 import { Hay } from "@/utils/api";
-import { roleProtectedRoutes } from "@/middleware/auth.global";
+import { roleProtectedRoutes } from "@/utils/route-access";
 import type { RouterOutputs } from "@/types/trpc";
 
 type PluginMenuItem = RouterOutputs["plugins"]["getMenuItems"]["items"][number];

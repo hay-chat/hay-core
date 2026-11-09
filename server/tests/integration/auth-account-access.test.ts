@@ -16,6 +16,7 @@ import {
 } from "@jest/globals";
 import * as crypto from "crypto";
 import { In } from "typeorm";
+import bcrypt from "bcrypt";
 
 const mockSendTemplateEmail = jest.fn(async (..._args: unknown[]) => ({ success: true }));
 jest.mock("../../services/email.service", () => ({
@@ -101,7 +102,7 @@ async function createMember(local: string, role: "owner" | "admin" | "member"): 
   const user = await users.save(
     users.create({
       email: `${local}@${DOMAIN}`,
-      password: await hashPassword(PASSWORD, "argon2"),
+      password: await hashPassword(PASSWORD),
       isActive: true,
       emailVerified: true,
       // Legacy column: must not grant anything without an organization membership.
@@ -320,7 +321,7 @@ describe("account access", () => {
     it("moves a bcrypt hash to argon2 on sign-in", async () => {
       const user = await createMember("pw-bcrypt", "member");
       const users = AppDataSource.getRepository(User);
-      await users.update({ id: user.id }, { password: await hashPassword(PASSWORD, "bcrypt") });
+      await users.update({ id: user.id }, { password: await bcrypt.hash(PASSWORD, 4) });
 
       await authRouter.createCaller(publicCtx()).login({ email: user.email, password: PASSWORD });
 

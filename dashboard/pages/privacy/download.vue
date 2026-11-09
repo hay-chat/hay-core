@@ -157,7 +157,7 @@ const fileSize = ref("~500 KB");
 const exportFormat = "ZIP Archive";
 
 const requestId = computed(() => route.query.requestId as string);
-const downloadToken = computed(() => route.query.token as string);
+const downloadToken = useUrlToken();
 
 const title = computed(() => {
   if (loading.value) return t("privacyDownload.loadingTitle");

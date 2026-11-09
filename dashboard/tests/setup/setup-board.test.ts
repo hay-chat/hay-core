@@ -9,7 +9,7 @@ vi.mock("@/composables/useDomain", () => ({
   useDomain: () => ({ getApiUrl: (path: string) => `http://api${path}` }),
 }));
 vi.mock("@/utils/api", () => ({ Hay: {}, HayApi: {} }));
-vi.mock("@/middleware/auth.global", async () => ({
+vi.mock("@/utils/route-access", async () => ({
   hasRouteAccess: (await import("./fixtures")).hasRouteAccess,
 }));
 const chatAsk = vi.hoisted(() => vi.fn());

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  baseSecurityHeaders,
   contentSecurityPolicy,
   inlineScriptBodies,
   scriptHashSource,
@@ -13,6 +14,14 @@ function directives(policy: string): Record<string, string> {
     }),
   );
 }
+
+describe("dashboard base headers", () => {
+  it("isolates the browsing context while keeping OAuth popups working", () => {
+    expect(baseSecurityHeaders(false)["Cross-Origin-Opener-Policy"]).toBe(
+      "same-origin-allow-popups",
+    );
+  });
+});
 
 describe("dashboard Content-Security-Policy", () => {
   it("allows the API (https + wss) and PostHog, and nothing else off-origin for scripts", () => {

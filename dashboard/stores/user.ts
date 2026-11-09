@@ -370,5 +370,7 @@ export const useUserStore = defineStore("user", {
   },
   persist: {
     pick: ["user", "activeOrganizationId", "organizations"],
+    // Fetched again on load; contact details don't need to sit in localStorage.
+    omit: ["user.email", "user.pendingEmail"],
   },
 });
