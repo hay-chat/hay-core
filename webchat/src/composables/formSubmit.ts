@@ -59,7 +59,7 @@ export async function submitFormMessage(params: {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversationId, messageId, response, proof, method: "POST", url }),
+      body: JSON.stringify({ conversationId, messageId, response, proof }),
     });
     const data = await res.json();
     if (!res.ok) {

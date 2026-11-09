@@ -23,15 +23,39 @@ const mockCreateConversation = jest.fn(async (_orgId: string, _data: unknown) =>
 jest.mock("@server/services/conversation.service", () => ({
   ConversationService: jest.fn(() => ({ createConversation: mockCreateConversation })),
 }));
+const mockConversation = jest.fn<() => unknown>(() => null);
+type ProofResult = { success: boolean; newNonce?: string; error?: string };
+const mockVerifyProof = jest.fn<(...args: unknown[]) => Promise<ProofResult>>(async () => ({
+  success: false,
+  error: "Invalid proof",
+}));
+jest.mock("@server/services/webchat/dpop-proof.service", () => ({
+  ...jest.requireActual<typeof import("@server/services/webchat/dpop-proof.service")>(
+    "@server/services/webchat/dpop-proof.service",
+  ),
+  verifyDPoPForRequest: (...args: unknown[]) => mockVerifyProof(...args),
+}));
+const mockFindMessage = jest.fn<() => Promise<unknown>>(async () => null);
+const mockUpdateMessage = jest.fn(async () => undefined);
+jest.mock("@server/repositories/message.repository", () => ({
+  MessageRepository: jest.fn(() => ({ findById: mockFindMessage, update: mockUpdateMessage })),
+}));
+jest.mock("@server/services/orchestrator-queue.service", () => ({
+  orchestratorQueueService: { enqueue: jest.fn(async () => undefined) },
+}));
 jest.mock("@server/services/dpop-cache.service", () => ({
   dpopCacheService: { generateNonce: jest.fn(async () => "nonce-1") },
 }));
 jest.mock("@server/repositories/conversation.repository", () => ({
-  conversationRepository: { updateById: jest.fn(async () => undefined) },
+  conversationRepository: {
+    updateById: jest.fn(async () => undefined),
+    findById: jest.fn(async () => mockConversation()),
+  },
 }));
+const mockFindCustomerById = jest.fn<() => Promise<unknown>>(async () => null);
 const mockFindByEmail = jest.fn(async () => ({ id: "existing-customer" }));
 const mockCreateCustomer = jest.fn(async (_data: unknown) => ({ id: "claimed-customer" }));
-const mockUpdateCustomer = jest.fn(async () => ({}));
+const mockUpdateCustomer = jest.fn(async (..._args: unknown[]) => ({}));
 const mockFindByExternalId = jest.fn<(id: string, orgId: string) => Promise<unknown>>(
   async () => null,
 );
@@ -39,6 +63,7 @@ jest.mock("@server/repositories/customer.repository", () => ({
   CustomerRepository: jest.fn(() => ({
     findByExternalId: mockFindByExternalId,
     findByEmail: mockFindByEmail,
+    findByIdAndOrganization: mockFindCustomerById,
     create: mockCreateCustomer,
     update: mockUpdateCustomer,
   })),
@@ -110,6 +135,7 @@ import {
   publicMetadata,
   withVisitorContext,
 } from "@server/routes/v1/public-conversations";
+import { MessageType } from "@server/database/entities/message.entity";
 import { conversationRepository } from "@server/repositories/conversation.repository";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -343,8 +369,6 @@ describe("publicConversations rate limits", () => {
     conversationId: "22222222-2222-4222-8222-222222222222",
     content: "hello",
     proof: "proof",
-    method: "POST",
-    url: "http://localhost:3001/v1/publicConversations.sendMessage",
   };
 
   it("sendMessage is limited per IP before the proof is checked", async () => {
@@ -384,8 +408,6 @@ describe("publicConversations.sendAttachment guards (D8-9)", () => {
     mimeType: "image/jpeg" as const,
     filename: "photo.jpg",
     proof: "proof",
-    method: "POST",
-    url: "http://localhost:3001/v1/publicConversations.sendAttachment",
   };
 
   it("is limited per IP before the proof is checked", async () => {
@@ -423,8 +445,6 @@ describe("publicConversations.submitCsat guards", () => {
     conversationId: "22222222-2222-4222-8222-222222222222",
     rating: 4,
     proof: "proof",
-    method: "POST",
-    url: "http://localhost:3001/v1/publicConversations.submitCsat",
   };
 
   it("is limited per IP before the proof is checked", async () => {
@@ -651,5 +671,90 @@ describe("publicConversations.create pre-chat form", () => {
 
   it("does not let the browser set the link source", () => {
     expect(publicMetadata({ customerLinkSource: "webchat_signature" })).toEqual({});
+  });
+});
+
+describe("publicConversations DPoP proofs", () => {
+  const conversationId = "22222222-2222-4222-8222-222222222222";
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it("checks a proof against the procedure called, not what the body names", async () => {
+    await callerFor({ host: "chat.selfhosted.test" })
+      .getMessages({
+        conversationId,
+        proof: "proof",
+        method: "GET",
+        url: "https://elsewhere.test/anything",
+      } as never)
+      .catch(() => undefined);
+
+    expect(mockVerifyProof).toHaveBeenCalledWith(conversationId, "proof", {
+      method: "POST",
+      path: "/v1/publicConversations.getMessages",
+      schemes: ["http:", "https:"],
+      hosts: ["api.hay.chat:443", "chat.selfhosted.test"],
+    });
+  });
+});
+
+describe("publicConversations.submitForm", () => {
+  const conversationId = "22222222-2222-4222-8222-222222222222";
+  const messageId = "33333333-3333-4333-8333-333333333333";
+  const schema = {
+    id: "details",
+    fields: [
+      { name: "name", label: "Name", type: "text", mapToCustomer: "name" },
+      { name: "phone", label: "Phone", type: "text", mapToCustomer: "phone" },
+    ],
+  };
+  const input = {
+    conversationId,
+    messageId,
+    response: { name: "Sam Typed", phone: "+15550100" },
+    proof: "proof",
+  };
+  const conversation = (metadata: Record<string, unknown>) => ({
+    id: conversationId,
+    organization_id: ORG_ID,
+    customer_id: "customer-1",
+    context: {},
+    metadata,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockVerifyProof.mockResolvedValueOnce({ success: true, newNonce: "nonce-2" });
+    mockFindMessage.mockResolvedValue({
+      id: messageId,
+      conversation_id: conversationId,
+      type: MessageType.FORM,
+      metadata: { ui: { kind: "form", schema, status: "PENDING" } },
+    });
+  });
+
+  it("keeps answers as visitor context and leaves a signed customer untouched", async () => {
+    mockConversation.mockReturnValueOnce(conversation({ customerLinkSource: "webchat_signature" }));
+    const { conversationRepository } = jest.requireMock<{
+      conversationRepository: { updateById: jest.Mock };
+    }>("@server/repositories/conversation.repository");
+
+    await callerFor().submitForm(input);
+
+    expect(conversationRepository.updateById).toHaveBeenCalledWith(conversationId, {
+      context: expect.objectContaining({
+        _visitor: expect.objectContaining({ name: "Sam Typed" }),
+      }),
+    });
+    expect(mockUpdateCustomer).not.toHaveBeenCalled();
+  });
+
+  it("only fills empty fields of a customer created from a typed email", async () => {
+    mockConversation.mockReturnValueOnce(conversation({ customerLinkSource: "prechat_email" }));
+    mockFindCustomerById.mockResolvedValueOnce({ id: "customer-1", name: null, phone: "+1999" });
+
+    await callerFor().submitForm(input);
+
+    expect(mockUpdateCustomer).toHaveBeenCalledWith("customer-1", ORG_ID, { name: "Sam Typed" });
   });
 });

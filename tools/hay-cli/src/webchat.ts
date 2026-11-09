@@ -86,7 +86,7 @@ export class WebchatClient {
   private async withProof<T extends NonceResult>(
     conversationId: string,
     procedure: string,
-    buildInput: (proof: { proof: string; method: string; url: string }) => unknown,
+    buildInput: (proof: { proof: string }) => unknown,
   ): Promise<T> {
     const keys = this.keysFor(conversationId);
     const url = `${this.api.baseUrl}/v1/publicConversations.${procedure}`;
@@ -95,7 +95,7 @@ export class WebchatClient {
       const proof = await createProof(keys, "POST", url, keys.nonce);
       const result = await this.api.mutation<T>(
         `publicConversations.${procedure}`,
-        buildInput({ proof, method: "POST", url }),
+        buildInput({ proof }),
         { auth: false },
       );
       if (result.nonce) {

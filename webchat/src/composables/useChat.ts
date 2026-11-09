@@ -325,7 +325,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
         throw new Error("Failed to create DPoP proof");
       }
 
-      const messagesData = await conversation.getMessages(convId, proof, "POST", wsUrl);
+      const messagesData = await conversation.getMessages(convId, proof);
 
       // Handle nonce expiration
       if (messagesData?.error === "NONCE_EXPIRED") {
@@ -345,7 +345,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
           throw new Error("Failed to create retry DPoP proof");
         }
 
-        const retryData = await conversation.getMessages(convId, retryProof, "POST", wsUrl);
+        const retryData = await conversation.getMessages(convId, retryProof);
         if (!retryData) {
           throw new Error("Failed to load messages on retry");
         }
@@ -817,8 +817,6 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
       const messagesData = await conversation.getMessages(
         conversationId.value,
         proof,
-        "POST",
-        wsUrl,
       );
 
       if (messagesData?.nonce) {
@@ -883,8 +881,6 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
       convId,
       text.trim(),
       proof,
-      "POST",
-      httpUrl,
       getContext(),
     );
 
@@ -1061,8 +1057,6 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
       filename: file.name,
       caption,
       proof,
-      method: "POST",
-      url,
       context: getContext(),
     });
     if (result.nonce) nonce.value = result.nonce;
@@ -1213,8 +1207,6 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
         conversationId.value,
         email,
         proof,
-        "POST",
-        url,
       );
       if (result.nonce) nonce.value = result.nonce;
       if (result.error === "NONCE_EXPIRED" && !retried) return saveContactEmail(email, true);
@@ -1276,8 +1268,6 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
         conversationId.value,
         rating,
         proof,
-        "POST",
-        url,
       );
       if (result.nonce) nonce.value = result.nonce;
       if (result.error === "NONCE_EXPIRED" && !retried) return submitCsat(rating, true);

@@ -11,6 +11,7 @@ import { EventEmitter } from "events";
 jest.mock("@server/config/env", () => ({
   config: {
     jwt: { secret: "ws-test-secret" },
+    domain: { api: "api.example.test" },
     cors: { origin: ["https://app.example.test"] },
     server: { trustProxy: 1 },
   },
@@ -47,12 +48,14 @@ const mockVerifyDPoP =
     (
       conversationId: string,
       proof: string,
-      method: string,
-      url: string,
+      target: unknown,
       options?: { checkNonce?: boolean },
     ) => Promise<{ success: boolean; newNonce?: string; error?: string }>
   >();
-jest.mock("@server/routes/v1/public-conversations", () => ({
+jest.mock("@server/services/webchat/dpop-proof.service", () => ({
+  ...jest.requireActual<typeof import("@server/services/webchat/dpop-proof.service")>(
+    "@server/services/webchat/dpop-proof.service",
+  ),
   verifyDPoPForRequest: mockVerifyDPoP,
 }));
 
@@ -133,19 +136,15 @@ function webConversation(overrides: Record<string, unknown> = {}) {
   };
 }
 
-const WS_URL = "ws://localhost:3001/ws";
-
 /** An identify frame carrying a (mocked) DPoP proof for the /ws endpoint. */
 function identifyFrame(conversationId: string = CONV_ID) {
-  return { type: "identify", conversationId, proof: "identify.jwt", url: WS_URL };
+  return { type: "identify", conversationId, proof: "identify.jwt" };
 }
 
 const validFrame = {
   type: "message",
   content: "hello",
   proof: "proof.jwt",
-  method: "POST",
-  url: "http://localhost:3001/v1/publicConversations.sendMessage",
   conversationId: CONV_ID,
 };
 
@@ -245,8 +244,7 @@ describe("WebSocket public writes require DPoP", () => {
     expect(mockVerifyDPoP).toHaveBeenCalledWith(
       CONV_ID,
       validFrame.proof,
-      validFrame.method,
-      validFrame.url,
+      expect.objectContaining({ method: "POST", path: "/v1/publicConversations.sendMessage" }),
     );
     expect(conversation.addMessage).toHaveBeenCalledWith(
       expect.objectContaining({ content: "hello" }),
@@ -357,17 +355,21 @@ describe("WebSocket identify requires proof of the conversation key", () => {
     expect(ws.last()).toEqual({ type: "error", error: "Unauthorized" });
   });
 
-  it("rejects a proof made for another endpoint", async () => {
+  it("checks an identify proof against /ws whatever url the frame names", async () => {
     mockVerifyDPoP.mockResolvedValue({ success: true });
-    const { send, clientId, internals } = connect(service);
+    const { send } = connect(service);
 
     await send({
       ...identifyFrame(),
       url: "http://localhost:3001/v1/publicConversations.getMessages",
     });
 
-    expect(mockVerifyDPoP).not.toHaveBeenCalled();
-    expect(internals.conversationClients.get(CONV_ID)?.has(clientId) ?? false).toBe(false);
+    expect(mockVerifyDPoP).toHaveBeenCalledWith(
+      CONV_ID,
+      "identify.jwt",
+      expect.objectContaining({ method: "GET", path: "/ws", schemes: ["ws:", "wss:"] }),
+      { checkNonce: false },
+    );
   });
 
   it("attaches a client whose proof verifies, without consuming the HTTP nonce", async () => {
@@ -376,9 +378,12 @@ describe("WebSocket identify requires proof of the conversation key", () => {
 
     await send(identifyFrame());
 
-    expect(mockVerifyDPoP).toHaveBeenCalledWith(CONV_ID, "identify.jwt", "GET", WS_URL, {
-      checkNonce: false,
-    });
+    expect(mockVerifyDPoP).toHaveBeenCalledWith(
+      CONV_ID,
+      "identify.jwt",
+      expect.objectContaining({ method: "GET", path: "/ws" }),
+      { checkNonce: false },
+    );
     expect(internals.conversationClients.get(CONV_ID)?.has(clientId)).toBe(true);
     expect(ws.last()).toEqual({ type: "identified", conversationId: CONV_ID });
   });

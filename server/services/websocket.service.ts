@@ -12,7 +12,11 @@ import { UserOrganization } from "@server/entities/user-organization.entity";
 import { User } from "@server/entities/user.entity";
 
 const logger = createLogger("websocket");
-import { verifyDPoPForRequest } from "../routes/v1/public-conversations";
+import {
+  publicConversationProofTarget,
+  socketIdentifyProofTarget,
+  verifyDPoPForRequest,
+} from "@server/services/webchat/dpop-proof.service";
 import { getClientIp } from "@server/lib/client-ip";
 import { isPageToolsOrigin, requestHostname } from "@server/lib/webchat-origin";
 import { webchatSettingsService } from "./webchat/webchat-settings.service";
@@ -40,9 +44,6 @@ const ATTACH_TIMEOUT_MS = 10_000;
 const HEARTBEAT_INTERVAL_MS = 30_000;
 /** Open sockets allowed per client IP (shared NATs keep this generous). */
 const MAX_CONNECTIONS_PER_IP = 100;
-/** DPoP proofs on identify are made for this method and the `/ws` endpoint. */
-const IDENTIFY_PROOF_METHOD = "GET";
-const IDENTIFY_PROOF_PATH = "/ws";
 /** WebSocket close code for a policy violation (RFC 6455). */
 const CLOSE_POLICY_VIOLATION = 1008;
 
@@ -55,6 +56,8 @@ interface WebSocketClient {
   ip: string;
   /** The Origin header of the upgrade request; browsers always send it. */
   origin?: string;
+  /** The Host header of the upgrade request. */
+  host?: string;
   /** Resolves once token authentication (if any) has finished. */
   ready: Promise<void>;
   /** Whether an `auth` frame was already received; only the first one counts. */
@@ -77,7 +80,6 @@ interface IdentifyMessage extends WebSocketMessage {
   conversationId?: string;
   /** DPoP proof (method GET, url `<api>/ws`) signed with the conversation's key. */
   proof?: unknown;
-  url?: unknown;
   /** Page tools (WebMCP) the host page registered; see page-tools.service. */
   tools?: unknown;
 }
@@ -96,8 +98,6 @@ interface ChatMessage extends WebSocketMessage {
   content: string;
   timestamp?: number;
   proof?: string; // DPoP proof JWT
-  method?: string; // HTTP method for DPoP validation
-  url?: string; // Request URL for DPoP validation
   conversationId?: string; // Conversation ID for DPoP validation
 }
 
@@ -353,6 +353,7 @@ export class WebSocketService {
       authenticated: false,
       ip,
       origin: req.headers.origin,
+      host: req.headers.host,
       ready: Promise.resolve(),
       authAttempted: false,
       isAlive: true,
@@ -561,15 +562,15 @@ export class WebSocketService {
     const client = this.clients.get(clientId);
     if (!client) return;
 
-    const { conversationId, proof, url } = message;
+    const { conversationId, proof } = message;
 
     if (typeof conversationId !== "string" || !conversationId) {
       this.sendError(client, "conversationId is required");
       return;
     }
 
-    if (typeof proof !== "string" || typeof url !== "string" || !isIdentifyProofUrl(url)) {
-      this.sendError(client, "DPoP authentication required: proof and url must be provided");
+    if (typeof proof !== "string") {
+      this.sendError(client, "DPoP authentication required: proof must be provided");
       return;
     }
 
@@ -589,8 +590,7 @@ export class WebSocketService {
     const verification = await verifyDPoPForRequest(
       conversation.id,
       proof,
-      IDENTIFY_PROOF_METHOD,
-      url,
+      socketIdentifyProofTarget(client.host),
       { checkNonce: false },
     );
     if (!verification.success) {
@@ -679,11 +679,8 @@ export class WebSocketService {
       return;
     }
 
-    if (!message.proof || !message.method || !message.url) {
-      this.sendError(
-        client,
-        "DPoP authentication required: proof, method and url must be provided",
-      );
+    if (!message.proof) {
+      this.sendError(client, "DPoP authentication required: proof must be provided");
       return;
     }
 
@@ -719,8 +716,7 @@ export class WebSocketService {
       const dpopVerification = await verifyDPoPForRequest(
         conversationId,
         message.proof,
-        message.method,
-        message.url,
+        publicConversationProofTarget("sendMessage", client.host),
       );
 
       if (!dpopVerification.success) {
@@ -998,16 +994,3 @@ export class WebSocketService {
 }
 
 export const websocketService = new WebSocketService();
-
-/** An identify proof is made for the `/ws` endpoint, not reused from an HTTP call. */
-function isIdentifyProofUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return (
-      (parsed.protocol === "ws:" || parsed.protocol === "wss:") &&
-      parsed.pathname === IDENTIFY_PROOF_PATH
-    );
-  } catch {
-    return false;
-  }
-}

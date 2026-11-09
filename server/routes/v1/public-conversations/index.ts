@@ -15,6 +15,10 @@ import { MessageType, MessageDirection } from "../../../database/entities/messag
 import type { Conversation } from "../../../database/entities/conversation.entity";
 import { TRPCError } from "@trpc/server";
 import { dpopCacheService } from "../../../services/dpop-cache.service";
+import {
+  publicConversationProofTarget,
+  verifyDPoPForRequest,
+} from "../../../services/webchat/dpop-proof.service";
 import { conversationRepository } from "../../../repositories/conversation.repository";
 import { CustomerRepository } from "../../../repositories/customer.repository";
 import { OrganizationRepository } from "../../../repositories/organization.repository";
@@ -101,8 +105,6 @@ const sendMessageSchema = z.object({
   conversationId: z.string().uuid(),
   content: z.string().min(1).max(PUBLIC_WIDGET_LIMITS.maxMessageLength),
   proof: z.string(), // DPoP proof
-  method: z.string(),
-  url: z.string(),
   context: z.record(z.string(), z.any()).optional(),
 });
 
@@ -114,8 +116,6 @@ const sendAttachmentSchema = z.object({
   filename: z.string().min(1).max(255),
   caption: z.string().max(PUBLIC_WIDGET_LIMITS.maxMessageLength).optional(),
   proof: z.string(), // DPoP proof
-  method: z.string(),
-  url: z.string(),
   context: z.record(z.string(), z.any()).optional(),
 });
 
@@ -124,16 +124,12 @@ const submitCsatSchema = z.object({
   conversationId: z.string().uuid(),
   rating: z.number().int().min(1).max(5),
   proof: z.string(), // DPoP proof
-  method: z.string(),
-  url: z.string(),
 });
 
 // Schema for getting messages
 const getMessagesSchema = z.object({
   conversationId: z.string().uuid(),
   proof: z.string(), // DPoP proof
-  method: z.string(),
-  url: z.string(),
   limit: z.number().optional().default(50),
   offset: z.number().optional().default(0),
 });
@@ -371,14 +367,13 @@ export const publicConversationsRouter = t.router({
   }),
 
   // Get messages for a conversation (requires DPoP proof)
-  getMessages: publicProcedure.input(getMessagesSchema).mutation(async ({ input }) => {
+  getMessages: publicProcedure.input(getMessagesSchema).mutation(async ({ input, ctx }) => {
     try {
       // Verify DPoP proof
       const verified = await verifyDPoPForRequest(
         input.conversationId,
         input.proof,
-        input.method,
-        input.url,
+        publicConversationProofTarget("getMessages", ctx.req.headers.host),
       );
 
       if (!verified.success) {
@@ -460,8 +455,7 @@ export const publicConversationsRouter = t.router({
       const verified = await verifyDPoPForRequest(
         input.conversationId,
         input.proof,
-        input.method,
-        input.url,
+        publicConversationProofTarget("sendMessage", ctx.req.headers.host),
       );
 
       if (!verified.success) {
@@ -560,8 +554,7 @@ export const publicConversationsRouter = t.router({
     const verified = await verifyDPoPForRequest(
       input.conversationId,
       input.proof,
-      input.method,
-      input.url,
+      publicConversationProofTarget("sendAttachment", ctx.req.headers.host),
     );
     if (!verified.success) {
       if (verified.newNonce && verified.error === "Invalid or expired nonce") {
@@ -663,8 +656,6 @@ export const publicConversationsRouter = t.router({
         conversationId: z.string().uuid(),
         email: z.string().trim().toLowerCase().email().max(255),
         proof: z.string(),
-        method: z.string(),
-        url: z.string(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -677,8 +668,7 @@ export const publicConversationsRouter = t.router({
       const verified = await verifyDPoPForRequest(
         input.conversationId,
         input.proof,
-        input.method,
-        input.url,
+        publicConversationProofTarget("setContactEmail", ctx.req.headers.host),
       );
       if (!verified.success) {
         if (verified.newNonce && verified.error === "Invalid or expired nonce") {
@@ -711,8 +701,7 @@ export const publicConversationsRouter = t.router({
     const verified = await verifyDPoPForRequest(
       input.conversationId,
       input.proof,
-      input.method,
-      input.url,
+      publicConversationProofTarget("submitCsat", ctx.req.headers.host),
     );
     if (!verified.success) {
       if (verified.newNonce && verified.error === "Invalid or expired nonce") {
@@ -755,18 +744,15 @@ export const publicConversationsRouter = t.router({
           y: z.string().optional(),
         }),
         proof: z.string(), // DPoP proof with old key
-        method: z.string(),
-        url: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       try {
         // Verify DPoP proof with current key
         const verified = await verifyDPoPForRequest(
           input.conversationId,
           input.proof,
-          input.method,
-          input.url,
+          publicConversationProofTarget("rotateKeys", ctx.req.headers.host),
         );
 
         if (!verified.success) {
@@ -820,17 +806,14 @@ export const publicConversationsRouter = t.router({
         messageId: z.string().uuid(),
         response: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
         proof: z.string(),
-        method: z.string(),
-        url: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       try {
         const verified = await verifyDPoPForRequest(
           input.conversationId,
           input.proof,
-          input.method,
-          input.url,
+          publicConversationProofTarget("submitForm", ctx.req.headers.host),
         );
         if (!verified.success) {
           throw new TRPCError({
@@ -1008,130 +991,3 @@ function botCheckRecord(gate: GateOutcome) {
 }
 
 // Public components of an EC JWK used for DPoP proof verification.
-interface EcPublicJwk {
-  kty?: string;
-  crv?: string;
-  x?: string;
-  y?: string;
-}
-
-// Helper function to verify DPoP proof for a request. `checkNonce: false` is
-// for read-only attaches (the WebSocket identify) that must not race the
-// widget's HTTP calls for the single rotating nonce; jti and iat still apply.
-export async function verifyDPoPForRequest(
-  conversationId: string,
-  proof: string,
-  method: string,
-  url: string,
-  options: { checkNonce?: boolean } = {},
-): Promise<{ success: boolean; newNonce?: string; error?: string }> {
-  try {
-    // Dynamically import jose using Function constructor to avoid static analysis
-    const importDynamic = new Function("specifier", "return import(specifier)");
-    const jose = await importDynamic("jose");
-
-    // Get the conversation to verify the public key
-    const conversation = await conversationRepository.findById(conversationId);
-    if (!conversation) {
-      return { success: false, error: "Conversation not found" };
-    }
-
-    // Verify this is a web channel conversation
-    if (conversation.channel !== "web") {
-      return { success: false, error: "Not a web conversation" };
-    }
-
-    // Check if conversation has a registered public key
-    if (!conversation.publicJwk) {
-      return { success: false, error: "No public key registered" };
-    }
-
-    // Parse the JWT to get header and payload
-    const payload = jose.decodeJwt(proof);
-    const protectedHeader = jose.decodeProtectedHeader(proof);
-
-    // Verify header requirements
-    if (protectedHeader.typ !== "dpop+jwt") {
-      return { success: false, error: "Invalid token type" };
-    }
-
-    if (protectedHeader.alg !== "ES256") {
-      return { success: false, error: "Invalid algorithm" };
-    }
-
-    if (!protectedHeader.jwk) {
-      return { success: false, error: "Missing JWK in header" };
-    }
-
-    // Verify the JWK matches the registered one
-    const registeredJwk = conversation.publicJwk as EcPublicJwk | null;
-
-    // Compare the essential public key components (x and y for EC keys)
-    const receivedJwk = protectedHeader.jwk as EcPublicJwk | undefined;
-    if (!receivedJwk || !registeredJwk) {
-      return { success: false, error: "Missing JWK" };
-    }
-
-    if (
-      receivedJwk.kty !== registeredJwk.kty ||
-      receivedJwk.crv !== registeredJwk.crv ||
-      receivedJwk.x !== registeredJwk.x ||
-      receivedJwk.y !== registeredJwk.y
-    ) {
-      return { success: false, error: "Public key mismatch" };
-    }
-
-    // Import the public key for verification
-    const publicKey = await jose.importJWK(protectedHeader.jwk, "ES256");
-
-    // Verify the JWT signature
-    await jose.jwtVerify(proof, publicKey, {
-      typ: "dpop+jwt",
-      algorithms: ["ES256"],
-    });
-
-    // Verify the claims
-    if (payload.htm !== method.toUpperCase()) {
-      return { success: false, error: "HTTP method mismatch" };
-    }
-
-    if (payload.htu !== url) {
-      return { success: false, error: "URL mismatch" };
-    }
-
-    // Check time window (±120 seconds)
-    const now = Math.floor(Date.now() / 1000);
-    if (Math.abs(now - payload.iat) > 120) {
-      return { success: false, error: "Token outside time window" };
-    }
-
-    // Check JTI for replay protection
-    const isNewJti = await dpopCacheService.checkAndStoreJTI(payload.jti);
-    if (!isNewJti) {
-      return { success: false, error: "JTI already used" };
-    }
-
-    if (options.checkNonce === false) {
-      return { success: true };
-    }
-
-    // Verify and rotate nonce
-    const newNonce = await dpopCacheService.verifyAndRotateNonce(conversationId, payload.nonce);
-
-    if (!newNonce) {
-      // Generate a new nonce for retry
-      const freshNonce = await dpopCacheService.generateNonce(conversationId);
-      return { success: false, error: "Invalid or expired nonce", newNonce: freshNonce };
-    }
-
-    // Update last message timestamp
-    await conversationRepository.updateById(conversationId, {
-      lastMessageAt: new Date(),
-    });
-
-    return { success: true, newNonce };
-  } catch (error) {
-    logger.error({ err: error }, "DPoP verification error");
-    return { success: false, error: "Verification failed" };
-  }
-} // restart

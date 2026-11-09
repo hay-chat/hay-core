@@ -149,8 +149,6 @@ export function useConversation(config: HayChatConfig) {
   const getMessages = async (
     conversationId: string,
     proof: string,
-    method: string,
-    url: string,
     limit: number = 50,
   ): Promise<GetMessagesResponse | null> => {
     try {
@@ -162,8 +160,6 @@ export function useConversation(config: HayChatConfig) {
         body: JSON.stringify({
           conversationId,
           proof,
-          method,
-          url,
           limit,
         }),
       });
@@ -197,8 +193,6 @@ export function useConversation(config: HayChatConfig) {
     conversationId: string,
     content: string,
     proof: string,
-    method: string,
-    url: string,
     context?: Record<string, unknown>,
   ): Promise<SendMessageResponse> => {
     const response = await fetch(`${baseUrl}/v1/publicConversations.sendMessage`, {
@@ -210,8 +204,6 @@ export function useConversation(config: HayChatConfig) {
         conversationId,
         content,
         proof,
-        method,
-        url,
         ...(context && Object.keys(context).length > 0 ? { context } : {}),
       }),
     });
@@ -247,8 +239,6 @@ export function useConversation(config: HayChatConfig) {
     filename: string;
     caption?: string;
     proof: string;
-    method: string;
-    url: string;
     context?: Record<string, unknown>;
   }): Promise<SendAttachmentResponse> => {
     const { context, caption, ...rest } = params;
@@ -276,13 +266,11 @@ export function useConversation(config: HayChatConfig) {
     conversationId: string,
     email: string,
     proof: string,
-    method: string,
-    url: string,
   ): Promise<{ saved: boolean; nonce?: string; error: string | null }> => {
     const response = await fetch(`${baseUrl}/v1/publicConversations.setContactEmail`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversationId, email, proof, method, url }),
+      body: JSON.stringify({ conversationId, email, proof }),
     });
     if (!response.ok) {
       throw new WidgetRequestError(response.status);
@@ -299,13 +287,11 @@ export function useConversation(config: HayChatConfig) {
     conversationId: string,
     rating: number,
     proof: string,
-    method: string,
-    url: string,
   ): Promise<{ saved: boolean; nonce?: string; error: string | null }> => {
     const response = await fetch(`${baseUrl}/v1/publicConversations.submitCsat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversationId, rating, proof, method, url }),
+      body: JSON.stringify({ conversationId, rating, proof }),
     });
     if (!response.ok) {
       throw new WidgetRequestError(response.status);
