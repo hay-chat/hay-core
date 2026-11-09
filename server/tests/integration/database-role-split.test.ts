@@ -63,11 +63,22 @@ describe("application database role", () => {
     const purge = `SELECT audit_logs_purge('1970-01-01'::timestamptz, '1970-01-01'::timestamptz)`;
     const migration = new AddAuditLogOutbox1794300000000();
     const runner = AppDataSource.createQueryRunner();
+    const purgeAsApp = async (): Promise<void> => {
+      await runner.query(`SET LOCAL ROLE "${role}"`);
+      await runner.query(purge);
+      await runner.query(`RESET ROLE`);
+    };
+    // Rolled back because Jest workers share this database: a committed down
+    // changes a function that other suites call. The role is checked on this
+    // connection because no other one can see the uncommitted change.
+    await runner.startTransaction();
     try {
       await migration.down(runner);
-      await expect(app.query(purge)).resolves.toBeDefined();
-    } finally {
+      await purgeAsApp();
       await migration.up(runner);
+      await purgeAsApp();
+    } finally {
+      await runner.rollbackTransaction();
       await runner.release();
     }
     await expect(app.query(purge)).resolves.toBeDefined();

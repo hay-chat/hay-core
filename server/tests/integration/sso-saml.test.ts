@@ -649,26 +649,29 @@ describe("single sign-on (SAML)", () => {
     });
 
     it("the SAML migration's down lifts required SSO for organizations whose connection it removes", async () => {
-      await AppDataSource.query(
-        `UPDATE organizations SET settings = jsonb_set(COALESCE(settings,'{}'::jsonb), '{ssoEnforced}', 'true') WHERE id = $1`,
-        [ORG_ID],
-      );
+      const migration = new AddSamlToSsoConnections1794500000000();
       const runner = AppDataSource.createQueryRunner();
+      // Rolled back because Jest workers share this database: a committed down
+      // removes columns that other suites are querying.
+      await runner.startTransaction();
       try {
-        await new AddSamlToSsoConnections1794500000000().down(runner);
-        const org = await AppDataSource.getRepository(Organization).findOneOrFail({
+        await runner.query(
+          `UPDATE organizations SET settings = jsonb_set(COALESCE(settings,'{}'::jsonb), '{ssoEnforced}', 'true') WHERE id = $1`,
+          [ORG_ID],
+        );
+        await migration.down(runner);
+        const org = await runner.manager.getRepository(Organization).findOneOrFail({
           where: { id: ORG_ID },
         });
         expect(org.settings?.ssoEnforced).toBe(false);
         expect(
-          await AppDataSource.query(`SELECT 1 FROM sso_connections WHERE organization_id = $1`, [
-            ORG_ID,
-          ]),
+          await runner.query(`SELECT 1 FROM sso_connections WHERE organization_id = $1`, [ORG_ID]),
         ).toHaveLength(0);
+        // Run up twice: it must be safe to repeat.
+        await migration.up(runner);
+        await migration.up(runner);
       } finally {
-        // Restore the schema, and run up twice: it must be safe to repeat.
-        await new AddSamlToSsoConnections1794500000000().up(runner);
-        await new AddSamlToSsoConnections1794500000000().up(runner);
+        await runner.rollbackTransaction();
         await runner.release();
       }
     });
