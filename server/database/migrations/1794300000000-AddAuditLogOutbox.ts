@@ -24,15 +24,18 @@ async function purgeGrantees(queryRunner: QueryRunner): Promise<string[]> {
   return rows.map((row) => row.rolname);
 }
 
+function quoteRole(role: string): string {
+  return `"${role.replace(/"/g, '""')}"`;
+}
+
 async function grantPurge(
   queryRunner: QueryRunner,
   signature: string,
   roles: string[],
 ): Promise<void> {
   for (const role of roles) {
-    const quoted = `"${role.replace(/"/g, '""')}"`;
     await queryRunner.query(
-      `GRANT EXECUTE ON FUNCTION audit_logs_purge(${signature}) TO ${quoted}`,
+      `GRANT EXECUTE ON FUNCTION audit_logs_purge(${signature}) TO ${quoteRole(role)}`,
     );
   }
 }
@@ -123,16 +126,16 @@ export class AddAuditLogOutbox1794300000000 implements MigrationInterface {
                  OR (changes IS NOT NULL AND action = ANY(${PERSONAL_CHANGES_ACTIONS})));
 
         -- Only a chain's oldest rows may go. A row is kept while an earlier
-        -- sequence is still inside retention (or, with require_shipped, not yet
-        -- shipped), so what remains stays contiguous.
+        -- sequence is still inside retention (or, with require_shipped, has no
+        -- record of having shipped), so what remains stays contiguous.
         WITH held AS (
           SELECT l.id, l.chain_key, l.chain_seq
           FROM audit_logs l
           WHERE l.chain_seq IS NOT NULL
             AND (l.created_at >= delete_before
-                 OR (require_shipped AND EXISTS (
+                 OR (require_shipped AND NOT EXISTS (
                    SELECT 1 FROM audit_log_outbox o
-                   WHERE o.audit_log_id = l.id AND o.shipped_at IS NULL
+                   WHERE o.audit_log_id = l.id AND o.shipped_at IS NOT NULL
                  )))
         ), floors AS (
           SELECT h.chain_key, min(h.chain_seq) AS floor_seq FROM held h GROUP BY h.chain_key
@@ -167,6 +170,10 @@ export class AddAuditLogOutbox1794300000000 implements MigrationInterface {
       `REVOKE EXECUTE ON FUNCTION audit_logs_purge(timestamptz, timestamptz, boolean) FROM PUBLIC`,
     );
     await grantPurge(queryRunner, "timestamptz, timestamptz, boolean", grantees);
+    // Default privileges just gave these roles DELETE on the new table; only the purge removes entries.
+    for (const role of grantees) {
+      await queryRunner.query(`REVOKE DELETE ON "audit_log_outbox" FROM ${quoteRole(role)}`);
+    }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
