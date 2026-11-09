@@ -6,9 +6,7 @@ sources:
   - hay-website src/_data/pricing.js (all prices and included resolutions)
   - hay-website src/pricing/en.locale.js and pt.locale.js (FAQ, resolution definition, trial)
   - hay-website src/llms.njk (overage cap, currencies)
-  - hay-website src/founder-sprint/en.locale.js
 todo:
-  - TODO(Roger) The Founder Sprint: the website WIP notes say the offer may be renamed and "Book a demo" still points to /founder-sprint/. Confirm the offer is still current and whether spots remain before quoting it.
   - TODO(Roger) Enterprise terms beyond the price (SLA, contract) are not published. The assistant offers a call.
   - TODO(Roger) Prices change. Re-check src/_data/pricing.js against what Stripe actually bills before go-live.
 ---
@@ -50,12 +48,9 @@ A resolution is a conversation the AI resolved: the shopper asked for something 
 
 It never counts: greetings and thank-yous with no real request, conversations the AI did not answer, conversations where the shopper said it did not help, empty chats, test chats, spam. A shopper who comes back within 72 hours of a resolution reverses the charge.
 
-You can check what you are billed for in Settings > Usage in the dashboard: every billable resolution with its transcript, exportable as CSV. If one should not count, exclude it there with a reason (up to 5% of the month's resolutions at once; beyond that the Hay.chat team reviews).
-
-## Founder Sprint (limited offer)
-Per hay.chat/founder-sprint/: open to 10 stores on any Hay.chat plan; dedicated time with the founders every week for 90 days to set up and improve the agent, a review of documentation and playbooks, and 50% off any plan for 90 days. Do not say spots remain; offer to book a call to confirm.
+You can check what you are billed for in Settings > Billing & Usage > Usage in the dashboard: every billable resolution with its transcript, exportable as CSV. If one should not count, exclude it there with a reason (up to 5% of the month's resolutions at once; beyond that the Hay.chat team reviews).
 
 ## Not published
 Discounts for non-profits or startups, custom contracts, invoicing terms, volume discounts above Enterprise, and any price not in the tables: do not answer; offer a call or hello@hay.chat.
 
-Sources: hay.chat/pricing, hay.chat/pt/preco, hay.chat/llms.txt, hay.chat/founder-sprint.
+Sources: hay.chat/pricing, hay.chat/pt/preco, hay.chat/llms.txt.

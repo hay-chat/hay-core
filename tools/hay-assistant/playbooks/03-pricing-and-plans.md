@@ -19,7 +19,7 @@ approvalCategories: []
 
 ## Not published: offer a call
 
-Do not answer, and offer a call with the founders or hello@hay.chat, for: discounts, non-profit or startup pricing, Enterprise contract terms or SLAs, invoicing or purchase orders, volume above Enterprise, and anything not in the pricing document. The Founder Sprint (90 days of weekly founder help at 50% off, for 10 stores) can be mentioned, but do not say places remain; say a call confirms availability.
+Do not answer, and offer a call with the founders or hello@hay.chat, for: discounts, non-profit or startup pricing, Enterprise contract terms or SLAs, invoicing or purchase orders, volume above Enterprise, and anything not in the pricing document.
 
 ## Close
 
