@@ -26,7 +26,11 @@ jest.mock("@server/config/env", () => {
   const actual = jest.requireActual<typeof import("@server/config/env")>("@server/config/env");
   return {
     ...actual,
-    config: { ...actual.config, jwt: { ...actual.config.jwt, secret: "test-jwt-secret" } },
+    config: {
+      ...actual.config,
+      jwt: { ...actual.config.jwt, secret: "test-jwt-secret" },
+      plugins: { ...actual.config.plugins, allowCustomPluginUi: true },
+    },
     getApiUrl: () => "http://api.test",
   };
 });

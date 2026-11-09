@@ -46,7 +46,8 @@ function jwt(role: "admin" | "member" | "contributor" | "viewer" | "agent") {
   });
 }
 
-const apiKey = () => callerFor({ authMethod: "apikey", hasScope: () => true, getRole: () => "admin" });
+const apiKey = () =>
+  callerFor({ authMethod: "apikey", hasScope: () => true, getRole: () => "admin" });
 
 function procedure(caller: unknown, path: string): Procedure {
   return path
@@ -54,8 +55,7 @@ function procedure(caller: unknown, path: string): Procedure {
     .reduce((node, key) => (node as Record<string, unknown>)[key], caller) as Procedure;
 }
 
-const call = (caller: unknown, path: string, input?: unknown) =>
-  procedure(caller, path)(input);
+const call = (caller: unknown, path: string, input?: unknown) => procedure(caller, path)(input);
 
 const conversationId = "11111111-1111-4111-8111-111111111111";
 
@@ -134,11 +134,13 @@ describe("addSecrets and addContext", () => {
   });
 
   it("refuses a conversation context that grows past the limit when merged", async () => {
-    jest.spyOn(ConversationRepository.prototype, "findById").mockResolvedValue({
+    jest.spyOn(ConversationRepository.prototype, "findByIdAndOrganization").mockResolvedValue({
       organization_id: "org-1",
       context: { existing: "x".repeat(60 * 1024) },
     } as never);
-    const update = jest.spyOn(ConversationRepository.prototype, "updateById").mockResolvedValue(null as never);
+    const update = jest
+      .spyOn(ConversationRepository.prototype, "updateById")
+      .mockResolvedValue(null as never);
     const input = { id: conversationId, context: { more: "y".repeat(10 * 1024) } };
     await expect(call(apiKey(), "conversations.addContext", input)).rejects.toMatchObject({
       code: "BAD_REQUEST",
@@ -151,7 +153,9 @@ describe("addSecrets and addContext", () => {
       id: "customer-1",
       external_metadata: { plan: "pro" },
     } as never);
-    const update = jest.spyOn(CustomerRepository.prototype, "update").mockResolvedValue(null as never);
+    const update = jest
+      .spyOn(CustomerRepository.prototype, "update")
+      .mockResolvedValue(null as never);
     await call(apiKey(), "customers.addContext", { externalId: "ext-1", context: { vip: true } });
     expect(update).toHaveBeenCalledWith("customer-1", "org-1", {
       external_metadata: { plan: "pro", vip: true },
@@ -173,9 +177,9 @@ describe("regenerateEmbeddings bounds", () => {
     [{ chunkSize: 500.5 }],
     [{ chunkSize: 500, chunkOverlap: 500 }],
   ])("refuses %j", async (input) => {
-    await expect(
-      call(jwt("admin"), "documents.regenerateEmbeddings", input),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(call(jwt("admin"), "documents.regenerateEmbeddings", input)).rejects.toMatchObject(
+      { code: "BAD_REQUEST" },
+    );
   });
 });
 

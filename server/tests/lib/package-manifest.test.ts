@@ -16,7 +16,8 @@ const rootPkg = readJson(path.join(REPO_ROOT, "package.json"));
 
 const SKIP_DIRS = new Set(["node_modules", "dist", "tests", "__tests__", "scripts"]);
 // plugin-ui.service.ts emits a Vue SFC template as a string; those imports run in the dashboard.
-const TEMPLATE_ONLY_IMPORTS = new Set(["vue", "lucide-vue-next", "@/components"]);
+// run-worker.ts evaluates tsx only when the entry is a .ts file, which never happens in the build.
+const TEMPLATE_ONLY_IMPORTS = new Set(["vue", "lucide-vue-next", "@/components", "tsx"]);
 
 function sourceFiles(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

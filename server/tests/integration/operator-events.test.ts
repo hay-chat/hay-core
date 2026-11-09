@@ -6,7 +6,7 @@ const mockConfig = {
 };
 jest.mock("@server/config/env", () => {
   const actual = jest.requireActual<typeof import("@server/config/env")>("@server/config/env");
-  return { config: { ...actual.config, internal: mockConfig.internal } };
+  return { ...actual, config: { ...actual.config, internal: mockConfig.internal } };
 });
 
 import { AppDataSource } from "../../database/data-source";
