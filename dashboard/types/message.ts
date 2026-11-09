@@ -10,6 +10,7 @@ export interface Message {
   errorMessage?: string; // Error message if delivery failed
   metadata?: {
     model?: string;
+    approvedImages?: string[];
     prompt_tokens?: number;
     completion_tokens?: number;
     total_tokens?: number;
