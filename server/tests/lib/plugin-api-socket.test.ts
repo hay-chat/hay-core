@@ -18,6 +18,17 @@ describe("plugin API socket", () => {
     expect(isPluginApiPath(undefined)).toBe(false);
   });
 
+  it("refuses paths the router or tRPC would resolve to something else", () => {
+    expect(isPluginApiPath("/v1/plugin-api/health")).toBe(true);
+    expect(isPluginApiPath("/v1/plugin-api/auth.login")).toBe(false);
+    expect(isPluginApiPath("/v1/plugin-api/x/auth.login")).toBe(false);
+    expect(isPluginApiPath("/v1/pluginApi.a/auth.login")).toBe(false);
+    expect(isPluginApiPath("/v1/pluginApi.a%2Cauth.login")).toBe(false);
+    expect(isPluginApiPath("/v1/pluginApi.a%2Fauth.login")).toBe(false);
+    expect(isPluginApiPath("/v1/plugin-api/%2e%2e/auth.login")).toBe(false);
+    expect(isPluginApiPath("http://core/v1/auth.login")).toBe(false);
+  });
+
   it("serves the app for plugin API paths and answers 404 for anything else", async () => {
     const dir = mkdtempSync(join(tmpdir(), "pa-sock-"));
     const socketPath = join(dir, "api.sock");

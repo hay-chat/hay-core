@@ -9,20 +9,24 @@
 import { createServer, type IncomingMessage, type RequestListener, type Server } from "http";
 import { chmodSync, rmSync } from "fs";
 
-const PLUGIN_API_PREFIX = "/v1/plugin-api/";
+const PLUGIN_API_ROUTES = new Set(["/v1/plugin-api/send-email", "/v1/plugin-api/health"]);
+const PLUGIN_API_PROCEDURE = /^pluginApi\.[A-Za-z0-9_.]+$/;
 
 /**
- * Whether `url` (request path and query) is part of the plugin API. tRPC batches
- * join procedures in one path (`/v1/a.b,c.d`), and every one must be a plugin
- * API procedure.
+ * Whether `url` (request path and query) is part of the plugin API. Matching is
+ * exact because the router behind this socket is more forgiving than a prefix:
+ * unknown /v1/plugin-api paths fall through to tRPC, and tRPC routes on whatever
+ * follows the last slash. Batches join procedures in one path (`/v1/a.b,c.d`),
+ * and every one must be a plugin API procedure.
  */
 export function isPluginApiPath(url: string | undefined): boolean {
   const path = (url ?? "").split("?")[0];
-  if (path.includes("..") || path.includes("//")) return false;
-  if (path.startsWith(PLUGIN_API_PREFIX)) return true;
+  if (PLUGIN_API_ROUTES.has(path)) return true;
   if (!path.startsWith("/v1/")) return false;
-  const procedures = path.slice("/v1/".length).split(",");
-  return procedures.every((procedure) => procedure.startsWith("pluginApi."));
+  return path
+    .slice("/v1/".length)
+    .split(",")
+    .every((procedure) => PLUGIN_API_PROCEDURE.test(procedure));
 }
 
 /** Serve `app` on a unix socket, limited to the plugin API paths. */
