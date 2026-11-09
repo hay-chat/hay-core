@@ -1,5 +1,9 @@
 <template>
-  <Page :title="$t('llmSettings.title')" :description="$t('llmSettings.description')">
+  <Page
+    :title="$t('llmSettings.title')"
+    :description="$t('llmSettings.description')"
+    :disabled="isLoading"
+  >
     <SettingsTabs />
     <template #header>
       <Button :loading="isSaving" :disabled="!unlocked || !hasChanges || isEu" @click="save">
@@ -214,6 +218,7 @@ const { t } = useI18n();
 const toast = useToast();
 
 const isSaving = ref(false);
+const isLoading = ref(true);
 const hasApiKey = ref(false);
 // Config is gated behind an explicit acknowledgement that changing AI defaults can
 // radically alter agent behavior.
@@ -403,8 +408,12 @@ async function save() {
 }
 
 onMounted(async () => {
-  await Promise.all([loadRegion(), loadCatalog()]);
-  await load();
+  try {
+    await Promise.all([loadRegion(), loadCatalog()]);
+    await load();
+  } finally {
+    isLoading.value = false;
+  }
 });
 
 definePageMeta({ layout: "default" });

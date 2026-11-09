@@ -1,5 +1,5 @@
 <template>
-  <Page :title="$t('general.title')" :description="$t('general.description')">
+  <Page :title="$t('general.title')" :description="$t('general.description')" :disabled="isLoading">
     <SettingsTabs />
     <!-- Header -->
     <template #header>
@@ -588,6 +588,8 @@ type PlatformSettings = {
 // Reactive state
 const originalSettings = ref<PlatformSettings>({} as PlatformSettings);
 const isSaving = ref(false);
+// Until the real values arrive the form holds placeholders; nothing may be edited or saved.
+const isLoading = ref(true);
 const settings = ref<PlatformSettings>({
   organizationName: "",
   organizationAbout: "",
@@ -974,6 +976,8 @@ onMounted(async () => {
   } catch (error) {
     console.error("Failed to load settings:", error);
     toast.error(t("common.error"), t("general.loadFailed"));
+  } finally {
+    isLoading.value = false;
   }
 });
 
