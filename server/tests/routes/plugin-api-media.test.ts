@@ -56,6 +56,7 @@ interface StoredUpload {
 const mockUpload = jest.fn<(options: Record<string, unknown>) => Promise<StoredUpload>>();
 jest.mock("@server/services/storage.service", () => ({
   CONVERSATION_MEDIA_FOLDER: "conversation-media",
+  UploadRejectedError: class UploadRejectedError extends Error {},
   storageService: { upload: mockUpload },
 }));
 
@@ -85,6 +86,7 @@ jest.mock("@server/services/transcription.service", () => ({
 jest.mock("@server/services/oauth.service", () => ({ oauthService: {} }));
 
 import { pluginApiTrpcRouter } from "@server/routes/v1/plugin-api/trpc";
+import { UploadRejectedError } from "@server/services/storage.service";
 import type { PluginAuthContext } from "@server/trpc/middleware/plugin-auth";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -166,7 +168,9 @@ describe("pluginApi.media.upload", () => {
   });
 
   it("maps storage validation errors to BAD_REQUEST", async () => {
-    mockUpload.mockRejectedValue(new Error("File type not allowed: application/x-msdownload"));
+    mockUpload.mockRejectedValue(
+      new UploadRejectedError("File type not allowed: application/x-msdownload"),
+    );
 
     await expect(
       caller()["media.upload"]({

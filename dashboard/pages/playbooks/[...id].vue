@@ -339,6 +339,7 @@
 </template>
 
 <script setup lang="ts">
+import { safeInternalPath } from "@/utils/safe-internal-path";
 import { ref, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import {
@@ -677,7 +678,7 @@ const handleSubmit = async () => {
       markAsSaved();
 
       // Check if there's a redirect parameter
-      const redirectPath = route.query.redirect as string;
+      const redirectPath = safeInternalPath(route.query.redirect, "");
       if (redirectPath) {
         await router.push(redirectPath);
         return;

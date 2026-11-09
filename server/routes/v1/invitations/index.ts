@@ -502,7 +502,7 @@ export const invitationsRouter = t.router({
    */
   getInvitationByToken: publicProcedure
     .input(z.object({ token: z.string() }))
-    .query(async ({ input }) => {
+    .mutation(async ({ input }) => {
       const tokenHash = hashToken(input.token);
       const invitationRepository = AppDataSource.getRepository(OrganizationInvitation);
 

@@ -2,7 +2,7 @@ import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { auditLogService } from "@server/services/audit-log.service";
 import type { AuditAction, AuditLog } from "@server/entities/audit-log.entity";
-import { TRPCError } from "@trpc/server";
+import { toClientError } from "@server/trpc/client-error";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { csvCell } from "@server/services/organization-export.service";
 
@@ -155,10 +155,7 @@ export const auditLogsRouter = t.router({
           };
         }
       } catch (error) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: error instanceof Error ? error.message : "Failed to export audit logs",
-        });
+        throw toClientError(error, "INTERNAL_SERVER_ERROR", "Failed to export audit logs");
       }
     }),
 });

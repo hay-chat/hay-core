@@ -67,7 +67,7 @@ onMounted(async () => {
       expiresIn: result.expiresIn,
     });
 
-    await router.push("/");
+    await router.replace("/");
   } catch (err: unknown) {
     status.value = "error";
     errorMessage.value =

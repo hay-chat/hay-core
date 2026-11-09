@@ -249,6 +249,7 @@
 </template>
 
 <script setup lang="ts">
+import { safeInternalPath } from "@/utils/safe-internal-path";
 import { nextTick } from "vue";
 import { validateEmail, validatePassword } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
@@ -270,7 +271,7 @@ const route = useRoute();
 const authStore = useAuthStore();
 
 // Get redirect URL from query params
-const redirectUrl = computed(() => (route.query.redirect as string) || "/");
+const redirectUrl = computed(() => safeInternalPath(route.query.redirect));
 const loginQuery = computed(() =>
   redirectUrl.value === "/" ? {} : { redirect: redirectUrl.value },
 );
@@ -309,7 +310,7 @@ const loadInvitationContext = async () => {
   if (!token) return;
 
   try {
-    const invitation = await Hay.invitations.getInvitationByToken.query({ token });
+    const invitation = await Hay.invitations.getInvitationByToken.mutate({ token });
     invitationContext.value = {
       email: invitation.email,
       role: invitation.role,
@@ -340,7 +341,7 @@ const loadSignupStatus = async () => {
       // page the visitor was heading to, so they come back to it afterwards.
       const target = new URL(status.signupUrl);
       const next = redirectUrl.value;
-      if (next && next !== "/" && /^\/(?![/\\])/.test(next)) {
+      if (next !== "/") {
         target.searchParams.set("return_to", next);
       }
       window.location.replace(target.toString());

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isAllowedConnectReturn } from "@server/lib/connect-return";
 import { TRPCError } from "@trpc/server";
+import { toClientError } from "@server/trpc/client-error";
 import { authenticatedProcedure, scopedProcedure } from "@server/trpc";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { hasPluginCredentials, pickHealthCheckTool } from "@server/lib/plugin-health-tool";
@@ -426,8 +427,7 @@ export const enablePlugin = pluginManageProcedure
         dropManagedOverrides(
           input.configuration || {},
           (plugin.metadata?.configSchema ?? (plugin.manifest as HayPluginManifest).configSchema) as
-            | Record<string, ConfigFieldDescriptor>
-            | undefined,
+            Record<string, ConfigFieldDescriptor> | undefined,
           configEnvAllowList(plugin),
         ),
       );
@@ -484,21 +484,7 @@ export const enablePlugin = pluginManageProcedure
       };
     } catch (error) {
       logger.error({ err: error, pluginName: plugin.name }, "Failed to enable plugin");
-
-      // Extract the most relevant error message
-      let errorMessage = "Unknown error";
-      if (error instanceof Error) {
-        // Clean up the error message for the user
-        errorMessage = error.message
-          .replace(/Failed to \w+ plugin hay-plugin-\w+: /, "") // Remove redundant prefix
-          .replace(/Error: /, "") // Remove Error: prefix
-          .replace(/Command failed: /, "Command failed: "); // Keep command failed for clarity
-      }
-
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: `Failed to enable ${plugin.name}: ${errorMessage}`,
-      });
+      throw toClientError(error, "INTERNAL_SERVER_ERROR", `Failed to enable ${plugin.name}`);
     }
   });
 
@@ -647,16 +633,7 @@ export const restartPlugin = pluginManageProcedure
       };
     } catch (error) {
       logger.error({ err: error, pluginName: plugin.name }, "Failed to restart plugin");
-
-      let errorMessage = "Unknown error";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: `Failed to restart ${plugin.name}: ${errorMessage}`,
-      });
+      throw toClientError(error, "INTERNAL_SERVER_ERROR", `Failed to restart ${plugin.name}`);
     }
   });
 
@@ -801,10 +778,7 @@ export const configurePlugin = pluginManageProcedure
 
         // Otherwise wrap it
         logger.error({ err: error, pluginName: plugin.name }, "Auth validation failed");
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `Auth validation failed: ${error.message}`,
-        });
+        throw toClientError(error, "INTERNAL_SERVER_ERROR", "Auth validation failed");
       }
     }
 
@@ -1098,10 +1072,7 @@ export const refreshMCPTools = pluginManageProcedure
       await fetchAndStoreTools(workerInfo.port, ctx.organizationId!, input.pluginId);
       return { success: true, message: "Tools refreshed successfully" };
     } catch (error) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: `Failed to refresh tools: ${error instanceof Error ? error.message : String(error)}`,
-      });
+      throw toClientError(error, "INTERNAL_SERVER_ERROR", "Failed to refresh tools");
     }
   });
 

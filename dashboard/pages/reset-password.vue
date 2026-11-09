@@ -225,7 +225,7 @@ const verifyToken = async () => {
   }
 
   try {
-    const response = await Hay.auth.verifyResetToken.query({ token: token.value });
+    const response = await Hay.auth.verifyResetToken.mutate({ token: token.value });
 
     if (response.valid) {
       userEmail.value = ("email" in response ? response.email : "") || "";

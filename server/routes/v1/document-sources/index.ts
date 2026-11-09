@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { toClientError } from "@server/trpc/client-error";
 import { z } from "zod";
 import { t, scopedProcedure } from "@server/trpc";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
@@ -138,10 +139,7 @@ export const documentSourcesRouter = t.router({
       } catch (err) {
         if (err instanceof TRPCError) throw err;
         logger.error({ err, pluginId: input.pluginId }, "listRoots passthrough failed");
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: err instanceof Error ? err.message : "listRoots failed",
-        });
+        throw toClientError(err, "INTERNAL_SERVER_ERROR", "listRoots failed");
       }
     }),
 
