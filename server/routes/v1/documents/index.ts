@@ -436,7 +436,12 @@ export const documentsRouter = t.router({
         await vectorStoreService.deleteByDocumentId(ctx.organizationId!, document.id);
 
         // Split new content into chunks
-        const contentToEmbed = nextContent || document.content || "";
+        // An FAQ's title is its question, so it is embedded with the answer.
+        const body = nextContent || document.content || "";
+        const contentToEmbed =
+          document.type === DocumentationType.FAQ
+            ? `${input.title || document.title}\n\n${body}`
+            : body;
         const chunks = splitTextIntoChunks(contentToEmbed, {
           chunkSize: 1000,
           chunkOverlap: 200,

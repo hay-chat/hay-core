@@ -73,7 +73,10 @@ export function pluginFor(
 function platformRow(
   question: SetupQuestion,
   need: SetupHandle,
-  base: Pick<SetupRow, "id" | "text" | "source" | "sources">,
+  base: Pick<
+    SetupRow,
+    "id" | "text" | "source" | "sources" | "answerDocumentId" | "linkedDocument"
+  >,
   facts: BoardFacts,
 ): SetupRow {
   const plugin = pluginFor(need, facts.setup, facts.plugins);
@@ -113,6 +116,8 @@ export function buildRow(question: SetupQuestion, facts: BoardFacts): SetupRow {
     text: question.text,
     source: question.source,
     sources: [] as SetupRow["sources"],
+    ...(question.answerDocumentId ? { answerDocumentId: question.answerDocumentId } : {}),
+    ...(question.linkedDocument ? { linkedDocument: question.linkedDocument } : {}),
   };
 
   if (question.needs) return platformRow(question, question.needs, base, facts);

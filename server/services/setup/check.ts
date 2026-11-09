@@ -9,6 +9,7 @@
  * @module services/setup/check
  */
 
+import { TRPCError } from "@trpc/server";
 import { In } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
 import { Document, DocumentationStatus } from "@server/entities/document.entity";
@@ -16,7 +17,9 @@ import { vectorStoreService } from "@server/services/vector-store.service";
 import { MIN_DOCUMENT_SIMILARITY } from "@server/services/document-similarity";
 import { LLMService } from "@server/services/core/llm.service";
 import { createLogger } from "@server/lib/logger";
-import type { SetupCheckResult, SetupSource } from "@server/types/setup.types";
+import { splitTextIntoChunks } from "@server/utils/text-chunking";
+import type { SetupCheckResult, SetupQuestion, SetupSource } from "@server/types/setup.types";
+import { plainTextOf } from "./answer-text";
 
 const logger = createLogger("setup-check");
 
@@ -113,7 +116,7 @@ export function parseCheckOutput(raw: string): CheckModelOutput {
   };
 }
 
-function isUsable(doc: Document): boolean {
+export function isUsable(doc: Document): boolean {
   return (
     doc.status !== DocumentationStatus.ARCHIVED &&
     doc.status !== DocumentationStatus.ERROR &&
@@ -232,4 +235,90 @@ export async function mapWithConcurrency<T, R>(
   });
   await Promise.all(runners);
   return results;
+}
+
+/**
+ * The documents holding each question's own answer, keyed by question id, in one query. A
+ * deleted document is simply absent: that question behaves as if it had no own answer.
+ */
+export async function loadOwnAnswers(
+  organizationId: string,
+  questions: SetupQuestion[],
+): Promise<Map<string, Document>> {
+  const ids = [...new Set(questions.flatMap((q) => q.answerDocumentId ?? []))];
+  if (ids.length === 0) return new Map();
+  const docs = await AppDataSource.getRepository(Document).find({
+    where: { id: In(ids), organizationId },
+  });
+  const byId = new Map(docs.map((d) => [d.id, d]));
+  return new Map(
+    questions.flatMap((q) => {
+      const doc = q.answerDocumentId ? byId.get(q.answerDocumentId) : undefined;
+      return doc ? [[q.id, doc] as const] : [];
+    }),
+  );
+}
+
+/**
+ * A question with its own answer always records that answer as its source, whatever the check
+ * found, or the wrong document would come back on the next recheck. A failed check stays failed.
+ * The real test turn still decides whether the row is Ready.
+ */
+export function preferOwnAnswer(result: SetupCheckResult, own?: Document): SetupCheckResult {
+  if (!own || result.outcome === "failed") return result;
+  return {
+    outcome: "answered",
+    answer: plainTextOf(own.content),
+    sources: [{ documentId: own.id, title: own.title }],
+    checkedAt: result.checkedAt,
+  };
+}
+
+/** Chunks of the document the model reads. TODO: search inside one document once the store can. */
+const DRAFT_CHUNK_COUNT = 10;
+
+export interface DraftDeps {
+  loadDocument: (organizationId: string, documentId: string) => Promise<Document | null>;
+  ask: CheckDeps["ask"];
+}
+
+const defaultDraftDeps: DraftDeps = {
+  loadDocument: (organizationId, documentId) =>
+    AppDataSource.getRepository(Document).findOne({ where: { id: documentId, organizationId } }),
+  ask: defaultDeps.ask,
+};
+
+/**
+ * Drafts an answer to `question` from one document. Null when the document does not state the
+ * fact. A model or parse failure throws so the caller can say so; nothing is written.
+ */
+export async function draftAnswerFromDocument(
+  organizationId: string,
+  question: string,
+  documentId: string,
+  deps: DraftDeps = defaultDraftDeps,
+): Promise<string | null> {
+  const doc = await deps.loadDocument(organizationId, documentId);
+  if (!doc) throw new TRPCError({ code: "NOT_FOUND", message: "Document not found" });
+  if (!isUsable(doc)) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "This document cannot be used" });
+  }
+
+  const chunks = splitTextIntoChunks(plainTextOf(doc.content), {
+    chunkSize: 1000,
+    chunkOverlap: 200,
+  }).slice(0, DRAFT_CHUNK_COUNT);
+  if (chunks.length === 0) return null;
+
+  const passages = chunks.map((content, index) => ({
+    number: index + 1,
+    documentId: doc.id,
+    title: doc.title,
+    content,
+  }));
+  const output = parseCheckOutput(
+    await deps.ask(organizationId, buildCheckPrompt(question, passages)),
+  );
+  const answer = output.answer.trim().slice(0, ANSWER_MAX_CHARS);
+  return output.states_the_fact && answer ? answer : null;
 }

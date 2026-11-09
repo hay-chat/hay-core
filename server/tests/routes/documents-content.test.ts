@@ -29,10 +29,11 @@ jest.mock("@server/repositories/document.repository", () => ({
         : null,
   },
 }));
+const mockAddChunks = jest.fn(async (..._args: unknown[]) => [] as string[]);
 jest.mock("@server/services/vector-store.service", () => ({
   vectorStoreService: {
     initialized: true,
-    addChunks: async () => [],
+    addChunks: (...args: unknown[]) => mockAddChunks(...args),
     deleteByDocumentId: async () => 0,
   },
 }));
@@ -96,6 +97,19 @@ describe("editor document content", () => {
     await caller().update({ id: "doc-1", content: "# Title\n\n<b>x</b>" });
 
     expect(mockUpdate.mock.calls[0][2].content).toBe("# Title\n\n<b>x</b>");
+  });
+
+  it("embeds an FAQ's title before its content, and only an FAQ's", async () => {
+    existing = { ...existing!, type: "faq", title: "Refunds?" };
+    await caller().update({ id: "doc-1", content: "<p>30 days.</p>" });
+    const embedded = (mockAddChunks.mock.calls[0][2] as { content: string }[])[0].content;
+    expect(embedded.startsWith("Refunds?")).toBe(true);
+
+    mockAddChunks.mockClear();
+    existing = { ...existing!, type: "article" };
+    await caller().update({ id: "doc-1", content: "<p>30 days.</p>" });
+    const plain = (mockAddChunks.mock.calls[0][2] as { content: string }[])[0].content;
+    expect(plain).not.toContain("Refunds?");
   });
 
   it("does not update a document owned by another organization", async () => {

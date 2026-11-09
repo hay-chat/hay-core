@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 
-jest.mock("@server/database/data-source", () => ({ AppDataSource: { query: jest.fn() } }));
+const findDocuments = jest.fn();
+jest.mock("@server/database/data-source", () => ({
+  AppDataSource: { query: jest.fn(), getRepository: () => ({ find: findDocuments }) },
+}));
 jest.mock("@server/services/organization.service", () => ({
   organizationService: { findOne: jest.fn().mockResolvedValue({ defaultLanguage: "en" }) },
 }));
@@ -17,7 +20,12 @@ jest.mock("@server/services/web-scraper.service", () => ({ WebScraperService: cl
 jest.mock("@server/repositories/document-source.repository", () => ({
   documentSourceRepository: {},
 }));
-jest.mock("@server/repositories/document.repository", () => ({ documentRepository: {} }));
+const findByIdAndOrganization = jest.fn();
+jest.mock("@server/repositories/document.repository", () => ({
+  documentRepository: {
+    findByIdAndOrganization: (...args: unknown[]) => findByIdAndOrganization(...args),
+  },
+}));
 
 const store = { current: {} as Record<string, unknown> };
 jest.mock("@server/services/setup/store", () => ({
@@ -41,6 +49,7 @@ jest.mock("@server/services/setup/site", () => ({
 const saveAnswerDocument = jest.fn();
 jest.mock("@server/services/setup/answer-document", () => ({
   saveAnswerDocument: (...args: unknown[]) => saveAnswerDocument(...args),
+  retitleAnswerDocument: jest.fn(),
 }));
 const startTurns = jest.fn();
 const readTurn = jest.fn();
@@ -50,10 +59,10 @@ jest.mock("@server/services/setup/turn", () => ({
 }));
 
 import {
-  addAnswer,
   checkQuestions,
   getBoard,
   needsCheck,
+  updateQuestion,
 } from "../../services/setup/setup.service";
 import { buildRow, type BoardFacts } from "../../services/setup/board";
 import { classifyTurn, turnRef } from "../../services/setup/turn-classify";
@@ -92,7 +101,10 @@ beforeEach(() => {
     return new Map((qs as { id: string }[]).map((q) => [q.id, { ...pending, ref: `ref-${q.id}` }]));
   });
   readTurn.mockReset().mockResolvedValue("pending");
-  saveAnswerDocument.mockReset().mockResolvedValue({ id: "doc1", title: "My answer" });
+  const mine = { id: "doc1", title: "My answer", content: "<p>Yes, 30 days.</p>" };
+  saveAnswerDocument.mockReset().mockResolvedValue(mine);
+  findDocuments.mockReset().mockResolvedValue([mine]);
+  findByIdAndOrganization.mockReset().mockResolvedValue(null);
   (
     jest.requireMock("@server/database/data-source") as { AppDataSource: { query: jest.Mock } }
   ).AppDataSource.query.mockResolvedValue([]);
@@ -246,10 +258,10 @@ describe("checkQuestions", () => {
   });
 });
 
-describe("addAnswer", () => {
+describe("updateQuestion with an answer", () => {
   it("counts the customer's own answer for the filter but still needs a passed turn", async () => {
     cheap.mockResolvedValue({ outcome: "not_answered", sources: [], checkedAt });
-    const board = await addAnswer("org", "q1", "Yes, 30 days.");
+    const board = await updateQuestion("org", { questionId: "q1", answer: "Yes, 30 days." });
     expect(startTurns).toHaveBeenCalledTimes(1);
     expect(board.rows[0].status).toBe("checking");
     expect(stored()).toMatchObject({
@@ -266,7 +278,7 @@ describe("addAnswer", () => {
 
   it("a handed-off turn on the customer's own answer is missing with handedOff", async () => {
     cheap.mockResolvedValue({ outcome: "not_answered", sources: [], checkedAt });
-    await addAnswer("org", "q1", "Maybe.");
+    await updateQuestion("org", { questionId: "q1", answer: "Maybe." });
     readTurn.mockResolvedValue("handed_off");
     expect((await getBoard("org")).rows[0]).toMatchObject({ status: "missing", handedOff: true });
     expect(stored().answerDocumentId).toBe("doc1");

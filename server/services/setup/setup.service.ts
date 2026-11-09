@@ -3,7 +3,7 @@
  *
  * Stored answers live in `settings.setup`; row statuses are worked out on every read from the
  * site's sync state, documents and playbooks (see board.ts). Only `checkQuestions`,
- * `addAnswer` and `addQuestion` call a model, and run a real test turn for answers the check finds.
+ * `updateQuestion` and `addQuestion` call a model, and run a real test turn for answers the check finds.
  *
  * @module services/setup/setup.service
  */
@@ -26,7 +26,6 @@ import {
   type SetupCheckResult,
   type SetupQuestion,
   type SetupSettings,
-  type SetupSource,
   type SetupSuggestions,
 } from "@server/types/setup.types";
 import {
@@ -41,8 +40,17 @@ import { connectedPluginIds } from "./connection";
 import { stepsFromInstructions } from "./playbook-generation";
 import { generatePlaybooksFor, turnOnPlaybook } from "./playbooks";
 import { catalogFor, catalogLocale, findCatalogQuestion } from "./catalog";
-import { CHECK_CONCURRENCY, checkQuestion, mapWithConcurrency } from "./check";
+import {
+  CHECK_CONCURRENCY,
+  checkQuestion,
+  draftAnswerFromDocument,
+  loadOwnAnswers,
+  mapWithConcurrency,
+  preferOwnAnswer,
+} from "./check";
+import { answerTextOf } from "./answer-text";
 import { saveAnswerDocument } from "./answer-document";
+import { documentRepository } from "@server/repositories/document.repository";
 import { readTurn, startTurns } from "./turn";
 import type { PendingTurn, TurnOutcome } from "./turn-classify";
 import { createLogger } from "@server/lib/logger";
@@ -370,7 +378,6 @@ interface CheckedQuestion {
   id: string;
   text: string;
   result: SetupCheckResult;
-  answerDocumentId?: string;
 }
 
 /**
@@ -460,25 +467,25 @@ async function saveChecks(
       questions: current.questions.map((q) => {
         const hit = results.find((r) => r.id === q.id && r.text === q.text);
         if (!hit) return q;
-        return {
-          ...q,
-          check: hit.result,
-          ...(hit.answerDocumentId ? { answerDocumentId: hit.answerDocumentId } : {}),
-        };
+        return { ...q, check: hit.result };
       }),
     };
   });
 }
 
-/** Cheap check for each target, then one real test turn for those it calls answered. */
+/**
+ * Cheap check for each target, then one real test turn for those it calls answered. Every
+ * recheck goes through here, so a question's own answer wins on every path.
+ */
 async function checkAndStart(
   organizationId: string,
   targets: SetupQuestion[],
 ): Promise<SetupSettings> {
+  const own = await loadOwnAnswers(organizationId, targets);
   const checked = await mapWithConcurrency(targets, CHECK_CONCURRENCY, async (q) => ({
     id: q.id,
     text: q.text,
-    result: await checkOnce(organizationId, q),
+    result: preferOwnAnswer(await checkOnce(organizationId, q), own.get(q.id)),
   }));
   return saveChecks(organizationId, await withTurns(organizationId, checked));
 }
@@ -511,40 +518,6 @@ function findQuestion(setup: SetupSettings, questionId: string): SetupQuestion {
   const question = setup.questions.find((q) => q.id === questionId);
   if (!question) throw new TRPCError({ code: "NOT_FOUND", message: "Question not found" });
   return question;
-}
-
-export async function addAnswer(
-  organizationId: string,
-  questionId: string,
-  answer: string,
-): Promise<SetupBoard> {
-  const question = findQuestion(await readSetup(organizationId), questionId);
-  if (question.needs) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "This question is answered by a connected platform, not by a document",
-    });
-  }
-
-  const document = await saveAnswerDocument(organizationId, question.text, answer);
-
-  return serialized(organizationId, async () => {
-    const rechecked = await checkOnce(organizationId, question);
-
-    // The customer just wrote the answer to this exact question and it is embedded, so a "not
-    // answered" verdict would be wrong: record their own text. A failed check stays failed. Their
-    // answer still has to pass a real test turn before the row is Ready.
-    const mine: SetupSource = { documentId: document.id, title: document.title };
-    const result: SetupCheckResult =
-      rechecked.outcome === "not_answered"
-        ? { outcome: "answered", answer, sources: [mine], checkedAt: rechecked.checkedAt }
-        : rechecked;
-
-    const [tested] = await withTurns(organizationId, [
-      { id: question.id, text: question.text, result, answerDocumentId: document.id },
-    ]);
-    return boardFor(organizationId, await saveChecks(organizationId, [tested]));
-  });
 }
 
 export async function addQuestion(organizationId: string, text: string): Promise<SetupBoard> {
@@ -585,6 +558,13 @@ export async function removeQuestion(
   return boardFor(organizationId, saved);
 }
 
+export async function restoreQuestion(
+  _organizationId: string,
+  _questionId: string,
+): Promise<SetupBoard> {
+  throw new TRPCError({ code: "NOT_IMPLEMENTED" });
+}
+
 export interface UpdateQuestionInput {
   questionId: string;
   text?: string;
@@ -592,33 +572,102 @@ export interface UpdateQuestionInput {
   linkedDocumentId?: string | null;
 }
 
+/**
+ * Saves a row's edit panel in one go: wording, own answer and the document it is based on, then
+ * one recheck. The document is written first so the check sees its new embedding.
+ */
 export async function updateQuestion(
-  _organizationId: string,
-  _input: UpdateQuestionInput,
+  organizationId: string,
+  input: UpdateQuestionInput,
 ): Promise<SetupBoard> {
-  throw new TRPCError({ code: "NOT_IMPLEMENTED" });
+  const setup = await readSetup(organizationId);
+  const question = findQuestion(setup, input.questionId);
+  const { answer, linkedDocumentId } = input;
+
+  if (question.needs && (answer !== undefined || linkedDocumentId !== undefined)) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "This question is answered by a connected platform, not by a document",
+    });
+  }
+
+  const text = input.text?.trim() ?? question.text;
+  const renamed = text !== question.text;
+  if (!renamed && answer === undefined && linkedDocumentId === undefined) {
+    return boardFor(organizationId, setup);
+  }
+  let linked: SetupQuestion["linkedDocument"];
+  if (typeof linkedDocumentId === "string") {
+    if (linkedDocumentId === question.answerDocumentId) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Link a different document" });
+    }
+    const document = await documentRepository.findByIdAndOrganization(
+      linkedDocumentId,
+      organizationId,
+    );
+    if (!document) throw new TRPCError({ code: "NOT_FOUND", message: "Document not found" });
+    linked = { id: document.id, title: document.title };
+  }
+
+  const own = question.answerDocumentId
+    ? await documentRepository.findByIdAndOrganization(question.answerDocumentId, organizationId)
+    : null;
+  // A title the customer never changed follows the question; one they changed is theirs.
+  const followsQuestion = !!own && own.title === question.text;
+  const title = own && !followsQuestion ? own.title : text;
+
+  let answerDocumentId = question.answerDocumentId;
+  if (answer !== undefined) {
+    answerDocumentId = (
+      await saveAnswerDocument(organizationId, { existing: own, title, text: answer })
+    ).id;
+  }
+
+  const saved = await updateSetup(organizationId, (current) => ({
+    ...current,
+    questions: current.questions.map((q) => {
+      if (q.id !== question.id) return q;
+      return {
+        ...q,
+        text,
+        check: undefined,
+        answerDocumentId,
+        linkedDocument: linkedDocumentId === undefined ? q.linkedDocument : linked,
+      };
+    }),
+  }));
+
+  if (question.needs) return boardFor(organizationId, saved);
+
+  return serialized(organizationId, async () => {
+    const latest = await readSetup(organizationId);
+    const target = latest.questions.find((q) => q.id === question.id);
+    if (!target || target.text !== text) return boardFor(organizationId, latest);
+    return boardFor(organizationId, await checkAndStart(organizationId, [target]));
+  });
 }
 
 export async function draftAnswer(
-  _organizationId: string,
-  _questionId: string,
-  _documentId: string,
+  organizationId: string,
+  questionId: string,
+  documentId: string,
 ): Promise<{ answer: string | null }> {
-  throw new TRPCError({ code: "NOT_IMPLEMENTED" });
+  const question = findQuestion(await readSetup(organizationId), questionId);
+  return { answer: await draftAnswerFromDocument(organizationId, question.text, documentId) };
 }
 
+/** The text of a row's own answer, or null when it has none or its document is gone. */
 export async function getAnswer(
-  _organizationId: string,
-  _questionId: string,
+  organizationId: string,
+  questionId: string,
 ): Promise<SetupAnswerText | null> {
-  throw new TRPCError({ code: "NOT_IMPLEMENTED" });
-}
-
-export async function restoreQuestion(
-  _organizationId: string,
-  _questionId: string,
-): Promise<SetupBoard> {
-  throw new TRPCError({ code: "NOT_IMPLEMENTED" });
+  const { answerDocumentId } = findQuestion(await readSetup(organizationId), questionId);
+  if (!answerDocumentId) return null;
+  const document = await documentRepository.findByIdAndOrganization(
+    answerDocumentId,
+    organizationId,
+  );
+  return document ? answerTextOf(document.content) : null;
 }
 
 export async function dismiss(organizationId: string): Promise<SetupBoard> {
