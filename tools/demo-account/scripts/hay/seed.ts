@@ -280,6 +280,17 @@ export async function applySeed(
           id: match.id,
           data: { ...fields, approvalCategories: playbook.approvalCategories },
         });
+        // The assistant reads the active version, which playbooks.update leaves untouched.
+        if (!dryRun) {
+          await client.mutation("playbooks.versions.saveDraft", {
+            playbookId: match.id,
+            instructions: playbook.instructions,
+          });
+          await client.mutation("playbooks.versions.publish", {
+            playbookId: match.id,
+            note: "Published by the seed script",
+          });
+        }
         write("update", `playbook "${playbook.title}"`);
       } else {
         if (!dryRun) {
