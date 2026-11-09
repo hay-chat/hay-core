@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { createHmac, timingSafeEqual } from "crypto";
 import path from "path";
 import fs from "fs/promises";
-import { getApiUrl } from "../config/env";
+import { config, getApiUrl } from "../config/env";
 import type { PluginRegistry } from "../entities/plugin-registry.entity";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
