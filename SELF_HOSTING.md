@@ -149,19 +149,32 @@ directory yourself.
 
 ## Backups
 
-Three things hold state:
+The `backup` container takes a database dump and an uploads archive once a day
+into the `hay_backups` volume, keeping 7 daily, 4 weekly and 6 monthly copies
+(`BACKUP_*` in `.env`). It shows as unhealthy in `docker compose ps` when the last
+good backup is more than two intervals old.
 
-1. **The database.**
-   ```bash
-   docker compose exec -T postgres pg_dump -U hay -Fc hay > hay-$(date +%F).dump
-   ```
-   Restore into an empty database with `pg_restore -U hay -d hay --clean`.
-2. **Uploaded files**, in the `hay_uploads` volume (or your S3 bucket).
-3. **`selfhost/.env`.** Without `PLUGIN_ENCRYPTION_KEY` the stored integration
-   credentials can't be decrypted, and without the JWT secrets everyone is
-   logged out.
+**Backups on the same disk don't survive losing the disk.** Set `RESTIC_REPOSITORY`
+and `RESTIC_PASSWORD` in `.env` to also keep an encrypted copy elsewhere (any
+[restic S3 or REST repository](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html)).
+That copy holds the dump, the uploads, and `selfhost/.env`. Store `RESTIC_PASSWORD`
+outside this machine as well: without it the copy can't be read.
 
-Redis and RabbitMQ hold only transient data.
+Without restic, save `selfhost/.env` yourself. Without its
+`PLUGIN_ENCRYPTION_KEY` the stored integration credentials can't be decrypted,
+and without the JWT secrets everyone is logged out. Redis and RabbitMQ hold only
+transient data. If uploads are on S3, use that bucket's versioning.
+
+Take one now, and rehearse a restore every quarter. The drill restores the newest
+dump into a scratch database, checks it, and drops it:
+
+```bash
+docker compose exec backup backup.sh --once
+docker compose exec backup restore-drill.sh
+```
+
+To restore for real, see [`runbooks/db-restore.md`](runbooks/db-restore.md). Other
+runbooks for outages, key rotation and incidents are in [`runbooks/`](runbooks/).
 
 ## Monitoring
 
