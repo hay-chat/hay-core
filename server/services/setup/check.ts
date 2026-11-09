@@ -274,7 +274,7 @@ export function preferOwnAnswer(result: SetupCheckResult, own?: Document): Setup
   };
 }
 
-/** Chunks of the document the model reads. TODO: search inside one document once the store can. */
+/** Chunks the model reads when drafting. TODO: search inside the documents once the store can. */
 const DRAFT_CHUNK_COUNT = 10;
 
 export interface DraftDeps {
@@ -289,33 +289,38 @@ const defaultDraftDeps: DraftDeps = {
 };
 
 /**
- * Drafts an answer to `question` from one document. Null when the document does not state the
- * fact. A model or parse failure throws so the caller can say so; nothing is written.
+ * Drafts an answer to `question` from the given documents, read together. Null when they do not
+ * state the fact. A model or parse failure throws so the caller can say so; nothing is written.
  */
-export async function draftAnswerFromDocument(
+export async function draftAnswerFromDocuments(
   organizationId: string,
   question: string,
-  documentId: string,
+  documentIds: string[],
   deps: DraftDeps = defaultDraftDeps,
 ): Promise<string | null> {
-  const doc = await deps.loadDocument(organizationId, documentId);
-  if (!doc) throw new TRPCError({ code: "NOT_FOUND", message: "Document not found" });
-  if (!isUsable(doc)) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: "This document cannot be used" });
+  const docs: Document[] = [];
+  for (const id of new Set(documentIds)) {
+    const doc = await deps.loadDocument(organizationId, id);
+    if (!doc) throw new TRPCError({ code: "NOT_FOUND", message: "Document not found" });
+    if (!isUsable(doc)) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "This document cannot be used" });
+    }
+    docs.push(doc);
   }
+  if (docs.length === 0) return null;
 
-  const chunks = splitTextIntoChunks(plainTextOf(doc.content), {
-    chunkSize: 1000,
-    chunkOverlap: 200,
-  }).slice(0, DRAFT_CHUNK_COUNT);
-  if (chunks.length === 0) return null;
+  // The model reads the same amount of text whatever the count: the chunks are shared out.
+  const perDocument = Math.max(1, Math.floor(DRAFT_CHUNK_COUNT / docs.length));
+  const passages = docs
+    .flatMap((doc) =>
+      splitTextIntoChunks(plainTextOf(doc.content), { chunkSize: 1000, chunkOverlap: 200 })
+        .slice(0, perDocument)
+        .map((content) => ({ documentId: doc.id, title: doc.title, content })),
+    )
+    .slice(0, DRAFT_CHUNK_COUNT)
+    .map((passage, index) => ({ number: index + 1, ...passage }));
+  if (passages.length === 0) return null;
 
-  const passages = chunks.map((content, index) => ({
-    number: index + 1,
-    documentId: doc.id,
-    title: doc.title,
-    content,
-  }));
   const output = parseCheckOutput(
     await deps.ask(organizationId, buildCheckPrompt(question, passages)),
   );

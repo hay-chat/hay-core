@@ -10,6 +10,7 @@ import type {
   SetupBoard,
   SetupChannelRef,
   SetupHandle,
+  SetupPlaybookStep,
   SetupPluginRef,
   SetupQuestion,
   SetupRow,
@@ -33,7 +34,7 @@ export interface BoardPlaybook {
   id: string;
   title: string;
   active: boolean;
-  steps: string[];
+  steps: SetupPlaybookStep[];
 }
 
 export interface BoardFacts {
@@ -75,7 +76,7 @@ function platformRow(
   need: SetupHandle,
   base: Pick<
     SetupRow,
-    "id" | "text" | "source" | "sources" | "answerDocumentId" | "linkedDocument"
+    "id" | "text" | "source" | "sources" | "answerDocumentId" | "linkedDocuments"
   >,
   facts: BoardFacts,
 ): SetupRow {
@@ -117,7 +118,7 @@ export function buildRow(question: SetupQuestion, facts: BoardFacts): SetupRow {
     source: question.source,
     sources: [] as SetupRow["sources"],
     ...(question.answerDocumentId ? { answerDocumentId: question.answerDocumentId } : {}),
-    ...(question.linkedDocument ? { linkedDocument: question.linkedDocument } : {}),
+    ...(question.linkedDocuments?.length ? { linkedDocuments: question.linkedDocuments } : {}),
   };
 
   if (question.needs) return platformRow(question, question.needs, base, facts);

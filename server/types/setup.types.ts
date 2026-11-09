@@ -76,10 +76,22 @@ export interface SetupQuestion {
   playbookAttempt?: { outcome: "no_tool" | "failed"; at: string };
   /** The document holding the answer the customer wrote for this question. */
   answerDocumentId?: string;
-  /** The existing document the customer based that answer on. */
-  linkedDocument?: SetupDocumentRef;
+  /** The existing documents the customer based that answer on, in the order they picked them. */
+  linkedDocuments?: SetupDocumentRef[];
   check?: SetupCheckResult;
 }
+
+/**
+ * One piece of a playbook step, as the playbook editor shows it: plain text or a mention chip.
+ * Actions carry the plugin and raw tool name so the dashboard can show the readable label.
+ */
+export type SetupStepPart =
+  | { type: "text"; text: string }
+  | { type: "action"; pluginId: string; tool: string; label: string }
+  | { type: "document"; label: string }
+  | { type: "handoff"; label: string }
+  | { type: "form"; label: string };
+export type SetupPlaybookStep = SetupStepPart[];
 
 export interface SetupDocumentRef {
   id: string;
@@ -153,13 +165,13 @@ export interface SetupRow {
   sources: SetupSource[];
   /** Present when the row has its own answer, in any status. */
   answerDocumentId?: string;
-  linkedDocument?: SetupDocumentRef;
+  linkedDocuments?: SetupDocumentRef[];
   /** For `missing`: the assistant found something but a real test turn went to the team. */
   handedOff?: boolean;
   needs?: SetupHandle;
   /** The platform that can do this for the customer, when one was chosen. */
   plugin?: SetupPluginRef;
-  playbook?: { id: string; title: string; steps: string[] };
+  playbook?: { id: string; title: string; steps: SetupPlaybookStep[] };
   /** For `playbook_missing`: still to be generated, no suitable tool, or the attempt failed. */
   generation?: "pending" | "no_tool" | "failed";
 }

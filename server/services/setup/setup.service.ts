@@ -24,6 +24,7 @@ import {
   type SetupBoard,
   type SetupChannelRef,
   type SetupCheckResult,
+  type SetupDocumentRef,
   type SetupQuestion,
   type SetupSettings,
   type SetupSuggestions,
@@ -43,7 +44,7 @@ import { catalogFor, catalogLocale, findCatalogQuestion } from "./catalog";
 import {
   CHECK_CONCURRENCY,
   checkQuestion,
-  draftAnswerFromDocument,
+  draftAnswerFromDocuments,
   loadOwnAnswers,
   mapWithConcurrency,
   preferOwnAnswer,
@@ -605,11 +606,12 @@ export interface UpdateQuestionInput {
   questionId: string;
   text?: string;
   answer?: string;
-  linkedDocumentId?: string | null;
+  /** The documents the answer is based on, replacing the current list. Empty drops every link. */
+  linkedDocumentIds?: string[];
 }
 
 /**
- * Saves a row's edit panel in one go: wording, own answer and the document it is based on, then
+ * Saves a row's edit panel in one go: wording, own answer and the documents it is based on, then
  * one recheck. The document is written first so the check sees its new embedding.
  */
 export async function updateQuestion(
@@ -618,9 +620,9 @@ export async function updateQuestion(
 ): Promise<SetupBoard> {
   const setup = await readSetup(organizationId);
   const question = findQuestion(setup, input.questionId);
-  const { answer, linkedDocumentId } = input;
+  const { answer, linkedDocumentIds } = input;
 
-  if (question.needs && (answer !== undefined || linkedDocumentId !== undefined)) {
+  if (question.needs && (answer !== undefined || linkedDocumentIds !== undefined)) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "This question is answered by a connected platform, not by a document",
@@ -629,7 +631,7 @@ export async function updateQuestion(
 
   const text = input.text?.trim() ?? question.text;
   const renamed = text !== question.text;
-  if (!renamed && answer === undefined && linkedDocumentId === undefined) {
+  if (!renamed && answer === undefined && linkedDocumentIds === undefined) {
     return boardFor(organizationId, setup);
   }
   if (renamed && setup.questions.some((q) => q.id !== question.id && sameText(q.text, text))) {
@@ -639,17 +641,18 @@ export async function updateQuestion(
     });
   }
 
-  let linked: SetupQuestion["linkedDocument"];
-  if (typeof linkedDocumentId === "string") {
-    if (linkedDocumentId === question.answerDocumentId) {
+  let linked: SetupDocumentRef[] | undefined;
+  if (linkedDocumentIds !== undefined) {
+    const ids = [...new Set(linkedDocumentIds)];
+    if (question.answerDocumentId && ids.includes(question.answerDocumentId)) {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Link a different document" });
     }
-    const document = await documentRepository.findByIdAndOrganization(
-      linkedDocumentId,
-      organizationId,
-    );
-    if (!document) throw new TRPCError({ code: "NOT_FOUND", message: "Document not found" });
-    linked = { id: document.id, title: document.title };
+    linked = [];
+    for (const id of ids) {
+      const document = await documentRepository.findByIdAndOrganization(id, organizationId);
+      if (!document) throw new TRPCError({ code: "NOT_FOUND", message: "Document not found" });
+      linked.push({ id: document.id, title: document.title });
+    }
   }
 
   const own = question.answerDocumentId
@@ -677,7 +680,8 @@ export async function updateQuestion(
         text,
         check: undefined,
         answerDocumentId,
-        linkedDocument: linkedDocumentId === undefined ? q.linkedDocument : linked,
+        linkedDocuments:
+          linked === undefined ? q.linkedDocuments : linked.length ? linked : undefined,
       };
     }),
   }));
@@ -695,10 +699,10 @@ export async function updateQuestion(
 export async function draftAnswer(
   organizationId: string,
   questionId: string,
-  documentId: string,
+  documentIds: string[],
 ): Promise<{ answer: string | null }> {
   const question = findQuestion(await readSetup(organizationId), questionId);
-  return { answer: await draftAnswerFromDocument(organizationId, question.text, documentId) };
+  return { answer: await draftAnswerFromDocuments(organizationId, question.text, documentIds) };
 }
 
 /** The text of a row's own answer, or null when it has none or its document is gone. */

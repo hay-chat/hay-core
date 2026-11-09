@@ -12,6 +12,7 @@
 import { LLMService } from "@server/services/core/llm.service";
 import { createLogger } from "@server/lib/logger";
 import type { TiptapDocument } from "@server/database/entities/playbook.entity";
+import type { SetupPlaybookStep, SetupStepPart } from "@server/types/setup.types";
 
 const logger = createLogger("setup-playbook-generation");
 
@@ -309,29 +310,76 @@ export function planToDocument(plan: PlaybookPlan, tools: GenerationTool[]): Tip
   } as unknown as TiptapDocument;
 }
 
-/** Plain text of each list item (or paragraph) in a playbook's instructions, for the review list. */
-export function stepsFromInstructions(instructions: unknown): string[] {
-  const textOf = (node: unknown): string => {
-    if (!node || typeof node !== "object") return "";
-    const n = node as {
-      type?: string;
-      text?: string;
-      attrs?: { label?: string };
-      content?: unknown[];
-    };
-    if (n.type === "text") return n.text ?? "";
-    if (n.type === "mention") return n.attrs?.label ?? "";
-    return (n.content ?? []).map(textOf).join("");
+type InstructionNode = {
+  type?: string;
+  text?: string;
+  attrs?: {
+    id?: string | null;
+    label?: string | null;
+    type?: string | null;
+    pluginId?: string | null;
   };
-  const collect = (node: unknown, type: string, out: string[]): void => {
+  content?: unknown[];
+};
+
+/** A mention as the review list shows it: the same chip the playbook editor draws. */
+function mentionPart(attrs: NonNullable<InstructionNode["attrs"]>): SetupStepPart {
+  const label = attrs.label ?? "";
+  switch (attrs.type) {
+    case "action": {
+      const pluginId = attrs.pluginId ?? "";
+      const id = attrs.id ?? "";
+      const tool =
+        pluginId && id.startsWith(`${pluginId}:`) ? id.slice(pluginId.length + 1) : label;
+      return pluginId ? { type: "action", pluginId, tool, label } : { type: "text", text: label };
+    }
+    case "document":
+    case "handoff":
+    case "form":
+      return { type: attrs.type, label };
+    default:
+      return { type: "text", text: label };
+  }
+}
+
+/** Joins neighbouring text, collapses whitespace and trims the step's ends. */
+function tidy(parts: SetupStepPart[]): SetupPlaybookStep {
+  const merged: SetupStepPart[] = [];
+  for (const part of parts) {
+    const last = merged[merged.length - 1];
+    if (part.type === "text" && last?.type === "text") last.text += part.text;
+    else merged.push(part.type === "text" ? { ...part } : part);
+  }
+  merged.forEach((part) => {
+    if (part.type === "text") part.text = part.text.replace(/\s+/g, " ");
+  });
+  const first = merged[0];
+  const last = merged[merged.length - 1];
+  if (first?.type === "text") first.text = first.text.trimStart();
+  if (last?.type === "text") last.text = last.text.trimEnd();
+  return merged.filter((part) => part.type !== "text" || part.text);
+}
+
+/** Each list item (or paragraph) of a playbook's instructions, as text and chips, for review. */
+export function stepsFromInstructions(instructions: unknown): SetupPlaybookStep[] {
+  const partsOf = (node: unknown, out: SetupStepPart[]): SetupStepPart[] => {
+    if (!node || typeof node !== "object") return out;
+    const n = node as InstructionNode;
+    if (n.type === "text") out.push({ type: "text", text: n.text ?? "" });
+    else if (n.type === "mention") out.push(mentionPart(n.attrs ?? {}));
+    else if (n.type === "hardBreak") out.push({ type: "text", text: " " });
+    else (n.content ?? []).forEach((child) => partsOf(child, out));
+    return out;
+  };
+  const collect = (node: unknown, type: string, out: SetupPlaybookStep[]): void => {
     if (!node || typeof node !== "object") return;
-    const n = node as { type?: string; content?: unknown[] };
-    if (n.type === type) out.push(textOf(node).replace(/\s+/g, " ").trim());
+    const n = node as InstructionNode;
+    if (n.type === type) out.push(tidy(partsOf(node, [])));
     else (n.content ?? []).forEach((child) => collect(child, type, out));
   };
 
-  const items: string[] = [];
+  const items: SetupPlaybookStep[] = [];
   collect(instructions, "listItem", items);
   if (items.length === 0) collect(instructions, "paragraph", items);
-  return items.filter(Boolean).slice(0, MAX_STEPS * 2);
+  return items.filter((step) => step.length > 0).slice(0, MAX_STEPS * 2);
 }

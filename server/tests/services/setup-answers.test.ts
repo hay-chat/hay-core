@@ -79,7 +79,7 @@ import {
   updateQuestion,
 } from "../../services/setup/setup.service";
 import {
-  draftAnswerFromDocument,
+  draftAnswerFromDocuments,
   loadOwnAnswers,
   preferOwnAnswer,
   type DraftDeps,
@@ -309,10 +309,10 @@ describe("own answer wins", () => {
 });
 
 describe("updateQuestion", () => {
-  it("puts the answer and link on every row status", () => {
+  it("puts the answer and links on every row status", () => {
     const q = question({
       answerDocumentId: "own1",
-      linkedDocument: { id: "d9", title: "Returns page" },
+      linkedDocuments: [{ id: "d9", title: "Returns page" }],
     });
     const facts: BoardFacts = {
       setup: { toolPluginIds: [], channels: [], questions: [q] },
@@ -325,7 +325,7 @@ describe("updateQuestion", () => {
     expect(buildRow(q, facts)).toMatchObject({
       status: "checking",
       answerDocumentId: "own1",
-      linkedDocument: { id: "d9", title: "Returns page" },
+      linkedDocuments: [{ id: "d9", title: "Returns page" }],
     });
   });
 
@@ -364,7 +364,7 @@ describe("updateQuestion", () => {
       "connected platform",
     );
     await expect(
-      updateQuestion("org", { questionId: "q1", linkedDocumentId: null }),
+      updateQuestion("org", { questionId: "q1", linkedDocumentIds: [] }),
     ).rejects.toThrow("connected platform");
     expect(saveAnswerDocument).not.toHaveBeenCalled();
   });
@@ -382,22 +382,37 @@ describe("updateQuestion", () => {
     expect(stored()[0].text).toBe("Do you offer refunds?");
   });
 
-  it("links a document of this organization, storing its id and title; null clears it", async () => {
-    documents.findByIdAndOrganization.mockResolvedValue(other("d9", "Returns page"));
-    await updateQuestion("org", { questionId: "q1", linkedDocumentId: "d9" });
-    expect(stored()[0].linkedDocument).toEqual({ id: "d9", title: "Returns page" });
+  it("links documents of this organization in order, once each; [] clears them", async () => {
+    documents.findByIdAndOrganization.mockImplementation(async (id: string) =>
+      id === "d9" ? other("d9", "Returns page") : other("d7", "Shipping"),
+    );
+    await updateQuestion("org", { questionId: "q1", linkedDocumentIds: ["d9", "d7", "d9"] });
+    expect(stored()[0].linkedDocuments).toEqual([
+      { id: "d9", title: "Returns page" },
+      { id: "d7", title: "Shipping" },
+    ]);
 
-    await updateQuestion("org", { questionId: "q1", linkedDocumentId: null });
-    expect(stored()[0].linkedDocument).toBeUndefined();
+    await updateQuestion("org", { questionId: "q1", linkedDocumentIds: [] });
+    expect(stored()[0].linkedDocuments).toBeUndefined();
   });
 
-  it("refuses a missing document and the row's own answer document", async () => {
+  it("keeps the links when only the answer changes", async () => {
+    seed([question({ linkedDocuments: [{ id: "d9", title: "Returns page" }] })]);
+    await updateQuestion("org", { questionId: "q1", answer: "Yes, 30 days." });
+    expect(stored()[0].linkedDocuments).toEqual([{ id: "d9", title: "Returns page" }]);
+  });
+
+  it("refuses a missing document and the row's own answer document, writing nothing", async () => {
+    documents.findByIdAndOrganization.mockImplementation(async (id: string) =>
+      id === "d9" ? other("d9", "Returns page") : null,
+    );
     await expect(
-      updateQuestion("org", { questionId: "q1", linkedDocumentId: "nope" }),
+      updateQuestion("org", { questionId: "q1", linkedDocumentIds: ["d9", "nope"] }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(stored()[0].linkedDocuments).toBeUndefined();
     seed([question({ answerDocumentId: "own1" })]);
     await expect(
-      updateQuestion("org", { questionId: "q1", linkedDocumentId: "own1" }),
+      updateQuestion("org", { questionId: "q1", linkedDocumentIds: ["d9", "own1"] }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
@@ -458,7 +473,7 @@ describe("draftAnswer", () => {
 
   it("drafts from the document, with HTML stripped from what the model reads", async () => {
     const ask = jest.fn(async (_o: string, _p: string) => reply());
-    expect(await draftAnswerFromDocument("org", "Refunds?", "d1", deps({ ask }))).toBe(
+    expect(await draftAnswerFromDocuments("org", "Refunds?", ["d1"], deps({ ask }))).toBe(
       "Yes, within 30 days.",
     );
     const prompt = ask.mock.calls[0][1];
@@ -468,9 +483,9 @@ describe("draftAnswer", () => {
 
   it("is null when the document does not state the fact or the answer is empty", async () => {
     const no = deps({ ask: async () => reply({ states_the_fact: false }) });
-    expect(await draftAnswerFromDocument("org", "Refunds?", "d1", no)).toBeNull();
+    expect(await draftAnswerFromDocuments("org", "Refunds?", ["d1"], no)).toBeNull();
     const empty = deps({ ask: async () => reply({ answer: "  " }) });
-    expect(await draftAnswerFromDocument("org", "Refunds?", "d1", empty)).toBeNull();
+    expect(await draftAnswerFromDocuments("org", "Refunds?", ["d1"], empty)).toBeNull();
   });
 
   it("reads at most the first 10 chunks", async () => {
@@ -480,20 +495,56 @@ describe("draftAnswer", () => {
       Array.from({ length: 80 }, (_, i) => `Paragraph ${i}. ${"x".repeat(900)}`).join("\n\n"),
     );
     const ask = jest.fn(async (_o: string, _p: string) => reply());
-    await draftAnswerFromDocument("org", "q", "d2", deps({ loadDocument: async () => long, ask }));
+    await draftAnswerFromDocuments(
+      "org",
+      "q",
+      ["d2"],
+      deps({ loadDocument: async () => long, ask }),
+    );
     expect(ask.mock.calls[0][1].match(/^\[\d+\] Long/gm)).toHaveLength(10);
+  });
+
+  it("reads several documents together, sharing the 10 chunks between them", async () => {
+    const long = (id: string, title: string) =>
+      other(
+        id,
+        title,
+        Array.from({ length: 40 }, (_, i) => `Paragraph ${i}. ${"x".repeat(900)}`).join("\n\n"),
+      );
+    const byId: Record<string, Document> = { a: long("a", "Alpha"), b: long("b", "Beta") };
+    const ask = jest.fn(async (_o: string, _p: string) => reply());
+    await draftAnswerFromDocuments(
+      "org",
+      "q",
+      ["a", "b", "a"],
+      deps({ loadDocument: async (_o, id) => byId[id] ?? null, ask }),
+    );
+    const prompt = ask.mock.calls[0][1];
+    expect(prompt.match(/^\[\d+\] Alpha/gm)).toHaveLength(5);
+    expect(prompt.match(/^\[\d+\] Beta/gm)).toHaveLength(5);
+  });
+
+  it("refuses the whole draft when any one document is missing", async () => {
+    await expect(
+      draftAnswerFromDocuments(
+        "org",
+        "q",
+        ["d1", "gone"],
+        deps({ loadDocument: async (_o, id) => (id === "d1" ? usable : null) }),
+      ),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("refuses another organization's document and unusable ones", async () => {
     await expect(
-      draftAnswerFromDocument("org", "q", "d1", deps({ loadDocument: async () => null })),
+      draftAnswerFromDocuments("org", "q", ["d1"], deps({ loadDocument: async () => null })),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     for (const status of [DocumentationStatus.ARCHIVED, DocumentationStatus.ERROR]) {
       await expect(
-        draftAnswerFromDocument(
+        draftAnswerFromDocuments(
           "org",
           "q",
-          "d1",
+          ["d1"],
           deps({ loadDocument: async () => ({ ...usable, status }) as Document }),
         ),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
@@ -502,10 +553,10 @@ describe("draftAnswer", () => {
 
   it("throws on a model or parse failure instead of saying the document does not answer", async () => {
     await expect(
-      draftAnswerFromDocument(
+      draftAnswerFromDocuments(
         "org",
         "q",
-        "d1",
+        ["d1"],
         deps({
           ask: async () => {
             throw new Error("llm down");
@@ -514,13 +565,13 @@ describe("draftAnswer", () => {
       ),
     ).rejects.toThrow("llm down");
     await expect(
-      draftAnswerFromDocument("org", "q", "d1", deps({ ask: async () => "not json" })),
+      draftAnswerFromDocuments("org", "q", ["d1"], deps({ ask: async () => "not json" })),
     ).rejects.toThrow();
   });
 
   it("the service draft writes nothing", async () => {
     findDocuments.mockResolvedValue([]);
-    await expect(draftAnswer("org", "nope", "d1")).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(draftAnswer("org", "nope", ["d1"])).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(documents.create).not.toHaveBeenCalled();
     expect(documents.update).not.toHaveBeenCalled();
     expect(saveAnswerDocument).not.toHaveBeenCalled();

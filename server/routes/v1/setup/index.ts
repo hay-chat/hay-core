@@ -76,8 +76,9 @@ export const setupRouter = t.router({
     ),
 
   /**
-   * Saves a row's edit panel: its wording, its own answer and the document that answer is based
-   * on. Omitted fields stay as they are; `linkedDocumentId: null` drops the link. Rechecks once.
+   * Saves a row's edit panel: its wording, its own answer and the documents that answer is based
+   * on. Omitted fields stay as they are; `linkedDocumentIds` replaces the list ([] drops every
+   * link). Rechecks once.
    */
   updateQuestion: update()
     .input(
@@ -85,17 +86,22 @@ export const setupRouter = t.router({
         questionId: z.string().min(1).max(255),
         text: z.string().trim().min(1).max(500).optional(),
         answer: z.string().trim().min(1).max(10000).optional(),
-        linkedDocumentId: z.string().uuid().nullable().optional(),
+        linkedDocumentIds: z.array(z.string().uuid()).max(10).optional(),
       }),
     )
     .mutation(({ ctx, input }): Promise<SetupBoard> => setup.updateQuestion(orgId(ctx), input)),
 
-  /** Drafts an answer from one document. `answer` is null when it does not state the fact. */
+  /** Drafts an answer from the documents together. `answer` is null when they don't state it. */
   draftAnswer: update()
     .use(rateLimitMiddleware(RateLimits.MODERATE))
-    .input(z.object({ questionId: z.string().min(1).max(255), documentId: z.string().uuid() }))
+    .input(
+      z.object({
+        questionId: z.string().min(1).max(255),
+        documentIds: z.array(z.string().uuid()).min(1).max(10),
+      }),
+    )
     .mutation(({ ctx, input }): Promise<{ answer: string | null }> =>
-      setup.draftAnswer(orgId(ctx), input.questionId, input.documentId),
+      setup.draftAnswer(orgId(ctx), input.questionId, input.documentIds),
     ),
 
   /** The current text of a row's own answer, or null when it has none or it was deleted. */

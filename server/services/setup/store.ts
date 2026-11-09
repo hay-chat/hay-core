@@ -1,12 +1,35 @@
 import { AppDataSource } from "@server/database/data-source";
-import type { SetupSettings } from "@server/types/setup.types";
+import type { SetupDocumentRef, SetupQuestion, SetupSettings } from "@server/types/setup.types";
 
 export function emptySetup(): SetupSettings {
   return { toolPluginIds: [], channels: [], questions: [] };
 }
 
-function normalize(raw: SetupSettings | null | undefined): SetupSettings {
-  return { ...emptySetup(), ...(raw ?? {}) };
+/** Before a question could link many documents it stored one, as `linkedDocument`. */
+type StoredQuestion = SetupQuestion & { linkedDocument?: SetupDocumentRef };
+
+// TODO: drop once migration 1794700000000-LinkManySetupDocuments has run everywhere. Code ships
+// before its migration runs, so until then a stored single link is read as a list of one.
+function normalizeQuestion(question: StoredQuestion): SetupQuestion {
+  const { linkedDocument, ...rest } = question;
+  if (!linkedDocument || rest.linkedDocuments) return rest;
+  return { ...rest, linkedDocuments: [linkedDocument] };
+}
+
+export function normalize(raw: SetupSettings | null | undefined): SetupSettings {
+  const setup = { ...emptySetup(), ...(raw ?? {}) };
+  return {
+    ...setup,
+    questions: setup.questions.map(normalizeQuestion),
+    ...(setup.recentlyRemoved
+      ? {
+          recentlyRemoved: setup.recentlyRemoved.map((r) => ({
+            ...r,
+            question: normalizeQuestion(r.question),
+          })),
+        }
+      : {}),
+  };
 }
 
 export async function readSetup(organizationId: string): Promise<SetupSettings> {
