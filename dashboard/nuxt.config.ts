@@ -31,6 +31,9 @@ export default defineNuxtConfig({
       // PostHog telemetry — only enabled when a project API key is provided
       posthogKey: process.env["POSTHOG_KEY"] || "",
       posthogHost: process.env["POSTHOG_HOST"] || "https://eu.i.posthog.com",
+      // Organization (on this deployment) whose assistant answers questions about Hay in the
+      // dashboard. Unset means no support widget.
+      supportWidgetOrgId: process.env["SUPPORT_WIDGET_ORG_ID"] || "",
       baseDomain:
         process.env["BASE_DOMAIN"] ||
         (process.env["NODE_ENV"] === "development" ? "localhost:3000" : ""),
