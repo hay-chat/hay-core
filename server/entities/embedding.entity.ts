@@ -12,6 +12,8 @@ import { Organization } from "./organization.entity";
 
 @Entity("embeddings")
 @Index("embeddings_org_id_idx", ["organizationId"])
+@Index("idx_embeddings_org_metadata_conversation", { synchronize: false })
+@Index("idx_embeddings_org_metadata_message", { synchronize: false })
 export class Embedding {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
