@@ -25,7 +25,10 @@ export async function setDocumentsArchived(
   const failed: string[] = [];
   for (const id of ids) {
     try {
-      await update({ id, status: archived ? DocumentationStatus.ARCHIVED : DocumentationStatus.PUBLISHED });
+      await update({
+        id,
+        status: archived ? DocumentationStatus.ARCHIVED : DocumentationStatus.PUBLISHED,
+      });
       succeeded.push(id);
     } catch (error) {
       console.error(`Error updating archive state of document ${id}:`, error);

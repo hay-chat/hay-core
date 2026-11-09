@@ -119,7 +119,13 @@
       <CardHeader>
         <CardTitle>{{ $t("insights.feedback.list.title") }}</CardTitle>
         <CardDescription>
-          {{ $t("insights.feedback.list.count", { count: filteredFeedback.length }, filteredFeedback.length) }}
+          {{
+            $t(
+              "insights.feedback.list.count",
+              { count: filteredFeedback.length },
+              filteredFeedback.length,
+            )
+          }}
         </CardDescription>
       </CardHeader>
       <CardContent>
