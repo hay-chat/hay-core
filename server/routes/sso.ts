@@ -27,7 +27,12 @@ function readCookie(req: Request, name: string): string | undefined {
   for (const part of (req.headers.cookie ?? "").split(";")) {
     const separator = part.indexOf("=");
     if (separator !== -1 && part.slice(0, separator).trim() === name) {
-      return decodeURIComponent(part.slice(separator + 1).trim()) || undefined;
+      try {
+        return decodeURIComponent(part.slice(separator + 1).trim()) || undefined;
+      } catch {
+        // A malformed value is no value.
+        return undefined;
+      }
     }
   }
   return undefined;
@@ -43,16 +48,36 @@ function bindingCookieOptions() {
   };
 }
 
-async function limited(
-  req: Request,
-  scope: "sso-start" | "sso-callback" | "sso-saml-acs" | "sso-saml-finish",
-): Promise<boolean> {
-  const ip = getClientIp(req.headers, req.socket.remoteAddress) || "unknown";
-  const result = await rateLimitService.checkIpRateLimit(ip, 30, 15 * 60, {
+type LimitScope = "sso-start" | "sso-callback" | "sso-saml-acs" | "sso-saml-finish";
+
+/**
+ * Per address, fail-closed. Starting a sign-in is cheap and anonymous, so every start counts, with room
+ * for an office behind one address. The other steps count only attempts that do not complete: a
+ * successful one clears the count (see `completed`), so many people signing in from one address do
+ * not lock each other out, while repeated failures still do.
+ */
+const LIMITS: Record<LimitScope, number> = {
+  "sso-start": 300,
+  "sso-callback": 30,
+  "sso-saml-acs": 30,
+  "sso-saml-finish": 30,
+};
+
+function addressOf(req: Request): string {
+  return getClientIp(req.headers, req.socket.remoteAddress) || "unknown";
+}
+
+async function limited(req: Request, scope: LimitScope): Promise<boolean> {
+  const result = await rateLimitService.checkIpRateLimit(addressOf(req), LIMITS[scope], 15 * 60, {
     scope,
     failClosed: true,
   });
   return result.limited;
+}
+
+/** A step that succeeded is not a failed attempt. */
+async function completed(req: Request, scope: LimitScope): Promise<void> {
+  await rateLimitService.resetRateLimit(addressOf(req), "ip", scope);
 }
 
 /** Starts a sign-in: the browser arrives here, leaves for the provider and comes back to /sso/callback. */
@@ -95,6 +120,7 @@ router.get("/sso/callback", async (req: Request, res: Response) => {
     if (await limited(req, "sso-callback"))
       return res.redirect(loginUrl({ sso_error: "rate_limited" }));
     const ticket = await ssoService.handleCallback({ ...params.data, binding });
+    await completed(req, "sso-callback");
     return res.redirect(
       `${getDashboardUrl()}/sso/callback?${new URLSearchParams({ ticket }).toString()}`,
     );
@@ -147,6 +173,7 @@ router.post("/sso/saml/acs", async (req: Request, res: Response) => {
       samlResponse: body.data.SAMLResponse,
       relayState: body.data.RelayState,
     });
+    await completed(req, "sso-saml-acs");
     return res.redirect(
       303,
       `${getApiUrl()}/sso/saml/finish?${new URLSearchParams({ handle }).toString()}`,
@@ -167,6 +194,7 @@ router.get("/sso/saml/finish", async (req: Request, res: Response) => {
     if (await limited(req, "sso-saml-finish"))
       return res.redirect(loginUrl({ sso_error: "rate_limited" }));
     const ticket = await ssoService.finishSamlLogin({ handle: handle.data, binding });
+    await completed(req, "sso-saml-finish");
     return res.redirect(
       `${getDashboardUrl()}/sso/callback?${new URLSearchParams({ ticket }).toString()}`,
     );

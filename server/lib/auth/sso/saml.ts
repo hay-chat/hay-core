@@ -62,6 +62,23 @@ export class SamlError extends Error {
   }
 }
 
+/**
+ * The library's messages can repeat text from the response (ids, audiences, issuers), and a
+ * response is supplied by whoever posts it. Only these fixed reasons reach logs and audit rows.
+ */
+function reasonFor(error: unknown): string {
+  const text = error instanceof Error ? error.message : "";
+  if (/already been received/i.test(text)) return "The assertion was already used";
+  if (/signature/i.test(text)) return "The signature could not be verified";
+  if (/InResponseTo|request/i.test(text)) return "The response does not answer this sign-in";
+  if (/audience/i.test(text)) return "The assertion is not meant for this service";
+  if (/NotBefore|NotOnOrAfter|not yet valid|expired|valid/i.test(text)) {
+    return "The assertion is not valid at this time";
+  }
+  if (/issuer/i.test(text)) return "The assertion comes from another issuer";
+  return "The response could not be verified";
+}
+
 /** What a connection needs to talk SAML. The organization id fixes the audience, so no two organizations share one. */
 export interface SamlConnectionConfig {
   organizationId: string;
@@ -227,7 +244,7 @@ export async function buildSamlRedirect(
       {},
     );
   } catch (error) {
-    throw new SamlError("request_failed", (error as Error).message);
+    throw new SamlError("request_failed", "The sign-in request could not be built");
   }
 }
 
@@ -302,7 +319,7 @@ export async function validateSamlResponse(
     });
     profile = result.profile;
   } catch (error) {
-    throw new SamlError("response_invalid", (error as Error).message);
+    throw new SamlError("response_invalid", reasonFor(error));
   }
   if (!profile || !profile.getAssertion || !profile.getAssertionXml) {
     throw new SamlError("response_invalid", "The response carries no assertion");

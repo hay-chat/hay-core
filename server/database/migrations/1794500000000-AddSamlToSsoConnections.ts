@@ -18,6 +18,9 @@ export class AddSamlToSsoConnections1794500000000 implements MigrationInterface 
     await queryRunner.query(
       `ALTER TABLE "sso_connections" ALTER COLUMN "client_secret" DROP NOT NULL`,
     );
+    await queryRunner.query(
+      `ALTER TABLE "sso_connections" DROP CONSTRAINT IF EXISTS "chk_sso_connections_protocol"`,
+    );
     await queryRunner.query(`
       ALTER TABLE "sso_connections" ADD CONSTRAINT "chk_sso_connections_protocol" CHECK (
         ("protocol" = 'oidc' AND "client_id" IS NOT NULL AND "client_secret" IS NOT NULL)
@@ -30,6 +33,12 @@ export class AddSamlToSsoConnections1794500000000 implements MigrationInterface 
     await queryRunner.query(
       `ALTER TABLE "sso_connections" DROP CONSTRAINT IF EXISTS "chk_sso_connections_protocol"`,
     );
+    // An organization that loses its connection must not keep requiring sign-in through it.
+    await queryRunner.query(`
+      UPDATE "organizations"
+         SET "settings" = jsonb_set(COALESCE("settings", '{}'::jsonb), '{ssoEnforced}', 'false'::jsonb)
+       WHERE "id" IN (SELECT "organization_id" FROM "sso_connections" WHERE "protocol" <> 'oidc')
+    `);
     await queryRunner.query(`DELETE FROM "sso_connections" WHERE "protocol" <> 'oidc'`);
     await queryRunner.query(
       `ALTER TABLE "sso_connections" ALTER COLUMN "client_secret" SET NOT NULL`,

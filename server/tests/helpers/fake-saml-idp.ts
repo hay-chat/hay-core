@@ -92,7 +92,7 @@ export class FakeSamlIdp {
   readonly entityId = "https://idp.saml-test.example/metadata";
   readonly ssoUrl = "https://idp.saml-test.example/sso";
   private readonly main: KeyMaterial = generateKeyMaterial("hay-test-idp");
-  private readonly other: KeyMaterial = generateKeyMaterial("hay-test-attacker");
+  private readonly other: KeyMaterial = generateKeyMaterial("hay-test-other-key");
 
   get certificate(): string {
     return this.main.certificate;

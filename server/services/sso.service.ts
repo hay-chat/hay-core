@@ -48,6 +48,7 @@ import { createLogger } from "@server/lib/logger";
 import { auditLogService } from "@server/services/audit-log.service";
 import { mfaService } from "@server/services/mfa.service";
 import { redisService } from "@server/services/redis.service";
+import { scimService } from "@server/services/scim.service";
 
 const logger = createLogger("sso");
 
@@ -112,6 +113,7 @@ type LoginState = OidcLoginState | SamlLoginState;
 interface SamlPendingLogin {
   connectionId: string;
   organizationId: string;
+  issuer: string;
   bindingHash: string;
   identity: SamlIdentity;
 }
@@ -344,9 +346,12 @@ export class SsoService {
     connection.updatedBy = actor.userId;
     await this.connections.save(connection);
 
-    // Links made through another provider would otherwise block the same people
-    // from linking to this one; they link again by email as active members.
-    if (existing && (previousIssuer !== connection.issuer || previousProtocol !== input.protocol)) {
+    // Links made through another provider would otherwise block the same people from linking to
+    // this one; they link again by email as active members. A change of protocol drops every link,
+    // since an OpenID Connect issuer can equal a SAML entity id and the old subjects mean nothing.
+    if (existing && previousProtocol !== input.protocol) {
+      await AppDataSource.getRepository(SsoIdentity).delete({ organizationId });
+    } else if (existing && previousIssuer !== connection.issuer) {
       await AppDataSource.getRepository(SsoIdentity)
         .createQueryBuilder()
         .delete()
@@ -386,6 +391,8 @@ export class SsoService {
     const wasEnforced = await this.isEnforced(organizationId);
     if (wasEnforced) await this.writeEnforcement(organizationId, false);
     await AppDataSource.getRepository(SsoIdentity).delete({ organizationId });
+    // Provisioning is part of the same setup: without the provider its token goes too.
+    await scimService.revokeToken(organizationId, actor);
     await auditLogService.record({
       userId: actor.userId,
       organizationId,
@@ -862,6 +869,7 @@ export class SsoService {
     const pending: SamlPendingLogin = {
       connectionId: connection.id,
       organizationId: connection.organizationId,
+      issuer: connection.issuer,
       bindingHash: state.bindingHash,
       identity,
     };
@@ -882,7 +890,11 @@ export class SsoService {
     assertSameBrowser(pending, params.binding);
 
     const connection = await this.connections.findOne({ where: { id: pending.connectionId } });
-    if (!connection?.enabled || connection.protocol !== "saml") {
+    if (
+      !connection?.enabled ||
+      connection.protocol !== "saml" ||
+      connection.issuer !== pending.issuer
+    ) {
       throw new SsoLoginError(
         "unavailable",
         "The connection changed during sign-in",

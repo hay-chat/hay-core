@@ -46,8 +46,22 @@ const mockRedis = new MockRedis();
 jest.mock("../../services/redis.service", () => ({
   redisService: { isConnected: () => true, getClient: () => mockRedis },
 }));
+const limiter = {
+  counts: new Map<string, number>(),
+  hit(key: string, max: number) {
+    const count = (this.counts.get(key) ?? 0) + 1;
+    this.counts.set(key, count);
+    return { limited: count > max };
+  },
+};
 jest.mock("../../services/rate-limit.service", () => ({
-  rateLimitService: { checkIpRateLimit: async () => ({ limited: false }) },
+  rateLimitService: {
+    checkIpRateLimit: async (ip: string, max: number, _window: number, o: { scope: string }) =>
+      limiter.hit(`${o.scope}:${ip}`, max),
+    resetRateLimit: async (ip: string, _type: string, scope: string) => {
+      limiter.counts.delete(`${scope}:${ip}`);
+    },
+  },
 }));
 jest.mock("../../services/email.service", () => ({
   emailService: { initialize: async () => undefined, sendTemplateEmail: async () => ({}) },
@@ -74,6 +88,7 @@ import {
   validateSamlResponse,
   type SamlConnectionConfig,
 } from "../../lib/auth/sso/saml";
+import { AddSamlToSsoConnections1794500000000 } from "../../database/migrations/1794500000000-AddSamlToSsoConnections";
 import { authRouter } from "../../routes/v1/auth";
 import ssoRoutes from "../../routes/sso";
 import {
@@ -213,6 +228,7 @@ describe("single sign-on (SAML)", () => {
 
   beforeEach(async () => {
     mockRedis.values.clear();
+    limiter.counts.clear();
     await cleanup();
     const orgs = AppDataSource.getRepository(Organization);
     await orgs.save(orgs.create({ id: ORG_ID, name: "Acme", slug: "acme-saml" }));
@@ -352,7 +368,7 @@ describe("single sign-on (SAML)", () => {
       refused({
         nameId: `victim@${DOMAIN}`,
         attributes: { email: [`victim@${DOMAIN}`] },
-        tamper: (xml) => xml.split(`victim@${DOMAIN}`).join(`attacker@${DOMAIN}`),
+        tamper: (xml) => xml.split(`victim@${DOMAIN}`).join(`other@${DOMAIN}`),
       }));
 
     it("a forged assertion placed before the signed one", async () => {
@@ -555,9 +571,18 @@ describe("single sign-on (SAML)", () => {
         email,
       });
       await cache.saveAsync(request.id, new Date().toISOString());
-      await expect(validateSamlResponse(config, cache, input)).rejects.toThrow(
-        /already been received/,
-      );
+      await expect(validateSamlResponse(config, cache, input)).rejects.toThrow(/already used/);
+    });
+
+    it("a response parked before the provider's entity id changed", async () => {
+      const { binding, request } = await start(email);
+      const handle = await ssoService.handleSamlResponse({
+        samlResponse: idp.respond(request, { nameId: email }),
+        relayState: request.relayState,
+      });
+      await configureSaml({ idpEntityId: "https://idp2.saml-test.example/metadata" });
+      expect(await failureOf(ssoService.finishSamlLogin({ handle, binding }))).toBe("unavailable");
+      await expectNoAccount(email);
     });
 
     it("a second use of the handle", async () => {
@@ -602,6 +627,52 @@ describe("single sign-on (SAML)", () => {
   });
 
   describe("configuration", () => {
+    it("drops every link when the protocol changes, even one whose issuer equals the new entity id", async () => {
+      const user = await createUser(`link@${DOMAIN}`, ORG_ID);
+      await AppDataSource.query(
+        `UPDATE sso_connections SET protocol = 'oidc', client_id = 'c', client_secret = 's',
+                saml_entry_point = NULL, saml_certificate = NULL WHERE organization_id = $1`,
+        [ORG_ID],
+      );
+      await AppDataSource.getRepository(SsoIdentity).save(
+        AppDataSource.getRepository(SsoIdentity).create({
+          organizationId: ORG_ID,
+          userId: user.id,
+          issuer: idp.entityId,
+          subject: "old-subject",
+        }),
+      );
+      await configureSaml();
+      expect(
+        await AppDataSource.getRepository(SsoIdentity).count({ where: { organizationId: ORG_ID } }),
+      ).toBe(0);
+    });
+
+    it("the SAML migration's down lifts required SSO for organizations whose connection it removes", async () => {
+      await AppDataSource.query(
+        `UPDATE organizations SET settings = jsonb_set(COALESCE(settings,'{}'::jsonb), '{ssoEnforced}', 'true') WHERE id = $1`,
+        [ORG_ID],
+      );
+      const runner = AppDataSource.createQueryRunner();
+      try {
+        await new AddSamlToSsoConnections1794500000000().down(runner);
+        const org = await AppDataSource.getRepository(Organization).findOneOrFail({
+          where: { id: ORG_ID },
+        });
+        expect(org.settings?.ssoEnforced).toBe(false);
+        expect(
+          await AppDataSource.query(`SELECT 1 FROM sso_connections WHERE organization_id = $1`, [
+            ORG_ID,
+          ]),
+        ).toHaveLength(0);
+      } finally {
+        // Restore the schema, and run up twice: it must be safe to repeat.
+        await new AddSamlToSsoConnections1794500000000().up(runner);
+        await new AddSamlToSsoConnections1794500000000().up(runner);
+        await runner.release();
+      }
+    });
+
     it("keeps the connection to one protocol and clears the other's credentials", async () => {
       const row = await AppDataSource.getRepository(SsoConnection).findOneOrFail({
         where: { organizationId: ORG_ID },
@@ -777,6 +848,82 @@ describe("single sign-on (SAML)", () => {
       });
       expect(res.headers.get("location")).toContain("sso_error=state_invalid");
       await expectNoAccount(email);
+    });
+
+    it("keeps response-supplied text out of the audit row", async () => {
+      const since = new Date();
+      const email = `marker@${DOMAIN}`;
+      const { request } = await begin(email);
+      const acs = await fetch(
+        `${base}/sso/saml/acs`,
+        form({
+          SAMLResponse: idp.respond(request, {
+            nameId: email,
+            audience: "https://marker-audience.example/entity",
+            issuer: "https://marker-issuer.example/metadata",
+          }),
+          RelayState: request.relayState,
+        }),
+      );
+      expect(acs.headers.get("location")).toContain("sso_error=token_invalid");
+      const rows = await AppDataSource.getRepository(AuditLog)
+        .createQueryBuilder("a")
+        .where("a.action = 'sso.login_failed' AND a.created_at >= :since", { since })
+        .getMany();
+      expect(rows.length).toBeGreaterThan(0);
+      expect(JSON.stringify(rows)).not.toContain("marker-");
+    });
+
+    it("reads a malformed binding cookie as no cookie", async () => {
+      const email = `badcookie@${DOMAIN}`;
+      const { request } = await begin(email);
+      const acs = await fetch(
+        `${base}/sso/saml/acs`,
+        form({
+          SAMLResponse: idp.respond(request, { nameId: email }),
+          RelayState: request.relayState,
+        }),
+      );
+      const res = await fetch(local(acs.headers.get("location")), {
+        redirect: "manual",
+        headers: { cookie: `${SSO_BINDING_COOKIE}=%E0%A4%A` },
+      });
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toContain("sso_error=state_invalid");
+    });
+
+    it("does not count completed sign-ins against an address, but does count failures", async () => {
+      const email = `office@${DOMAIN}`;
+      for (let i = 0; i < 35; i += 1) {
+        const { cookie, request } = await begin(email);
+        const acs = await fetch(
+          `${base}/sso/saml/acs`,
+          form({
+            SAMLResponse: idp.respond(request, { nameId: email }),
+            RelayState: request.relayState,
+          }),
+        );
+        expect(acs.status).toBe(303);
+        const done = await fetch(local(acs.headers.get("location")), {
+          redirect: "manual",
+          headers: {
+            cookie: `${SSO_BINDING_COOKIE}=${/hay_sso_binding=([^;]+)/.exec(cookie)?.[1]}`,
+          },
+        });
+        expect(done.headers.get("location")).toContain("/sso/callback?ticket=");
+      }
+      const outcomes: string[] = [];
+      for (let i = 0; i < 32; i += 1) {
+        const res = await fetch(
+          `${base}/sso/saml/acs`,
+          form({ SAMLResponse: "AAAA", RelayState: `never-issued-${i}` }),
+        );
+        outcomes.push(
+          new URL(res.headers.get("location") as string).searchParams.get("sso_error") as string,
+        );
+      }
+      expect(outcomes.slice(0, 30).every((code) => code === "state_invalid")).toBe(true);
+      expect(outcomes.slice(30)).toEqual(["rate_limited", "rate_limited"]);
     });
 
     it("refuses a post with no relay state (provider-initiated) and records the refusal", async () => {
