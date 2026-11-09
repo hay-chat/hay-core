@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from "@jest/globals";
+import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
 
 /**
  * StorageService — uploads are private unless their folder is public.
@@ -14,6 +14,8 @@ jest.mock("@server/config/env", () => ({
         bucket: "hay-test",
         accessKeyId: "key",
         secretAccessKey: "secret",
+        useAcls: true,
+        serverSideEncryption: undefined,
       },
       local: { uploadDir: "/tmp/hay-test-uploads", baseUrl: "http://localhost/uploads" },
       limits: {
@@ -144,6 +146,48 @@ describe("StorageService private uploads", () => {
     expect(mockS3Send).toHaveBeenCalledTimes(1);
     expect((mockS3Send.mock.calls[0] as unknown[])[0]).toEqual({
       input: { Bucket: "hay-test", Key: "uploads/o/document-images/a.png", ACL: "private" },
+    });
+  });
+
+  describe("bucket settings", () => {
+    const s3 = (
+      jest.requireMock("@server/config/env") as {
+        config: { storage: { s3: { useAcls: boolean; serverSideEncryption?: string } } };
+      }
+    ).config.storage.s3;
+
+    afterEach(() => {
+      s3.useAcls = true;
+      s3.serverSideEncryption = undefined;
+    });
+
+    it("requests server-side encryption when configured", async () => {
+      s3.serverSideEncryption = "AES256";
+      await new StorageService().uploadPluginZip({
+        buffer: Buffer.from("PK\u0003\u0004"),
+        originalName: "plugin.zip",
+        pluginId: "my-plugin",
+        organizationId: ORG_ID,
+        uploadedById: "user-1",
+      });
+      expect(mockS3Params[0].ServerSideEncryption).toBe("AES256");
+    });
+
+    it("sends no ACLs to a bucket that has them disabled", async () => {
+      s3.useAcls = false;
+      mockS3Send.mockClear();
+      const storage = new StorageService();
+      await storage.uploadPluginZip({
+        buffer: Buffer.from("PK\u0003\u0004"),
+        originalName: "plugin.zip",
+        pluginId: "my-plugin",
+        organizationId: ORG_ID,
+        uploadedById: "user-1",
+      });
+      await storage.makePrivate({ storageType: "s3", path: "a.png" } as never);
+
+      expect(mockS3Params[0]).not.toHaveProperty("ACL");
+      expect(mockS3Send).not.toHaveBeenCalled();
     });
   });
 

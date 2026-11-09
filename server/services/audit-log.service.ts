@@ -3,9 +3,9 @@ import { AuditLog, type AuditAction, type AuditActorType } from "../entities/aud
 import { User } from "../entities/user.entity";
 import { createLogger } from "@server/lib/logger";
 import { metrics } from "@server/lib/metrics";
-import { config } from "@server/config/env";
 import { createHmac } from "crypto";
 import { apiKeyIdFromUserId } from "@server/lib/auth/api-token-actor";
+import { deriveServiceKey } from "@server/lib/auth/utils/service-keys";
 
 const logger = createLogger("audit-log");
 
@@ -88,8 +88,8 @@ function resolveActor(
 
 /** Keyed hash so failed logins for the same unknown email can be correlated without storing it. */
 export function hashEmailForAudit(email: string): string {
-  return createHmac("sha256", config.jwt.secret || "")
-    .update(`hay:audit-email:v1:${email.trim().toLowerCase()}`)
+  return createHmac("sha256", deriveServiceKey("hay:audit-email:v2"))
+    .update(email.trim().toLowerCase())
     .digest("hex");
 }
 

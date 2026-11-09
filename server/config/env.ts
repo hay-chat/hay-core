@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import path from "path";
+import { configuredEncryptionKeys } from "../lib/auth/utils/encryption-keys";
 
 // Load environment variables
 // In production, the compiled code is in server/dist/config, so we need to go up 3 levels to project root
@@ -24,6 +25,18 @@ dotenv.config({ path: envPath || path.resolve(__dirname, "../../../../.env"), qu
  */
 function stripScheme(value: string): string {
   return value.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
+}
+
+/**
+ * S3_SERVER_SIDE_ENCRYPTION: AES256, aws:kms or none. Defaults to AES256 on AWS
+ * only: other S3-compatible stores may reject the header.
+ */
+function s3ServerSideEncryption(): "AES256" | "aws:kms" | undefined {
+  const setting = process.env.S3_SERVER_SIDE_ENCRYPTION;
+  if (setting === "AES256" || setting === "aws:kms") return setting;
+  if (setting === "none") return undefined;
+  if (setting) throw new Error("S3_SERVER_SIDE_ENCRYPTION must be AES256, aws:kms or none");
+  return process.env.S3_ENDPOINT?.includes("amazonaws.com") ? "AES256" : undefined;
 }
 
 export const config = {
@@ -150,6 +163,14 @@ export const config = {
     // database server when DB_SSL=true. Without it the connection is encrypted
     // but the server certificate is not verified.
     sslCa: process.env.DB_SSL_CA || "",
+    // Owner role for migrations. Unset: migrations run as DB_USERNAME (one role for everything).
+    migratorUsername: process.env.DB_MIGRATOR_USERNAME || "",
+    migratorPassword: process.env.DB_MIGRATOR_PASSWORD || "",
+    statementTimeoutMs: parseInt(process.env.DB_STATEMENT_TIMEOUT_MS || "30000", 10),
+    idleInTransactionTimeoutMs: parseInt(
+      process.env.DB_IDLE_IN_TRANSACTION_TIMEOUT_MS || "60000",
+      10,
+    ),
     synchronize: false, // Never use synchronize in production
     logging: process.env.DB_LOGGING === "true",
     maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || "10", 10),
@@ -167,6 +188,9 @@ export const config = {
   rabbitmq: {
     url: process.env.RABBITMQ_URL || "amqp://hay:hay_password@localhost:5672/",
   },
+
+  // Root of the purpose-specific signing keys (lib/auth/utils/service-keys).
+  serviceKey: process.env.HAY_SERVICE_KEY || "",
 
   jwt: {
     secret: process.env.JWT_SECRET || "",
@@ -318,6 +342,9 @@ export const config = {
       bucket: process.env.S3_BUCKET || null,
       accessKeyId: process.env.S3_ACCESS_KEY_ID || null,
       secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || null,
+      // false for buckets with ACLs disabled; public folders then need a bucket policy.
+      useAcls: process.env.S3_USE_ACLS !== "false",
+      serverSideEncryption: s3ServerSideEncryption(),
     },
     limits: {
       maxFileSize: parseInt(process.env.UPLOAD_MAX_SIZE_MB || "10", 10) * 1024 * 1024,
@@ -552,6 +579,23 @@ export function validateJwtSecrets(): void {
 const MIN_SECRET_LENGTH = 32;
 const DEFAULT_DB_PASSWORD = "hay_password";
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+const PRIVATE_IPV4 = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/;
+
+/** A host reached over a network we don't control: not loopback, a private IP or a bare container name. */
+export function isRemoteHost(host: string): boolean {
+  return !LOCAL_HOSTS.has(host) && !PRIVATE_IPV4.test(host) && host.includes(".");
+}
+
+/** What is wrong with the database TLS settings for this environment, or null. */
+export function databaseTlsError(): string | null {
+  if (config.env === "development" || config.env === "test") return null;
+  if (!isRemoteHost(config.database.host)) return null;
+  if (!config.database.ssl) return "DB_SSL must be true for a remote database host.";
+  if (!config.database.sslCa) {
+    return "DB_SSL_CA (PEM text or a path to a PEM file) is required for a remote database host.";
+  }
+  return null;
+}
 
 /**
  * Validates the configuration a production server needs. Throws on settings
@@ -560,6 +604,12 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
  * Should be called at application startup.
  */
 export function validateProductionConfig(): string[] {
+  if (!process.env.NODE_ENV) {
+    throw new Error(
+      "NODE_ENV must be set (production, development or test): production checks depend on it.",
+    );
+  }
+
   // JWT secrets are validated in all environments (except test)
   validateJwtSecrets();
 
@@ -584,11 +634,18 @@ export function validateProductionConfig(): string[] {
     missingVars.push("RABBITMQ_URL");
   }
 
-  const encryptionKey = process.env.PLUGIN_ENCRYPTION_KEY || "";
-  if (!encryptionKey) {
-    missingVars.push("PLUGIN_ENCRYPTION_KEY");
-  } else if (encryptionKey.length < MIN_SECRET_LENGTH) {
-    errors.push(`PLUGIN_ENCRYPTION_KEY must be at least ${MIN_SECRET_LENGTH} characters.`);
+  try {
+    const encryptionKeys = configuredEncryptionKeys();
+    if (encryptionKeys.length === 0) {
+      missingVars.push("PLUGIN_ENCRYPTION_KEY");
+    } else if (encryptionKeys.some((key) => key.secret.length < MIN_SECRET_LENGTH)) {
+      errors.push(`PLUGIN_ENCRYPTION_KEY must be at least ${MIN_SECRET_LENGTH} characters.`);
+    }
+  } catch (error) {
+    errors.push((error as Error).message);
+  }
+  if (config.serviceKey && config.serviceKey.length < MIN_SECRET_LENGTH) {
+    errors.push(`HAY_SERVICE_KEY must be at least ${MIN_SECRET_LENGTH} characters when set.`);
   }
 
   if (!process.env.DB_PASSWORD || process.env.DB_PASSWORD === DEFAULT_DB_PASSWORD) {
@@ -609,6 +666,14 @@ export function validateProductionConfig(): string[] {
     );
   }
 
+  const tlsError = databaseTlsError();
+  if (tlsError) {
+    errors.push(tlsError);
+  }
+  if (!config.redis.password && isRemoteHost(config.redis.host)) {
+    errors.push("REDIS_PASSWORD is required for a remote Redis host.");
+  }
+
   if (missingVars.length > 0) {
     errors.unshift(`Missing required environment variables: ${missingVars.join(", ")}`);
   }
@@ -623,14 +688,8 @@ export function validateProductionConfig(): string[] {
   if (config.logging.level === "debug" || config.logging.level === "trace") {
     warnings.push(`LOG_LEVEL=${config.logging.level} is verbose and may log customer data.`);
   }
-  if (!config.database.ssl && !LOCAL_HOSTS.has(config.database.host)) {
-    warnings.push("DB_SSL is off for a remote database host; database traffic is unencrypted.");
-  }
   if (config.database.ssl && !config.database.sslCa) {
     warnings.push("DB_SSL is on without DB_SSL_CA; the database certificate is not verified.");
-  }
-  if (!config.redis.password && !LOCAL_HOSTS.has(config.redis.host)) {
-    warnings.push("REDIS_PASSWORD is not set for a remote Redis host.");
   }
   if (process.env.TRUST_PROXY === undefined) {
     warnings.push(

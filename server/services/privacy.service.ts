@@ -39,6 +39,7 @@ import { anonymizeConversations } from "@server/services/conversation-anonymizer
 import { recordErasure } from "@server/services/erasure-ledger";
 import { isUuid } from "@server/services/media-url.service";
 import { fetchPublicFile } from "@server/utils/fetch-public-file";
+import { deriveServiceKey } from "@server/lib/auth/utils/service-keys";
 
 /** Job `data.type` values run by the background job queue (job-queue.service). */
 const PRIVACY_JOB_TYPES = [PRIVACY_EXPORT_JOB_TYPE, PRIVACY_DELETION_JOB_TYPE];
@@ -1687,14 +1688,9 @@ please contact ${supportContact}.
 
   /**
    * Sign export data using HMAC-SHA256
-   * Uses a deterministic key derived from the organization's data
    */
   private signExportData(data: string): string {
-    // Use a signing key from environment or generate a deterministic one
-    const { config } = require("@server/config/env");
-    const signingKey = config.jwt.secret;
-
-    const hmac = crypto.createHmac("sha256", signingKey);
+    const hmac = crypto.createHmac("sha256", deriveServiceKey("hay:privacy-export:v1"));
     hmac.update(data);
     return hmac.digest("hex");
   }

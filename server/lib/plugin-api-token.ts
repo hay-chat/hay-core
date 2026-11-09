@@ -8,6 +8,7 @@
  */
 import * as jwt from "jsonwebtoken";
 import { config } from "@server/config/env";
+import { deriveServiceKey } from "@server/lib/auth/utils/service-keys";
 import type { Organization } from "@server/entities/organization.entity";
 
 export const PLUGIN_API_TOKEN_ISSUER = "hay-plugin-api";
@@ -22,6 +23,10 @@ export interface PluginApiTokenClaims {
   exp?: number;
 }
 
+function signingKey(): Buffer {
+  return deriveServiceKey("hay:plugin-api-token:v1");
+}
+
 /** Thrown when a token verifies cryptographically but its claims are not a plugin-api token. */
 export class PluginApiTokenClaimsError extends Error {}
 
@@ -32,7 +37,7 @@ export function mintPluginApiToken(
 ): string {
   return jwt.sign(
     { organizationId, pluginId, scope: PLUGIN_API_TOKEN_SCOPE, capabilities },
-    config.jwt.secret,
+    signingKey(),
     {
       algorithm: "HS256",
       expiresIn: "24h",
@@ -48,11 +53,21 @@ export function mintPluginApiToken(
  * token and {@link PluginApiTokenClaimsError} for a token with the wrong claims.
  */
 export function verifyPluginApiToken(token: string): PluginApiTokenClaims {
-  const decoded = jwt.verify(token, config.jwt.secret, {
+  const options: jwt.VerifyOptions = {
     algorithms: ["HS256"],
     issuer: PLUGIN_API_TOKEN_ISSUER,
     audience: PLUGIN_API_TOKEN_AUDIENCE,
-  });
+  };
+  let decoded: string | jwt.JwtPayload;
+  try {
+    decoded = jwt.verify(token, signingKey(), options);
+  } catch (error) {
+    // TODO: remove once no worker can hold a token older than 24h from this release.
+    if (!(error instanceof jwt.JsonWebTokenError) || error.message !== "invalid signature") {
+      throw error;
+    }
+    decoded = jwt.verify(token, config.jwt.secret, options);
+  }
   if (typeof decoded !== "object" || decoded === null) {
     throw new PluginApiTokenClaimsError("Invalid token payload");
   }

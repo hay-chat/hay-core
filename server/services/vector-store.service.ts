@@ -407,7 +407,7 @@ export class VectorStoreService {
     const result = await queryRunner.query(
       `DELETE FROM embeddings
        WHERE "organization_id" = $1
-       AND (metadata->>'conversationId')::uuid = ANY($2::uuid[])`,
+       AND metadata->>'conversationId' = ANY($2::text[])`,
       [orgId, validIds],
     );
 
@@ -447,7 +447,7 @@ export class VectorStoreService {
     const result = await queryRunner.query(
       `DELETE FROM embeddings
        WHERE "organization_id" = $1
-       AND (metadata->>'messageId')::uuid = ANY($2::uuid[])`,
+       AND metadata->>'messageId' = ANY($2::text[])`,
       [orgId, validIds],
     );
 
@@ -475,7 +475,7 @@ export class VectorStoreService {
       `SELECT id, page_content as "pageContent", metadata, created_at as "createdAt"
        FROM embeddings
        WHERE "organization_id" = $1
-       AND (metadata->>'conversationId')::uuid = ANY($2::uuid[])`,
+       AND metadata->>'conversationId' = ANY($2::text[])`,
       [orgId, conversationIds],
     );
 
@@ -503,7 +503,7 @@ export class VectorStoreService {
       `SELECT id, page_content as "pageContent", metadata, created_at as "createdAt"
        FROM embeddings
        WHERE "organization_id" = $1
-       AND (metadata->>'messageId')::uuid = ANY($2::uuid[])`,
+       AND metadata->>'messageId' = ANY($2::text[])`,
       [orgId, messageIds],
     );
 

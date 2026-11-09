@@ -9,6 +9,18 @@ export function boundedJsonRecord(maxBytes: number) {
     });
 }
 
+const uuid = z.string().uuid();
+
+/** Embedding metadata. The vector store deletes by these two keys, so they must hold real ids. */
+export function embeddingChunkMetadata(maxBytes: number) {
+  return boundedJsonRecord(maxBytes).refine(
+    (metadata) =>
+      (metadata.conversationId === undefined || uuid.safeParse(metadata.conversationId).success) &&
+      (metadata.messageId === undefined || uuid.safeParse(metadata.messageId).success),
+    { message: "conversationId and messageId must be UUIDs" },
+  );
+}
+
 /** Keys starting with "_" hold Hay's own bookkeeping and cannot be written by callers. */
 function hasNoReservedKeys(value: Record<string, unknown>): boolean {
   return !Object.keys(value).some((key) => key.startsWith("_"));
