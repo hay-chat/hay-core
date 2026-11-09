@@ -84,7 +84,7 @@
 
     <div v-else class="space-y-3">
       <p class="text-sm text-neutral-muted">
-        {{ $t("insights.page.list.count", { count: items.length }) }}
+        {{ $t("insights.page.list.count", { count: items.length }, items.length) }}
       </p>
       <Card
         v-for="item in items"
