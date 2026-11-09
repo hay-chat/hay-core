@@ -64,8 +64,8 @@ async function startServer() {
     logger.warn("Starting server without Redis connection");
   }
 
-  // Initialize Channel Delivery service (depends on Redis)
-  // Listens for outbound bot/agent messages and delivers them to external channels (WhatsApp, etc.)
+  // Initialize Channel Delivery service: consumes the durable delivery queue and
+  // sends outbound bot/agent messages to external channels (WhatsApp, etc.)
   const { channelDeliveryService } = await import("@server/services/channel-delivery.service");
   try {
     await channelDeliveryService.initialize();
@@ -623,7 +623,12 @@ async function startServer() {
     await step("orchestrator", () => orchestratorWorker.stop());
     await step("plugin-cleanup", () => pluginInstanceManagerService.stopCleanup());
     await step("websocket", () => websocketService.shutdown());
-    await step("scheduler", () => schedulerService.shutdown({ gracefulTimeout: 15000 }));
+    await step("background-work", () =>
+      Promise.all([
+        schedulerService.shutdown({ gracefulTimeout: 15000 }),
+        channelDeliveryService.stop(15000),
+      ]),
+    );
     await step("http", () => {
       httpServer.closeIdleConnections();
       return httpClosed;

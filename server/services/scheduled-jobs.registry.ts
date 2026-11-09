@@ -291,6 +291,32 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "channel-delivery-sweep",
+    description: "Publish outbound deliveries the queue never received and close abandoned ones",
+    schedule: 15000, // Every 15 seconds
+    handler: async (signal) => {
+      const { channelDeliveryService } = await import("./channel-delivery.service");
+      await channelDeliveryService.sweep(signal);
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
+    name: "cleanup-message-deliveries",
+    description: "Delete settled outbound delivery records older than 30 days",
+    schedule: "45 3 * * *", // Daily at 3:45 AM
+    handler: async () => {
+      const { messageDeliveryRepository } =
+        await import("../repositories/message-delivery.repository");
+      await messageDeliveryRepository.deleteSettledOlderThan(30);
+    },
+    singleton: true,
+    enabled: true,
+  },
+
+  {
     name: "simulation-sweep",
     description: "Fail simulated conversations stuck past their timeout and move their runs on",
     schedule: 60000, // Every 60 seconds

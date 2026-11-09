@@ -12,18 +12,41 @@ import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 const mockLogger = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
 jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
 
-type RedisHandler = (event: unknown) => void;
-let deliveryHandler: RedisHandler | null = null;
 const mockPublish = jest.fn<(channel: string, data: unknown) => Promise<void>>();
 let redisConnected = true;
 jest.mock("@server/services/redis.service", () => ({
   redisService: {
     publish: mockPublish,
     isConnected: () => redisConnected,
-    subscribe: jest.fn(async (_channel: string, handler: RedisHandler) => {
-      deliveryHandler = handler;
-    }),
   },
+}));
+
+/** Deliveries queued by the broadcast, keyed by message id. */
+const mockDeliveries = new Map<
+  string,
+  { id: string; kind: string; organizationId: string; conversationId: string; attempts: number }
+>();
+jest.mock("@server/repositories/message-delivery.repository", () => ({
+  messageDeliveryRepository: {
+    insertMessage: jest.fn(
+      async (row: { messageId: string; organizationId: string; conversationId: string }) => {
+        mockDeliveries.set(row.messageId, {
+          id: row.messageId,
+          kind: "message",
+          organizationId: row.organizationId,
+          conversationId: row.conversationId,
+          attempts: 1,
+        });
+        return true;
+      },
+    ),
+    claim: jest.fn(async (id: string) => mockDeliveries.get(id) ?? null),
+    markDelivered: jest.fn(async () => undefined),
+    markFailed: jest.fn(async () => undefined),
+  },
+}));
+jest.mock("@server/services/rabbitmq.service", () => ({
+  rabbitmqService: { isConnected: () => false, publish: async () => false, on: () => undefined },
 }));
 
 const mockFindPluginIdByChannel =
@@ -60,6 +83,7 @@ const mockMessageRepo = {
   ),
   update: jest.fn<(id: string, data: Record<string, unknown>) => Promise<unknown>>(),
   updateProviderMessageId: jest.fn<(id: string, providerMessageId: string) => Promise<void>>(),
+  findById: jest.fn(async () => storedMessage),
 };
 jest.mock("@server/repositories/message.repository", () => ({
   MessageRepository: jest.fn(() => mockMessageRepo),
@@ -278,19 +302,16 @@ describe("messageApprovalService", () => {
     const mockFetch =
       jest.fn<(url: string, init: RequestInit) => Promise<{ json: () => Promise<unknown> }>>();
 
-    /** Replay what approval published through the channel-delivery subscriber. */
+    /** Run whatever the approval queued for channel delivery. */
     const replayThroughChannelDelivery = async () => {
-      for (const [, event] of mockPublish.mock.calls) {
-        deliveryHandler!(event);
+      for (const id of mockDeliveries.keys()) {
+        await channelDeliveryService.processDelivery(id);
       }
-      await new Promise((resolve) => setImmediate(resolve));
-      await new Promise((resolve) => setImmediate(resolve));
     };
 
     beforeEach(async () => {
+      mockDeliveries.clear();
       global.fetch = mockFetch as unknown as typeof fetch;
-      await channelDeliveryService.initialize();
-      expect(deliveryHandler).not.toBeNull();
       mockFindPluginIdByChannel.mockResolvedValue("hay-channel-whatsapp-meta");
       mockGetOrStartWorker.mockResolvedValue({ port: 4567 });
       mockFetch.mockResolvedValue({
