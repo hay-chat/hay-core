@@ -7,23 +7,26 @@ import {
   toPublicMessageEvent,
 } from "./webchat/public-message";
 import { isSimulationConversation } from "./simulation/simulation-kind";
+import { channelDeliveryQueueService } from "./channel-delivery-queue.service";
 
 const logger = createLogger("websocket");
 
 /** The subset of a conversation a message broadcast needs. */
-type MessageBroadcastConversation = Pick<Conversation, "id" | "organization_id" | "metadata">;
+type MessageBroadcastConversation = Pick<
+  Conversation,
+  "id" | "organization_id" | "metadata" | "channel"
+>;
 
 /**
  * Service for broadcasting conversation-related events to WebSocket clients
  */
 class ConversationEventsService {
   /**
-   * Broadcast a message to everyone who should see it, as a `message_received`
-   * event on the Redis "websocket:events" channel. Downstream:
-   *   - websocketService forwards it to dashboard clients (all messages) and to
+   * Send a message to everyone who should see it:
+   *   - outbound channel delivery is queued durably, whether or not Redis is up,
+   *   - websocketService forwards the `message_received` event on the Redis
+   *     "websocket:events" channel to dashboard clients (all messages) and to
    *     webchat clients (public types with `deliveryState: "sent"`).
-   *   - channelDeliveryService POSTs `sent` bot/agent messages on non-web
-   *     channels to the channel plugin's /deliver.
    *
    * Call it when a message is created and again when a queued (approval-mode)
    * message becomes `sent`, so the approved reply actually reaches the customer.
@@ -35,6 +38,9 @@ class ConversationEventsService {
   ): Promise<void> {
     // Simulated conversations (D7-7) reach no one: no dashboard, widget or channel.
     if (isSimulationConversation(conversation.metadata)) return;
+    await this.queueChannelDelivery(() =>
+      channelDeliveryQueueService.enqueueMessage(conversation, message),
+    );
     try {
       const { redisService } = await import("./redis.service");
 
@@ -98,6 +104,15 @@ class ConversationEventsService {
     }
   }
 
+  /** A failure to queue must not stop the live broadcast. */
+  private async queueChannelDelivery(enqueue: () => Promise<void>): Promise<void> {
+    try {
+      await enqueue();
+    } catch (error) {
+      logger.error({ err: error }, "Failed to queue channel delivery");
+    }
+  }
+
   /**
    * Broadcast conversation created event
    */
@@ -151,6 +166,11 @@ class ConversationEventsService {
     changedFields?: string[],
   ): Promise<void> {
     if (isSimulationConversation(conversation.metadata)) return;
+    if (changedFields?.includes("status") && conversation.status === "pending-human") {
+      await this.queueChannelDelivery(() =>
+        channelDeliveryQueueService.enqueueEscalation(conversation),
+      );
+    }
     try {
       const { redisService } = await import("./redis.service");
 

@@ -2,11 +2,13 @@ import { Orchestrator } from "../orchestrator";
 import { AppDataSource } from "../database/data-source";
 import { createLogger, withLogContext } from "@server/lib/logger";
 import { rabbitmqService } from "@server/services/rabbitmq.service";
+import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { simulationHarnessService } from "@server/services/simulation/simulation-harness.service";
 import {
   orchestratorQueueService,
   ORCHESTRATOR_QUEUES,
   MAX_RETRY_ATTEMPTS,
+  type OrchestratorDeadLetterMessage,
   type OrchestratorMessage,
 } from "@server/services/orchestrator-queue.service";
 
@@ -181,7 +183,34 @@ export class OrchestratorWorker {
       { prefetch: 2 },
     );
 
-    logger.info("RabbitMQ consumer started for orchestrator.process");
+    await rabbitmqService.consume(
+      ORCHESTRATOR_QUEUES.DEAD,
+      async (msg) => {
+        await this.handleDeadLetter(
+          rabbitmqService.parseMessage<OrchestratorDeadLetterMessage>(msg),
+        );
+        rabbitmqService.ack(msg);
+      },
+      { prefetch: 1 },
+    );
+
+    logger.info("RabbitMQ consumers started for orchestrator.process");
+  }
+
+  /**
+   * A conversation that used up its queue retries is flagged as stuck, so the
+   * stale-message check recovers it or hands it to a person.
+   */
+  private async handleDeadLetter(data: OrchestratorDeadLetterMessage): Promise<void> {
+    logger.error(
+      { conversationId: data.conversationId, trigger: data.trigger, error: data.error },
+      "Conversation dead-lettered",
+    );
+    await new ConversationRepository().updateById(data.conversationId, {
+      is_stuck: true,
+      stuck_detected_at: new Date(),
+      stuck_reason: "orchestrator_dead_letter",
+    });
   }
 
   /**

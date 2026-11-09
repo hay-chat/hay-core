@@ -32,7 +32,7 @@ jest.mock("@server/services/document-retry.service", () => ({ documentRetryServi
 import { getJobConfig } from "@server/services/scheduled-jobs.registry";
 
 describe("orchestrator-sweep", () => {
-  const sweep = () => getJobConfig("orchestrator-sweep")!.handler();
+  const sweep = () => getJobConfig("orchestrator-sweep")!.handler(new AbortController().signal);
 
   beforeEach(() => {
     jest.clearAllMocks();

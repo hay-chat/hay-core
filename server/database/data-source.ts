@@ -51,6 +51,7 @@ import { PluginState } from "./entities/plugin-state.entity";
 import { EmailSendingDomain } from "./entities/email-sending-domain.entity";
 import { CustomerMergeDismissal } from "./entities/customer-merge-dismissal.entity";
 import { TeamQuestion } from "./entities/team-question.entity";
+import { MessageDelivery } from "./entities/message-delivery.entity";
 import { OrderLinkMessageSubscriber } from "./subscribers/order-link-message.subscriber";
 import { SnakeNamingStrategy } from "./naming-strategy";
 import { config } from "../config/env";
@@ -142,6 +143,7 @@ export const AppDataSource = new DataSource({
     EmailSendingDomain,
     CustomerMergeDismissal,
     TeamQuestion,
+    MessageDelivery,
     SimulationRun,
     SimulationRunItem,
     TestTranscript,

@@ -7,16 +7,80 @@ import { describe, it, expect, jest, beforeEach, beforeAll } from "@jest/globals
 const mockLogger = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
 jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
 
-type RedisHandler = (event: unknown) => void;
-let capturedHandler: RedisHandler | null = null;
 const mockPublish = jest.fn<(channel: string, data: unknown) => Promise<void>>();
-jest.mock("@server/services/redis.service", () => ({
-  redisService: {
-    subscribe: jest.fn(async (_channel: string, handler: RedisHandler) => {
-      capturedHandler = handler;
-    }),
-    publish: mockPublish,
-  },
+jest.mock("@server/services/redis.service", () => ({ redisService: { publish: mockPublish } }));
+
+/** What was published to RabbitMQ, oldest first. */
+const published: Array<{ queue: string; id: string }> = [];
+const mockRabbit = {
+  isConnected: jest.fn(() => true),
+  publish: jest.fn(async (queue: string, message: { messageId: string }) => {
+    published.push({ queue, id: message.messageId });
+    return true;
+  }),
+  assertQueue: jest.fn(async () => undefined),
+  consume: jest.fn(async () => undefined),
+  on: jest.fn(),
+};
+jest.mock("@server/services/rabbitmq.service", () => ({ rabbitmqService: mockRabbit }));
+
+/** In-memory message_deliveries. */
+type Row = { id: string; kind: string; status: string; attempts: number; lastError: string | null };
+const rows = new Map<string, Row & { organizationId: string; conversationId: string }>();
+const mockDeliveryRepo = {
+  insertMessage: jest.fn(
+    async (args: { messageId: string; organizationId: string; conversationId: string }) => {
+      if (rows.has(args.messageId)) return false;
+      rows.set(args.messageId, {
+        id: args.messageId,
+        kind: "message",
+        status: "pending",
+        attempts: 0,
+        lastError: null,
+        organizationId: args.organizationId,
+        conversationId: args.conversationId,
+      });
+      return true;
+    },
+  ),
+  insertEscalation: jest.fn(async (args: { organizationId: string; conversationId: string }) => {
+    const id = `escalation-${rows.size}`;
+    rows.set(id, {
+      id,
+      kind: "escalation",
+      status: "pending",
+      attempts: 0,
+      lastError: null,
+      organizationId: args.organizationId,
+      conversationId: args.conversationId,
+    });
+    return id;
+  }),
+  claim: jest.fn(async (id: string) => {
+    const row = rows.get(id);
+    if (!row || row.status !== "pending") return null;
+    row.status = "processing";
+    row.attempts += 1;
+    return { ...row };
+  }),
+  markDelivered: jest.fn(async (id: string) => {
+    rows.get(id)!.status = "delivered";
+  }),
+  markFailed: jest.fn(async (id: string, error: string) => {
+    Object.assign(rows.get(id)!, { status: "failed", lastError: error });
+  }),
+  scheduleRetry: jest.fn(async (id: string, _delayMs: number, error: string) => {
+    Object.assign(rows.get(id)!, { status: "pending", lastError: error });
+  }),
+  markDead: jest.fn(async (id: string) => {
+    const row = rows.get(id);
+    if (!row || row.status !== "failed") return null;
+    row.status = "dead";
+    return { ...row };
+  }),
+};
+jest.mock("@server/repositories/message-delivery.repository", () => ({
+  messageDeliveryRepository: mockDeliveryRepo,
 }));
 
 const mockFindPluginIdByChannel =
@@ -41,7 +105,10 @@ jest.mock("@server/repositories/message.repository", () => ({
   messageRepository: mockMessageRepo,
 }));
 
-const mockConversationRepo = { findById: jest.fn<() => Promise<unknown>>() };
+const mockConversationRepo = {
+  findById: jest.fn<() => Promise<unknown>>(),
+  updateById: jest.fn<(id: string, data: Record<string, unknown>) => Promise<unknown>>(),
+};
 jest.mock("@server/repositories/conversation.repository", () => ({
   ConversationRepository: jest.fn(() => mockConversationRepo),
   conversationRepository: mockConversationRepo,
@@ -66,10 +133,9 @@ jest.mock("@server/config/env", () => {
   };
 });
 
-import {
-  ChannelDeliveryService,
-  channelDeliveryService,
-} from "@server/services/channel-delivery.service";
+import { ChannelDeliveryService } from "@server/services/channel-delivery.service";
+import { channelDeliveryQueueService } from "@server/services/channel-delivery-queue.service";
+import { conversationEventsService } from "@server/services/conversation-events.service";
 import { verifyMediaSignature } from "@server/services/media-url.service";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -113,7 +179,10 @@ const outboundEvent = (payload: Record<string, unknown>) => ({
 
 const mockFetch =
   jest.fn<
-    (url: string, init: RequestInit) => Promise<{ status?: number; json: () => Promise<unknown> }>
+    (
+      url: string,
+      init: RequestInit,
+    ) => Promise<{ ok?: boolean; status?: number; json: () => Promise<unknown> }>
   >();
 
 const deliverBody = () => {
@@ -121,18 +190,38 @@ const deliverBody = () => {
   return JSON.parse(init.body) as Record<string, unknown>;
 };
 
-/** The subscribe handler fires-and-forgets; wait for the async chain to settle. */
-const dispatch = async (event: unknown) => {
-  capturedHandler!(event);
-  await new Promise((resolve) => setImmediate(resolve));
-  await new Promise((resolve) => setImmediate(resolve));
+type TestEvent = { type: string; payload?: Record<string, unknown> };
+
+const channelDeliveryService = new ChannelDeliveryService();
+
+/** Queue an event's delivery the way the broadcast does and consume what got published. */
+const dispatch = async (event: TestEvent, service = channelDeliveryService) => {
+  const current = (await mockConversationRepo.findById()) as Parameters<
+    typeof channelDeliveryQueueService.enqueueMessage
+  >[0];
+  if (event.type === "message_received") {
+    mockMessageRepo.findById.mockResolvedValue(event.payload);
+    await channelDeliveryQueueService.enqueueMessage(
+      current,
+      event.payload as unknown as Parameters<typeof channelDeliveryQueueService.enqueueMessage>[1],
+    );
+  } else {
+    await channelDeliveryQueueService.enqueueEscalation(current);
+  }
+  const queued = published.splice(0).map(({ id }) => id);
+  const results = [];
+  for (const id of queued) results.push(await service.processDelivery(id));
+  return results;
 };
+
+beforeEach(() => {
+  rows.clear();
+  published.length = 0;
+});
 
 describe("channelDeliveryService /deliver", () => {
   beforeAll(async () => {
     global.fetch = mockFetch as unknown as typeof fetch;
-    await channelDeliveryService.initialize();
-    expect(capturedHandler).not.toBeNull();
   });
 
   beforeEach(() => {
@@ -260,22 +349,27 @@ describe("channelDeliveryService /deliver", () => {
 });
 
 describe("channelDeliveryService retry (D13-7)", () => {
-  const sleep = jest.fn(async (_ms: number) => {});
-  let handler: RedisHandler;
+  const service = new ChannelDeliveryService({
+    retryDelaysMs: [10, 20, 40],
+    rabbit: mockRabbit as never,
+  });
 
-  const deliverOnce = async (event: unknown) => {
-    handler(event);
-    // Retries chain several awaits; give the loop time to settle.
-    await new Promise((resolve) => setTimeout(resolve, 30));
+  /** Queue the message, then replay each retry the delay queues hand back. */
+  const deliverOnce = async (event: TestEvent) => {
+    let results = await dispatch(event, service);
+    const retries: string[] = [];
+    while (results[results.length - 1] === "retry") {
+      const [next] = published.splice(0);
+      retries.push(next.queue);
+      results = [await service.processDelivery(next.id)];
+    }
+    return { result: results[results.length - 1], retries };
   };
 
   const answer = (status: number, body: unknown) => ({ status, json: async () => body });
 
   beforeAll(async () => {
     global.fetch = mockFetch as unknown as typeof fetch;
-    const service = new ChannelDeliveryService({ retryDelaysMs: [10, 20, 40], sleep });
-    await service.initialize();
-    handler = capturedHandler!;
   });
 
   beforeEach(() => {
@@ -286,32 +380,43 @@ describe("channelDeliveryService retry (D13-7)", () => {
     mockGetOrStartWorker.mockResolvedValue({ port: 4567 });
   });
 
-  it("retries a 503 with backoff and stores the provider id once it goes through", async () => {
+  it("retries a 503 through the delay queues and stores the provider id once it goes through", async () => {
     mockFetch
       .mockResolvedValueOnce(answer(503, { success: false, error: "rate_limited" }))
       .mockResolvedValueOnce(answer(503, { success: false, error: "rate_limited" }))
       .mockResolvedValueOnce(answer(200, { success: true, providerMessageId: "wamid.OK" }));
 
-    await deliverOnce(outboundEvent({}));
+    const { result, retries } = await deliverOnce(outboundEvent({}));
 
+    expect(result).toBe("done");
     expect(mockFetch).toHaveBeenCalledTimes(3);
-    expect(sleep.mock.calls.map(([ms]) => ms)).toEqual([10, 20]);
+    expect(retries).toEqual(["channel.deliver.retry.10", "channel.deliver.retry.20"]);
     expect(mockMessageRepo.updateProviderMessageId).toHaveBeenCalledWith("msg-1", "wamid.OK");
     expect(mockMessageRepo.update).not.toHaveBeenCalled();
     expect(mockOnChannelDeliveryFailed).not.toHaveBeenCalled();
   });
 
-  it("gives up after 3 retries, keeps the message failed and alerts owners/admins", async () => {
+  it("gives up after 3 retries, keeps the message failed and alerts from the dead-letter path", async () => {
     mockFetch.mockResolvedValue(answer(503, { success: false, error: "rate_limited" }));
 
-    await deliverOnce(outboundEvent({}));
+    const { result, retries } = await deliverOnce(outboundEvent({}));
 
+    expect(result).toBe("dead");
     expect(mockFetch).toHaveBeenCalledTimes(4);
-    expect(sleep.mock.calls.map(([ms]) => ms)).toEqual([10, 20, 40]);
+    expect(retries).toHaveLength(3);
     expect(mockMessageRepo.update).toHaveBeenCalledWith("msg-1", {
       providerStatus: "failed",
       providerError: { code: "rate_limited" },
     });
+    expect(mockOnChannelDeliveryFailed).not.toHaveBeenCalled();
+
+    await service.handleDeadLetter("msg-1");
+    await service.handleDeadLetter("msg-1");
+
+    expect(mockConversationRepo.updateById).toHaveBeenCalledWith(
+      CONVERSATION_ID,
+      expect.objectContaining({ is_stuck: true, stuck_reason: "channel_delivery_failed" }),
+    );
     expect(mockPublish).toHaveBeenCalledWith("websocket:events", {
       type: "channel_delivery_failed",
       organizationId: ORG_ID,
@@ -322,6 +427,7 @@ describe("channelDeliveryService retry (D13-7)", () => {
         providerError: { code: "rate_limited" },
       },
     });
+    expect(mockOnChannelDeliveryFailed).toHaveBeenCalledTimes(1);
     expect(mockOnChannelDeliveryFailed).toHaveBeenCalledWith({
       organizationId: ORG_ID,
       conversationId: CONVERSATION_ID,
@@ -331,10 +437,11 @@ describe("channelDeliveryService retry (D13-7)", () => {
   it("never retries a permanent refusal (200 success:false) and does not alert", async () => {
     mockFetch.mockResolvedValue(answer(200, { success: false, error: "24h_window_expired" }));
 
-    await deliverOnce(outboundEvent({}));
+    const { result, retries } = await deliverOnce(outboundEvent({}));
 
+    expect(result).toBe("done");
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(sleep).not.toHaveBeenCalled();
+    expect(retries).toEqual([]);
     expect(mockMessageRepo.update).toHaveBeenCalledWith("msg-1", {
       providerStatus: "failed",
       providerError: { code: "24h_window_expired" },
@@ -365,6 +472,7 @@ describe("channelDeliveryService retry (D13-7)", () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(mockMessageRepo.updateProviderMessageId).toHaveBeenCalledWith("msg-1", "wamid.OK");
 
+    rows.clear();
     jest.clearAllMocks();
     mockConversationRepo.findById.mockResolvedValue(conversation);
     mockFindPluginIdByChannel.mockResolvedValue("hay-channel-whatsapp");
@@ -381,6 +489,35 @@ describe("channelDeliveryService retry (D13-7)", () => {
   });
 });
 
+describe("channel delivery queueing", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockConversationRepo.findById.mockResolvedValue(conversation);
+    mockFindPluginIdByChannel.mockResolvedValue("hay-channel-whatsapp");
+    mockGetChannelRendering.mockReturnValue({});
+    mockGetOrStartWorker.mockResolvedValue({ port: 4567 });
+    mockFetch.mockResolvedValue({ json: async () => ({ success: true }) });
+  });
+
+  it("queues a message once however often it is broadcast", async () => {
+    const message = outboundEvent({}).payload as never;
+    await conversationEventsService.broadcastMessageReceived(conversation as never, message);
+    await conversationEventsService.broadcastMessageReceived(conversation as never, message);
+
+    expect(published).toEqual([{ queue: "channel.deliver", id: "msg-1" }]);
+  });
+
+  it("does nothing for a delivery another consumer already claimed", async () => {
+    const event = outboundEvent({});
+    mockMessageRepo.findById.mockResolvedValue(event.payload);
+    await channelDeliveryQueueService.enqueueMessage(conversation as never, event.payload as never);
+
+    expect(await channelDeliveryService.processDelivery("msg-1")).toBe("done");
+    expect(await channelDeliveryService.processDelivery("msg-1")).toBe("skipped");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("channelDeliveryService AI disclosure (D14-7)", () => {
   const shown = {
     ...conversation,
@@ -394,12 +531,11 @@ describe("channelDeliveryService AI disclosure (D14-7)", () => {
     mockGetChannelRendering.mockReturnValue({});
     mockGetOrStartWorker.mockResolvedValue({ port: 4567 });
     mockFetch.mockResolvedValue({ json: async () => ({ success: true }) });
-    mockMessageRepo.findById.mockResolvedValue({ id: "msg-1", metadata: { model: "m" } });
   });
 
   it("opens the first AI reply with the label in the shopper's language and records it", async () => {
     mockConversationRepo.findById.mockResolvedValue(shown);
-    await dispatch(outboundEvent({}));
+    await dispatch(outboundEvent({ metadata: { model: "m" } }));
 
     expect(deliverBody()).toMatchObject({ content: "[Assistente de IA]\n\nhello" });
     expect(mockMessageRepo.update).toHaveBeenCalledWith("msg-1", {
@@ -460,14 +596,13 @@ describe("channelDeliveryService AI disclosure (D14-7)", () => {
 describe("channelDeliveryService /escalate attachments (D8-10)", () => {
   beforeAll(async () => {
     global.fetch = mockFetch as unknown as typeof fetch;
-    await channelDeliveryService.initialize();
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockFindPluginIdByChannel.mockResolvedValue("hay-channel-chatwoot");
     mockGetOrStartWorker.mockResolvedValue({ port: 4567 });
-    mockFetch.mockResolvedValue({ status: 200, json: async () => ({ success: true }) });
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true }) });
   });
 
   const statusEvent = {
@@ -575,7 +710,7 @@ describe("channelDeliveryService channel-aware rendering (D13-12)", () => {
 
     mockFetch.mockClear();
     mockGetChannelRendering.mockReturnValue({ markdown: "whatsapp" });
-    await dispatch(outboundEvent({ content: "**Hi** *there*" }));
+    await dispatch(outboundEvent({ id: "msg-2", content: "**Hi** *there*" }));
     expect(deliverBody().content).toBe("*Hi* _there_");
   });
 

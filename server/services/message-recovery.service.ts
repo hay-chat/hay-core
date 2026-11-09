@@ -72,6 +72,16 @@ export class MessageRecoveryService {
         return await this.escalateToHuman(conversation, staleConv.stuckReason);
       }
 
+      // Waiting out a backoff is not a recovery attempt. The detector skips the
+      // conversation until the cooldown ends, then the retry below runs.
+      if (
+        staleConv.stuckReason === StaleReason.REPEATED_FAILURES &&
+        !this.cooldownElapsed(conversation) &&
+        (conversation.processing_error_count || 0) < this.maxRecoveryAttempts
+      ) {
+        return await this.startBackoff(conversation);
+      }
+
       // Increment recovery attempts
       await this.conversationRepository.updateById(conversation.id, {
         recovery_attempts: recoveryAttempts + 1,
@@ -163,39 +173,46 @@ export class MessageRecoveryService {
     return { success: true, action: "requeued_for_processing" };
   }
 
+  private cooldownElapsed(conversation: Conversation): boolean {
+    return !!conversation.cooldown_until && new Date(conversation.cooldown_until) <= new Date();
+  }
+
   /**
-   * Recover from repeated failures with exponential backoff
+   * Hold a repeatedly failing conversation for an exponential backoff
+   * (8s, 16s, ... max 60s). Nothing is queued until the cooldown has passed.
    */
-  private async recoverFromRepeatedFailures(conversation: Conversation): Promise<RecoveryResult> {
+  private async startBackoff(conversation: Conversation): Promise<RecoveryResult> {
     const errorCount = conversation.processing_error_count || 0;
-
-    // Escalate to human after threshold
-    if (errorCount >= this.maxRecoveryAttempts) {
-      return await this.escalateToHuman(conversation, StaleReason.REPEATED_FAILURES);
-    }
-
-    // Calculate exponential backoff: 1s, 2s, 4s, 8s, 16s (max 60s)
-    const backoffDelay = Math.min(1000 * Math.pow(2, errorCount), 60000);
+    const backoffMs = Math.min(1000 * Math.pow(2, errorCount), 60000);
 
     logger.debug(
-      {
-        conversationId: conversation.id,
-        errorCount,
-        backoffMs: backoffDelay,
-      },
+      { conversationId: conversation.id, errorCount, backoffMs },
       "Applying backoff for conversation",
     );
 
-    // Wait for backoff period
-    await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+    await this.conversationRepository.updateById(conversation.id, {
+      needs_processing: false,
+      status: "open",
+      processing_locked_until: null,
+      processing_locked_by: null,
+      is_stuck: false,
+      stuck_detected_at: null,
+      stuck_reason: null,
+      cooldown_until: new Date(Date.now() + backoffMs),
+    });
 
-    // The owner may have taken over during the wait.
-    const blocker = await recheckAiReply(conversation.id);
-    if (blocker && !isPauseBlocker(blocker)) {
-      return this.skippedFor(conversation.id, blocker);
+    return { success: false, action: "backoff_started", backoffMs };
+  }
+
+  /**
+   * Retry a repeatedly failing conversation whose backoff has passed, or hand it
+   * to a human once it has failed too often.
+   */
+  private async recoverFromRepeatedFailures(conversation: Conversation): Promise<RecoveryResult> {
+    if ((conversation.processing_error_count || 0) >= this.maxRecoveryAttempts) {
+      return await this.escalateToHuman(conversation, StaleReason.REPEATED_FAILURES);
     }
 
-    // Retry
     await this.conversationRepository.updateById(conversation.id, {
       needs_processing: true,
       status: "open",
@@ -204,13 +221,10 @@ export class MessageRecoveryService {
       is_stuck: false,
       stuck_detected_at: null,
       stuck_reason: null,
+      cooldown_until: null,
     });
 
-    return {
-      success: true,
-      action: "retry_with_backoff",
-      backoffMs: backoffDelay,
-    };
+    return { success: true, action: "retry_with_backoff" };
   }
 
   /**
