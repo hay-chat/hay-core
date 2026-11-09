@@ -39,20 +39,22 @@ export const documentListInputSchema = baseListInputSchema.extend({
 });
 
 // Conversation-specific filters
+const conversationStatusSchema = z.enum([
+  "open",
+  "processing",
+  "pending-human",
+  "awaiting-approval",
+  "human-took-over",
+  "resolved",
+  "unresolved",
+  "closed",
+]);
+
 export const conversationFiltersSchema = z
   .object({
-    status: z
-      .enum([
-        "open",
-        "processing",
-        "pending-human",
-        "awaiting-approval",
-        "human-took-over",
-        "resolved",
-        "unresolved",
-        "closed",
-      ])
-      .optional(),
+    status: conversationStatusSchema.optional(),
+    /** Any of these statuses; for filters that span several (e.g. escalated). */
+    statuses: z.array(conversationStatusSchema).min(1).max(8).optional(),
     playbookId: z.string().uuid().optional(),
     hasMessages: z.boolean().optional(),
     /** Leaves out playground chats, for counts of real customer conversations. */
