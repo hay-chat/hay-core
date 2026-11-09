@@ -77,7 +77,7 @@
     "multer": "^2.5.0",
     "node-cron": "^4.6.0",
     "nodemailer": "^10.3.1",
-    "openai": "^6.49.0",
+    "openai": "^7.52.0",
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.20.2",
     "pg": "^8.23.1",
