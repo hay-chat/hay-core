@@ -3,8 +3,9 @@
     <!-- Page Header -->
     <template #header>
       <div class="mt-4 sm:mt-0 flex space-x-3">
+        <RefreshIndicator :active="refreshing" class="self-center" />
         <Button variant="outline" :disabled="loading" @click="refreshData">
-          <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
+          <RefreshCw class="mr-2 h-4 w-4" />
           {{ $t("documents.actions.refresh") }}
         </Button>
         <NuxtLink to="/documents/sources">
@@ -162,7 +163,10 @@
           <TableRow
             v-for="document in documents"
             :key="document.id"
-            :class="selectedDocuments.includes(document.id) ? 'bg-background-secondary' : ''"
+            :class="[
+              selectedDocuments.includes(document.id) ? 'bg-background-secondary' : '',
+              { 'data-settle': isNewRow(document.id) },
+            ]"
           >
             <TableCell>
               <Checkbox
@@ -463,7 +467,6 @@ const router = useRouter();
 const { formatDateTime } = useOrgDateTime();
 
 // State
-const loading = ref(false);
 const searching = ref(false);
 const searchQuery = ref("");
 const retryingAll = ref(false);
@@ -486,9 +489,79 @@ interface Document {
   hasAttachment?: boolean;
 }
 
-const documents = ref<Document[]>([]);
 const { page: currentPage, pageSize, setPage, setPageSize } = usePagination();
-const totalDocuments = ref(0);
+
+const {
+  data: listData,
+  loading,
+  refreshing,
+  keyHash: listKeyHash,
+  refresh: refreshList,
+  setData: setListData,
+} = useCachedQuery(
+  () =>
+    [
+      "documents",
+      "list",
+      {
+        page: currentPage.value,
+        limit: pageSize.value,
+        type: typeFilter.value,
+        status: statusFilter.value,
+      },
+    ] as const,
+  async ([, , params]) => {
+    const filters: Record<string, string> = {};
+    if (params.type !== "all") filters.type = params.type;
+    if (params.status !== "all") filters.status = params.status;
+
+    const result = await HayApi.documents.list.query({
+      pagination: { page: params.page, limit: params.limit },
+      ...(Object.keys(filters).length > 0 && { filters }),
+    });
+
+    return {
+      total: result.pagination.total,
+      items: (result.items || []).map((doc: Record<string, unknown>): Document => ({
+        id: doc.id as string,
+        name: (doc.title as string) || "Untitled",
+        description: (doc.description as string) || (doc.content as string)?.substring(0, 100),
+        type: (doc.type as string) || "article",
+        category: (doc.categories as string[])?.[0] || "general",
+        fileSize: (doc.attachments as Array<{ size: number }>)?.[0]?.size || 0,
+        status: (doc.status as string) || "draft",
+        createdAt: new Date((doc.created_at || doc.createdAt) as string),
+        updatedAt: new Date((doc.updated_at || doc.updatedAt) as string),
+        sourceUrl: doc.sourceUrl as string | undefined,
+        importMethod: doc.importMethod as Document["importMethod"],
+        hasAttachment: !!(doc.attachments as Array<unknown>)?.length,
+      })),
+    };
+  },
+);
+
+// Hybrid search results replace the list until the next refresh; they are not cached.
+const searchResults = ref<Document[] | null>(null);
+const documents = computed(() => searchResults.value ?? listData.value?.items ?? []);
+const totalDocuments = computed(() =>
+  searchResults.value ? searchResults.value.length : (listData.value?.total ?? 0),
+);
+const isNewRow = useNewRows(
+  () => searchResults.value ?? listData.value?.items,
+  () => (searchResults.value ? "search" : listKeyHash.value),
+);
+
+/** Apply a change to whichever rows are on screen. */
+const updateDocuments = (change: (docs: Document[]) => Document[]) => {
+  if (searchResults.value) {
+    searchResults.value = change(searchResults.value);
+  } else {
+    setListData((list) => ({ ...list, items: change(list.items) }));
+  }
+};
+const setDocumentStatus = (id: string, status: string) => {
+  updateDocuments((docs) => docs.map((doc) => (doc.id === id ? { ...doc, status } : doc)));
+};
 
 // Computed total pages
 const totalPages = computed(() => Math.ceil(totalDocuments.value / pageSize.value));
@@ -578,39 +651,9 @@ const _formatFileSize = (bytes: number) => {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 };
 
-const refreshData = async () => {
-  loading.value = true;
-  try {
-    const filters: Record<string, string> = {};
-    if (typeFilter.value !== "all") filters.type = typeFilter.value;
-    if (statusFilter.value !== "all") filters.status = statusFilter.value;
-
-    const result = await HayApi.documents.list.query({
-      pagination: { page: currentPage.value, limit: pageSize.value },
-      ...(Object.keys(filters).length > 0 && { filters }),
-    });
-
-    // Map the result to the expected document format
-    documents.value = (result.items || []).map((doc: Record<string, unknown>) => ({
-      id: doc.id as string,
-      name: (doc.title as string) || "Untitled",
-      description: (doc.description as string) || (doc.content as string)?.substring(0, 100),
-      type: (doc.type as string) || "article",
-      category: (doc.categories as string[])?.[0] || "general",
-      fileSize: (doc.attachments as Array<{ size: number }>)?.[0]?.size || 0,
-      status: (doc.status as string) || "draft",
-      createdAt: new Date((doc.created_at || doc.createdAt) as string),
-      updatedAt: new Date((doc.updated_at || doc.updatedAt) as string),
-      sourceUrl: doc.sourceUrl as string | undefined,
-      importMethod: doc.importMethod as Document["importMethod"],
-      hasAttachment: !!(doc.attachments as Array<unknown>)?.length,
-    }));
-    totalDocuments.value = result.pagination.total;
-  } catch (error) {
-    console.error("Failed to fetch documents:", error);
-  } finally {
-    loading.value = false;
-  }
+const refreshData = () => {
+  searchResults.value = null;
+  return refreshList();
 };
 
 // Search documents using hybrid search (vector + keyword)
@@ -625,7 +668,7 @@ const searchDocuments = async () => {
     });
 
     // Update the main documents list with search results
-    documents.value = (results || []).map((doc) => ({
+    searchResults.value = (results || []).map((doc) => ({
       id: doc.id,
       name: doc.title || "Untitled",
       title: doc.title,
@@ -640,7 +683,6 @@ const searchDocuments = async () => {
       importMethod: doc.importMethod,
       hasAttachment: doc.hasAttachment,
     }));
-    totalDocuments.value = documents.value.length;
   } catch (error) {
     console.error("Search failed:", error);
   } finally {
@@ -649,14 +691,14 @@ const searchDocuments = async () => {
 };
 
 // Pagination handlers
-const handlePageChange = async (page: number) => {
+const handlePageChange = (page: number) => {
   setPage(page);
-  await refreshData();
+  searchResults.value = null;
 };
 
-const handleItemsPerPageChange = async (itemsPerPage: number) => {
+const handleItemsPerPageChange = (itemsPerPage: number) => {
   setPageSize(itemsPerPage); // Resets to page 1, persists the preference, syncs the URL
-  await refreshData();
+  searchResults.value = null;
 };
 
 // Helper function to detect file type from MIME type or extension
@@ -691,7 +733,7 @@ const _mapDocumentStatus = (documentStatus: string, processingStatus?: string): 
 const applyFilters = () => {
   setPage(1);
   selectedDocuments.value = [];
-  refreshData();
+  searchResults.value = null;
 };
 
 const clearFilters = () => {
@@ -700,7 +742,7 @@ const clearFilters = () => {
   statusFilter.value = "all";
   selectedDocuments.value = [];
   setPage(1);
-  refreshData();
+  searchResults.value = null;
 };
 
 const toggleDocumentSelection = (documentId: string) => {
@@ -841,10 +883,8 @@ const performSingleDelete = async () => {
     });
 
     if (result.success) {
-      const index = documents.value.findIndex((d) => d.id === documentToDelete.value!.id);
-      if (index > -1) {
-        documents.value.splice(index, 1);
-      }
+      const deletedId = documentToDelete.value!.id;
+      updateDocuments((docs) => docs.filter((doc) => doc.id !== deletedId));
 
       toast.success(result.message || t("documents.toast.deleteSuccess"));
     }
@@ -900,7 +940,7 @@ const performBulkDelete = async () => {
     // Remove the progress toast
     toast.remove(progressToastId);
 
-    documents.value = documents.value.filter((doc) => !successfulDeletes.includes(doc.id));
+    updateDocuments((docs) => docs.filter((doc) => !successfulDeletes.includes(doc.id)));
 
     selectedDocuments.value = [];
 
@@ -952,7 +992,7 @@ const retryDocument = async (document: Document) => {
   const previousStatus = document.status;
   try {
     // Set processing immediately so the UI updates before the API call
-    document.status = "processing";
+    setDocumentStatus(document.id, "processing");
 
     await HayApi.documents.retryDocument.mutate({
       documentId: document.id,
@@ -963,14 +1003,14 @@ const retryDocument = async (document: Document) => {
   } catch (error) {
     console.error("Error retrying document:", error);
     toast.error(t("documents.toast.retryFailed"));
-    document.status = previousStatus;
+    setDocumentStatus(document.id, previousStatus);
   }
 };
 
 const viewFailedDocuments = () => {
   statusFilter.value = "error";
   setPage(1);
-  refreshData();
+  searchResults.value = null;
 };
 
 const retryAllFailed = async () => {
@@ -994,7 +1034,7 @@ const retryAllFailed = async () => {
           documentId: document.id,
         });
 
-        document.status = "processing";
+        setDocumentStatus(document.id, "processing");
         successCount++;
         toast.update(
           progressToastId,
@@ -1038,9 +1078,7 @@ const retryAllFailed = async () => {
 const websocket = useWebSocket();
 
 // Lifecycle
-onMounted(async () => {
-  await refreshData();
-
+onMounted(() => {
   // Set up WebSocket connection and listeners
   websocket.connect();
 
@@ -1063,7 +1101,7 @@ onMounted(async () => {
     const document = documents.value.find((doc) => doc.id === data.documentId);
     if (document) {
       const oldStatus = document.status;
-      document.status = data.status;
+      setDocumentStatus(data.documentId, data.status);
 
       logger.debug(
         `[Documents] Updated document ${data.documentId} status: ${oldStatus} → ${data.status}`,

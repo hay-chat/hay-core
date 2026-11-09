@@ -3,6 +3,7 @@
     <!-- Header -->
     <template #header>
       <div class="flex items-center space-x-2">
+        <RefreshIndicator :active="refreshing" />
         <Button variant="outline" size="icon" @click="router.push('/playbooks/new')">
           <Plus class="h-4 w-4" />
         </Button>
@@ -136,6 +137,7 @@
         v-for="playbook in paginatedPlaybooks"
         :key="playbook.id"
         class="hover:shadow-md transition-shadow cursor-pointer"
+        :class="{ 'data-settle': isNewPlaybook(playbook.id) }"
         @click="editPlaybook(playbook.id)"
       >
         <CardHeader>
@@ -231,6 +233,7 @@
                 v-for="playbook in paginatedPlaybooks"
                 :key="playbook.id"
                 class="border-b hover:bg-background-secondary cursor-pointer"
+                :class="{ 'data-settle': isNewPlaybook(playbook.id) }"
                 @click="editPlaybook(playbook.id)"
               >
                 <td class="py-3 px-4">
@@ -364,7 +367,6 @@ const createFromTemplate = async (template: PlaybookTemplate) => {
 };
 
 // Reactive state
-const loading = ref(true);
 const searchQuery = ref("");
 const selectedCategory = ref("");
 const selectedStatus = ref("");
@@ -372,7 +374,24 @@ const viewMode = ref<"grid" | "table">("grid");
 const { page: currentPage, pageSize, setPage, setPageSize } = usePagination();
 
 // Data from API
-const playbooks = ref<Playbook[]>([]);
+const {
+  data: playbooksData,
+  loading,
+  refreshing,
+  error: playbooksError,
+  keyHash,
+  setData: setPlaybooks,
+} = useCachedQuery(
+  () => ["playbooks", "list"] as const,
+  async () => (await HayApi.playbooks.list.query()) as Playbook[],
+);
+const playbooks = computed(() => playbooksData.value ?? []);
+const isNewPlaybook = useNewRows(playbooksData, keyHash);
+
+watch(playbooksError, (failure) => {
+  // With playbooks on screen a failed background refresh stays quiet.
+  if (failure && !playbooksData.value) toast.error(t("toast.loadFailed"));
+});
 
 // Stats computed from playbooks
 const stats = computed(() => {
@@ -472,7 +491,7 @@ const duplicatePlaybook = async (id: string) => {
 const setPlaybookStatus = async (id: string, status: PlaybookStatus, successMessage: string) => {
   try {
     await HayApi.playbooks.update.mutate({ id, data: { status } });
-    playbooks.value = playbooks.value.map((p) => (p.id === id ? { ...p, status } : p));
+    setPlaybooks((list) => list.map((p) => (p.id === id ? { ...p, status } : p)));
     toast.success(successMessage);
   } catch (error) {
     console.error("Failed to update playbook status:", error);
@@ -506,10 +525,11 @@ const confirmDelete = async () => {
   if (!playbookToDelete.value) return;
 
   try {
-    await HayApi.playbooks.delete.mutate({ id: playbookToDelete.value.id });
+    const deletedId = playbookToDelete.value.id;
+    await HayApi.playbooks.delete.mutate({ id: deletedId });
 
     // Remove from local list
-    playbooks.value = playbooks.value.filter((p) => p.id !== playbookToDelete.value!.id);
+    setPlaybooks((list) => list.filter((p) => p.id !== deletedId));
 
     toast.success(t("toast.deleteSuccess"));
   } catch (error) {
@@ -521,21 +541,6 @@ const confirmDelete = async () => {
   }
 };
 
-// Fetch playbooks from API
-const fetchPlaybooks = async () => {
-  try {
-    loading.value = true;
-    const response = await HayApi.playbooks.list.query();
-    // Type assertion to ensure compatibility
-    playbooks.value = (response || []) as Playbook[];
-  } catch (error) {
-    console.error("Failed to fetch playbooks:", error);
-    toast.error(t("toast.loadFailed"));
-  } finally {
-    loading.value = false;
-  }
-};
-
 // Pagination handlers
 const handlePageChange = (page: number) => {
   setPage(page);
@@ -544,11 +549,6 @@ const handlePageChange = (page: number) => {
 const handleItemsPerPageChange = (itemsPerPage: number) => {
   setPageSize(itemsPerPage); // Resets to page 1, persists the preference, syncs the URL
 };
-
-// Lifecycle
-onMounted(async () => {
-  await fetchPlaybooks();
-});
 
 // Set page meta
 definePageMeta({
