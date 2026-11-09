@@ -12,7 +12,9 @@ export type SetupSiteState = SetupBoard["site"];
 export type SetupSuggestions = RouterOutputs["setup"]["suggestions"];
 /** What a row's edit panel sends: only the fields the person changed. */
 export type SetupRowChanges = Omit<RouterInputs["setup"]["updateQuestion"], "questionId">;
-export type SetupDocumentRef = NonNullable<SetupRow["linkedDocument"]>;
+export type SetupDocumentRef = NonNullable<SetupRow["linkedDocuments"]>[number];
+/** One playbook step as text and mention parts, the way the playbook editor shows it. */
+export type SetupPlaybookStep = NonNullable<SetupRow["playbook"]>["steps"][number];
 
 /** `forbidden` covers roles without access, so callers can hide setup instead of erroring. */
 type LoadStatus = "idle" | "loading" | "ready" | "error" | "forbidden";

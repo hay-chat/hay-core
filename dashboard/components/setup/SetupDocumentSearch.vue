@@ -28,7 +28,7 @@
         <button
           type="button"
           class="flex min-h-11 w-full items-center rounded-md px-2 text-left text-sm text-neutral-900 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9"
-          @click="emit('select', doc)"
+          @click="pick(doc)"
         >
           {{ pageTitle(doc.title) }}
         </button>
@@ -44,10 +44,13 @@ import { Hay } from "@/utils/api";
 import { pageTitle } from "@/utils/format";
 import type { SetupDocumentRef } from "@/stores/setup";
 
-const props = defineProps<{
-  /** The row's own answer document, which is never offered as a source for itself. */
-  excludeId?: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    /** Documents not to offer: the row's own answer, and the ones already picked. */
+    excludeIds?: string[];
+  }>(),
+  { excludeIds: () => [] },
+);
 
 const emit = defineEmits<{
   select: [document: SetupDocumentRef];
@@ -76,11 +79,14 @@ const clearTimer = () => {
 const search = async (text: string) => {
   const mine = ++latest;
   try {
-    // One extra, so hiding the row's own answer still leaves a full list.
-    const found = await Hay.documents.search.query({ query: text, limit: MAX_RESULTS + 1 });
+    // Extra ones, so hiding excluded documents still leaves a full list.
+    const found = await Hay.documents.search.query({
+      query: text,
+      limit: MAX_RESULTS + props.excludeIds.length,
+    });
     if (mine !== latest) return;
     results.value = found
-      .filter((doc) => doc.id !== props.excludeId)
+      .filter((doc) => !props.excludeIds.includes(doc.id))
       .slice(0, MAX_RESULTS)
       .map(({ id, title }) => ({ id, title }));
     searched.value = text;
@@ -104,7 +110,20 @@ const onInput = (value: string | number | boolean) => {
   timer = setTimeout(() => void search(text), DEBOUNCE_MS);
 };
 
-const focus = () => document.getElementById(inputId)?.focus();
+/** A picked document joins the list above, so the search starts over for the next one. */
+const pick = (doc: SetupDocumentRef) => {
+  clearTimer();
+  latest++;
+  query.value = "";
+  state.value = "idle";
+  results.value = [];
+  emit("select", doc);
+  focus();
+};
+
+function focus() {
+  document.getElementById(inputId)?.focus();
+}
 defineExpose({ focus });
 
 onBeforeUnmount(clearTimer);

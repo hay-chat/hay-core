@@ -9,6 +9,9 @@ const api = vi.hoisted(() => ({ get: vi.fn(), checkQuestions: vi.fn() }));
 vi.mock("@/composables/useDomain", () => ({
   useDomain: () => ({ getApiUrl: (path: string) => `http://api${path}` }),
 }));
+vi.mock("@/composables/useToolLabel", () => ({
+  useToolLabel: () => ({ getToolLabel: (_plugin: string, tool: string) => `Label of ${tool}` }),
+}));
 vi.mock("@/utils/api", () => ({
   Hay: {
     setup: { get: { query: api.get }, checkQuestions: { mutate: api.checkQuestions } },

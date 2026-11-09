@@ -409,3 +409,17 @@
 - Failure mode: `playbooks.update` changed the title and description but not the active version the assistant reads, so re-seeding looked successful ("8 updated") while chats ran the old instructions. Correct prices in those chats came from a retrieved document and were credited to the edit.
 - Detection signal: the Playbook message in the conversation (`hay chat send --json`, `turn`) still showed the old text.
 - Prevention rule: after changing a playbook, assert on the instructions in the conversation's Playbook message, not on the seed output or the reply alone. When a publish step fails, treat the next test run as invalid.
+
+## 2026-11-09: Setup board card redesign
+
+### reka-ui tooltips hang component tests in jsdom
+
+- **Failure mode**: Focusing a button wrapped in a reka-ui `TooltipRoot` made `flushPromises()` take ~13s and time the test out; floating-ui keeps repositioning the open tooltip on animation frames in jsdom.
+- **Detection signal**: Board tests that move focus (remove/undo) timed out at 5000 ms after icon buttons got tooltips; the same component mounted alone was fast.
+- **Prevention**: `mountWithStubs` stubs `TooltipPortal`/`TooltipContent` (tooltip text renders inline, `hidden`). Mount through the harness rather than plain `mount` when a component has tooltips.
+
+### Closing a card must not drop an answer being written
+
+- **Failure mode**: Resetting section-edit state on close also cleared the compose draft, so closing a "missing" card lost the half-written answer.
+- **Detection signal**: The existing "draft survives closing and a board poll" test failed after the rewrite.
+- **Prevention**: Keep "a section being edited" state separate from "an answer being written"; only the first ends when the card closes.

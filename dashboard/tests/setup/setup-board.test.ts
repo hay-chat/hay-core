@@ -8,6 +8,9 @@ import { board, row } from "./fixtures";
 vi.mock("@/composables/useDomain", () => ({
   useDomain: () => ({ getApiUrl: (path: string) => `http://api${path}` }),
 }));
+vi.mock("@/composables/useToolLabel", () => ({
+  useToolLabel: () => ({ getToolLabel: (_plugin: string, tool: string) => `Label of ${tool}` }),
+}));
 const api = vi.hoisted(() => ({
   getAnswer: vi.fn(),
   draftAnswer: vi.fn(),
@@ -128,7 +131,9 @@ describe("SetupRow", () => {
     expect(wrapper.get(`label[for="${field.attributes("id")}"]`).exists()).toBe(true);
     await field.setValue("  Yes, we ship to Canada.  ");
     await wrapper.get("form").trigger("submit");
-    expect(wrapper.emitted("save")).toEqual([[{ answer: "Yes, we ship to Canada." }]]);
+    expect(wrapper.emitted("save")).toEqual([
+      [{ answer: "Yes, we ship to Canada." }, { keepOpen: false }],
+    ]);
   });
 
   it("missing says documents, not website, when there is no site", () => {
@@ -161,11 +166,20 @@ describe("SetupRow", () => {
   it("playbook_off lists the playbook's steps inline", () => {
     const wrapper = mountRow(
       "playbook_off",
-      { playbook: { id: "p1", title: "Order status", steps: ["Ask for the order", "Look it up"] } },
+      {
+        playbook: {
+          id: "p1",
+          title: "Order status",
+          steps: [
+            [{ type: "text", text: "Ask for the order" }],
+            [{ type: "text", text: "Look it up" }],
+          ],
+        },
+      },
       { expanded: true, playbookTo: "/playbooks/p1" },
     );
     expect(wrapper.text()).toContain("setup.status.playbook_off");
-    expect(wrapper.findAll("ol li").map((li) => li.text())).toEqual([
+    expect(wrapper.findAll("[data-testid=setup-step]").map((step) => step.text())).toEqual([
       "Ask for the order",
       "Look it up",
     ]);
@@ -338,22 +352,23 @@ describe("SetupBoard", () => {
     expect(wrapper.text()).toContain("setup.board.testingOther");
 
     await wrapper.setProps({ checking: false });
+    // Cards sit in their group from the start (needs you, then ready); the reveal follows the list.
     await vi.advanceTimersByTimeAsync(80);
-    expect(statuses(wrapper)).toEqual(["ready", "checking", "checking"]);
+    expect(statuses(wrapper)).toEqual(["checking", "checking", "ready"]);
     await vi.advanceTimersByTimeAsync(160);
-    expect(statuses(wrapper)).toEqual(["ready", "missing", "needs_connection"]);
+    expect(statuses(wrapper)).toEqual(["missing", "needs_connection", "ready"]);
     expect(wrapper.text()).toContain('setup.board.ready {"ready":1,"total":3}');
 
     // A later check does not replay the reveal.
     await wrapper.setProps({ checking: true });
-    expect(statuses(wrapper)).toEqual(["ready", "missing", "needs_connection"]);
+    expect(statuses(wrapper)).toEqual(["missing", "needs_connection", "ready"]);
   });
 
   it("skips the animation when the person prefers reduced motion", async () => {
     vi.stubGlobal("matchMedia", () => ({ matches: true }));
     const wrapper = mountBoard();
     await wrapper.setProps({ checking: false });
-    expect(statuses(wrapper)).toEqual(["ready", "missing", "needs_connection"]);
+    expect(statuses(wrapper)).toEqual(["missing", "needs_connection", "ready"]);
   });
 
   it("clears the reveal timer when unmounted mid-settle", async () => {
@@ -436,7 +451,7 @@ describe("SetupBoard", () => {
 
   it("shows the result at once when it returns with no check running", () => {
     const wrapper = mountBoard({ checking: false });
-    expect(statuses(wrapper)).toEqual(["ready", "missing", "needs_connection"]);
+    expect(statuses(wrapper)).toEqual(["missing", "needs_connection", "ready"]);
     expect(wrapper.text()).not.toContain("setup.board.testing");
   });
 

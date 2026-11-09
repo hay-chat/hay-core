@@ -52,10 +52,22 @@
       }
     },
     "types": {
-      "store": { "name": "Loja virtual", "hint": "Você vende produtos online" },
-      "saas": { "name": "Software ou SaaS", "hint": "Clientes assinam seu produto" },
-      "service": { "name": "Prestador de serviços", "hint": "Clientes agendam ou contratam você" },
-      "other": { "name": "Outro", "hint": "Vamos começar pelo básico" }
+      "store": {
+        "name": "Loja virtual",
+        "hint": "Você vende produtos online"
+      },
+      "saas": {
+        "name": "Software ou SaaS",
+        "hint": "Clientes assinam seu produto"
+      },
+      "service": {
+        "name": "Prestador de serviços",
+        "hint": "Clientes agendam ou contratam você"
+      },
+      "other": {
+        "name": "Outro",
+        "hint": "Vamos começar pelo básico"
+      }
     },
     "groups": {
       "commerce": "Onde você vende",
@@ -112,7 +124,20 @@
       "undoError": "Não conseguimos desfazer. Adicione a pergunta de novo.",
       "removeError": "Não conseguimos remover essa pergunta. Tente de novo.",
       "partialNoticeOne": "Lemos {count} página do seu site até agora, então um pedido marcado como sem resposta pode estar numa página que ainda não lemos.",
-      "partialNoticeOther": "Lemos {count} páginas do seu site até agora, então um pedido marcado como sem resposta pode estar numa página que ainda não lemos."
+      "partialNoticeOther": "Lemos {count} páginas do seu site até agora, então um pedido marcado como sem resposta pode estar numa página que ainda não lemos.",
+      "filtersLabel": "Mostrar",
+      "filterAll": "Todas",
+      "filterNeedsYou": "Precisam de você",
+      "filterReady": "Prontas",
+      "needYouOne": "1 precisa de você",
+      "needYouOther": "{count} precisam de você",
+      "allSet": "Tudo pronto",
+      "groups": {
+        "needs_you": "Precisam de você",
+        "checking": "Em verificação",
+        "ready": "Prontas"
+      },
+      "filterEmpty": "Nada aqui no momento."
     },
     "status": {
       "checking": "Verificando…",
@@ -127,7 +152,7 @@
     "why": {
       "checking": "Testando no seu assistente",
       "readingSite": "Ainda lendo seu site",
-      "readyFound": "Encontrada em {source}",
+      "readyFound": "Com base em {source}",
       "readyOwn": "Sua resposta",
       "readyLinked": "Sua resposta, com base em {document}",
       "readyTool": "{plugin} conectado, {playbook} ligado",
@@ -143,7 +168,11 @@
       "playbookFailed": "Não conseguimos escrever um playbook. Tente de novo ou escreva o seu.",
       "failed": "Algo deu errado na verificação. Tente de novo.",
       "missingHandedOff": "Encontramos algo, mas não o bastante para responder com segurança. Isso iria para a sua equipe.",
-      "missingPartial": "Não encontrado nas páginas lidas até agora"
+      "missingPartial": "Não encontrado nas páginas lidas até agora",
+      "readyFoundMoreOne": "Com base em {source} e em mais 1 documento",
+      "readyFoundMoreOther": "Com base em {source} e em mais {count} documentos",
+      "readyLinkedMoreOne": "Sua resposta, com base em {document} e em mais 1 documento",
+      "readyLinkedMoreOther": "Sua resposta, com base em {document} e em mais {count} documentos"
     },
     "needs": {
       "orders": "consultar pedidos",
@@ -165,37 +194,42 @@
       "choosePlatform": "Escolher plataforma",
       "writeOwn": "Escrever o meu",
       "review": "Revisar",
-      "retry": "Tentar de novo"
+      "retry": "Tentar de novo",
+      "expand": "Expandir",
+      "collapse": "Recolher",
+      "connectPlugin": "Conectar {plugin}",
+      "tryInChat": "Testar no chat"
     },
     "answer": {
       "label": "Como seu assistente deve responder?",
       "placeholder": "Escreva a resposta que os clientes devem receber",
       "save": "Salvar",
       "cancel": "Cancelar",
-      "error": "Não conseguimos salvar as alterações. Tente de novo."
+      "error": "Não conseguimos salvar as alterações. Tente de novo.",
+      "saveAnswer": "Salvar resposta"
     },
     "panel": {
       "questionLabel": "Pergunta",
-      "useDocument": "Usar um documento",
       "searchLabel": "Buscar nos seus documentos",
       "searchHint": "Digite pelo menos 2 caracteres.",
       "searching": "Buscando…",
       "searchError": "Não conseguimos buscar nos seus documentos. Tente de novo.",
       "noResults": "Nenhum documento corresponde a “{query}”.",
       "resultsLabel": "Documentos encontrados",
-      "basedOn": "Com base em {document}",
-      "changeDocument": "Trocar documento",
-      "writeMyOwn": "Escrever minha resposta",
-      "drafting": "Redigindo um rascunho a partir de {document}…",
-      "draftReady": "Redigimos um rascunho a partir deste documento. Seu texto continua até você substituí-lo.",
+      "draftReady": "Redigimos uma resposta a partir dos seus documentos. Seu texto continua até você substituí-lo.",
       "replaceDraft": "Substituir pelo rascunho",
-      "noAnswer": "{document} não responde a isso. Escreva a resposta ou escolha outro documento.",
-      "draftError": "Não conseguimos redigir um rascunho a partir de {document}. Escreva a resposta ou escolha o documento de novo.",
+      "draftError": "Não conseguimos redigir uma resposta a partir destes documentos. Escreva você mesmo ou tente de novo.",
       "loadingAnswer": "Carregando sua resposta",
       "answerLoadError": "Não conseguimos carregar sua resposta.",
       "formatted": "Esta resposta tem formatação que seria perdida aqui.",
       "editInKnowledge": "Editar em Conhecimento",
-      "removeQuestion": "Remover pergunta"
+      "removeQuestion": "Remover pergunta",
+      "answerLabel": "O que seu assistente responde",
+      "editAnswer": "Editar resposta",
+      "draftingOne": "Redigindo uma resposta a partir de {document}…",
+      "draftingOther": "Redigindo uma resposta a partir de {count} documentos…",
+      "noAnswerOne": "{document} não responde a isso. Escreva a resposta ou adicione outro documento.",
+      "noAnswerOther": "Estes {count} documentos não respondem a isso. Escreva a resposta ou adicione outro documento."
     },
     "playbook": {
       "whatItDoes": "O que o playbook {playbook} faz",
@@ -205,7 +239,8 @@
       "turnOnError": "Não conseguimos ligar este playbook. Tente de novo.",
       "generateError": "Não conseguimos escrever o playbook. Tente de novo.",
       "reviewHint": "Nada muda para os clientes até você ligar.",
-      "stepsLabel": "Passos"
+      "stepsLabel": "Passos",
+      "writtenFrom": "Escrito com as ferramentas de {plugin}"
     },
     "connectError": {
       "message": "Não conseguimos conectar {plugin}. Nada foi alterado. Tente de novo.",
@@ -321,6 +356,22 @@
       "capped": "Esta reprodução parou antes, no limite de uso de IA. Os números cobrem o que terminou.",
       "cancelled": "Esta reprodução foi interrompida. Os números cobrem o que terminou.",
       "openReport": "Abrir o relatório completo"
+    },
+    "documents": {
+      "basedOnOne": "Com base em 1 documento",
+      "basedOnOther": "Com base em {count} documentos",
+      "draftingFromOne": "Redigindo a partir de 1 documento",
+      "draftingFromOther": "Redigindo a partir de {count} documentos",
+      "none": "Não se baseia em nenhum documento",
+      "startFrom": "Comece a partir de um documento",
+      "edit": "Editar documentos",
+      "addDocuments": "Adicionar documentos",
+      "done": "Concluir",
+      "remove": "Remover {document}",
+      "removeTip": "Remover documento",
+      "open": "Abrir {document}",
+      "openTip": "Abrir documento",
+      "redraftHint": "Ao clicar em Concluir, redigimos a resposta de novo a partir destes documentos e a salvamos como sua."
     }
   }
 }

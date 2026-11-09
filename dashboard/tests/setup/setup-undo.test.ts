@@ -8,6 +8,9 @@ import { board, row } from "./fixtures";
 vi.mock("@/composables/useDomain", () => ({
   useDomain: () => ({ getApiUrl: (path: string) => `http://api${path}` }),
 }));
+vi.mock("@/composables/useToolLabel", () => ({
+  useToolLabel: () => ({ getToolLabel: (_plugin: string, tool: string) => `Label of ${tool}` }),
+}));
 vi.mock("@/utils/api", () => ({ Hay: {}, HayApi: {} }));
 vi.mock("@/utils/route-access", async () => ({
   hasRouteAccess: (await import("./fixtures")).hasRouteAccess,
@@ -147,7 +150,8 @@ describe("removing a question and undoing it", () => {
     await flushPromises();
 
     expect(actions.restoreQuestion).toHaveBeenCalledWith("b");
-    expect(ids()).toEqual(["a", "b", "c"]);
+    // "b" needs an answer, so it is back at the top, in the Needs you group.
+    expect(ids()).toEqual(["b", "a", "c"]);
     expect(document.activeElement).toBe(chevron("b"));
     expect(toastMock.error).not.toHaveBeenCalled();
   });
