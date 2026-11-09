@@ -1236,6 +1236,20 @@ describe("SCIM", () => {
       expect(roleForGroups({ x: "owner" as never }, ["x"])).toBeNull();
     });
 
+    it("leave a hand-promoted person alone when they are pushed into an unrelated group", async () => {
+      await mapRoles();
+      const promoted = await createUser(`hand@${DOMAIN}`, [[ORG_A, "admin"]]);
+      const group = await scim<GroupResource>("POST", "/Groups", {
+        body: { displayName: "Everyone", members: [{ value: promoted.id }] },
+      });
+      expect(await roleOf(promoted.id)).toBe("admin");
+      await scim("PATCH", `/Groups/${group.body.id}`, {
+        body: patch([{ op: "remove", path: "members", value: [{ value: promoted.id }] }]),
+      });
+      await scim("DELETE", `/Groups/${group.body.id}`);
+      expect(await roleOf(promoted.id)).toBe("admin");
+    });
+
     it("leave roles alone when the connection maps no groups", async () => {
       const a = await provision("la");
       await scim("POST", "/Groups", {
@@ -1269,6 +1283,102 @@ describe("SCIM", () => {
         await AppDataSource.getRepository(ScimGroup).count({ where: { organizationId: ORG_B } }),
       ).toBe(1);
       expect((await scim("GET", `/Groups/${mine.body.id}`, { token: tokenB })).status).toBe(404);
+    });
+  });
+
+  describe("review follow-ups", () => {
+    const deactivate = (id: string) =>
+      scim("PATCH", `/Users/${id}`, { body: patch([{ op: "replace", value: { active: false } }]) });
+
+    it("reactivation turns the account on when the only other membership is suspended", async () => {
+      const user = await createUser(`quiet@${DOMAIN}`, [
+        [ORG_A, "member"],
+        [ORG_B, "member"],
+      ]);
+      await AppDataSource.getRepository(UserOrganization).update(
+        { userId: user.id, organizationId: ORG_B },
+        { isActive: false },
+      );
+      await deactivate(user.id);
+      expect(
+        (await AppDataSource.getRepository(User).findOneOrFail({ where: { id: user.id } }))
+          .isActive,
+      ).toBe(false);
+      const res = await scim<UserResource>("PATCH", `/Users/${user.id}`, {
+        body: patch([{ op: "replace", value: { active: true } }]),
+      });
+      expect(res.body.active).toBe(true);
+      expect(
+        (await AppDataSource.getRepository(User).findOneOrFail({ where: { id: user.id } }))
+          .isActive,
+      ).toBe(true);
+    });
+
+    it("refuses a rename and a name change when another membership exists, suspended or not", async () => {
+      const user = await createUser(`kept@${DOMAIN}`, [
+        [ORG_A, "member"],
+        [ORG_B, "member"],
+      ]);
+      await AppDataSource.getRepository(UserOrganization).update(
+        { userId: user.id, organizationId: ORG_B },
+        { isActive: false },
+      );
+      const renamed = await scim("PATCH", `/Users/${user.id}`, {
+        body: patch([{ op: "replace", path: "userName", value: `renamed2@${DOMAIN}` }]),
+      });
+      expect(renamed.status).toBe(400);
+      await scim("PATCH", `/Users/${user.id}`, {
+        body: patch([{ op: "replace", value: { name: { givenName: "Changed" } } }]),
+      });
+      const after = await AppDataSource.getRepository(User).findOneOrFail({
+        where: { id: user.id },
+      });
+      expect(after).toMatchObject({ email: `kept@${DOMAIN}`, firstName: "First" });
+    });
+
+    it("answers 401 for a suspended or deactivated organization, and for none after the connection is deleted", async () => {
+      await AppDataSource.getRepository(Organization).update(
+        { id: ORG_A },
+        { suspendedAt: new Date() },
+      );
+      expect((await scim("GET", "/Users")).status).toBe(401);
+      await AppDataSource.getRepository(Organization).update(
+        { id: ORG_A },
+        { suspendedAt: null, isActive: false },
+      );
+      expect((await scim("GET", "/Users")).status).toBe(401);
+      await AppDataSource.getRepository(Organization).update({ id: ORG_A }, { isActive: true });
+      expect((await scim("GET", "/Users")).status).toBe(200);
+    });
+
+    it("revokes the token when the connection is deleted, and works without a connection until then", async () => {
+      // A token can exist before any connection: users then get the default role and groups map to nothing.
+      expect((await scim("GET", "/Users")).status).toBe(200);
+      await AppDataSource.getRepository(SsoConnection).save(
+        AppDataSource.getRepository(SsoConnection).create({
+          organizationId: ORG_A,
+          protocol: "saml",
+          issuer: "https://idp.example/metadata",
+          samlEntryPoint: "https://idp.example/sso",
+          samlCertificate: "x",
+          defaultRole: "member",
+          roleMapping: {},
+          enabled: false,
+        }),
+      );
+      await ssoService.deleteConnection(ORG_A, { userId: ownerA.id });
+      expect((await scim("GET", "/Users")).status).toBe(401);
+      expect(
+        await AppDataSource.getRepository(ScimToken).count({ where: { organizationId: ORG_A } }),
+      ).toBe(0);
+    });
+
+    it("answers a huge startIndex with an empty page, not an error", async () => {
+      for (const index of ["1000000000000000000000", "99999999999999999"]) {
+        const res = await scim<ListResource>("GET", `/Users?startIndex=${index}`);
+        expect(res.status).toBe(200);
+        expect(res.body.Resources).toEqual([]);
+      }
     });
   });
 

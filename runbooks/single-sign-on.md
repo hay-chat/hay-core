@@ -48,12 +48,16 @@ Choose "SAML 2.0" on the settings page. Hay shows the values to enter at the pro
 Then enter the provider's entity ID, its single sign-on URL (HTTP-Redirect binding) and the certificate it signs with
 (PEM or plain base64; paste two during a rotation). Sign-in starts at Hay only. Requirements on the provider:
 
-- The **assertion** must be signed with the configured certificate (signing only the outer response is refused).
+- The **assertion** itself must be signed with the configured certificate. A provider that signs only the response
+  (and not the assertion) is refused; there is no setting to relax this.
   Okta signs the assertion by default. In Entra choose "Sign SAML assertion" or "Sign SAML response and assertion".
 - The assertion must name this audience, be addressed (Recipient) to the ACS URL, answer the request Hay sent
   (`InResponseTo`) and be within its validity window (60 seconds of clock skew, and no assertion older than 5 minutes).
 - NameID must not be `transient`. The email address comes from the `email`, `mail` or `emailaddress` claim,
   else from an email NameID. Optional first/last name attributes: `givenName`/`firstName`, `sn`/`surname`.
+- The email attribute must not be editable by the people it describes (in the provider's directory or profile).
+  A first sign-in links to an existing member of the organization by email, so anyone who can change their own
+  address at the provider could otherwise take over a colleague's account.
 - A groups attribute can be named for role mapping, as with the OpenID Connect groups claim.
 
 How the browser comes back: the provider POSTs the response to the ACS URL. That request is cross-site, so the
@@ -64,6 +68,10 @@ assertion has no `email_verified`: the signed assertion plus the DNS-proven doma
 
 Switching an organization between OpenID Connect and SAML, or to another provider, turns the requirement off and forgets
 the old provider's links; people link again by email as active members.
+
+Rate limits: starting a sign-in is limited to 300 per 15 minutes per address. The callback, ACS and finish steps allow 30
+per 15 minutes per address, but a step that succeeds clears its count, so only failed attempts add up and an office behind
+one address is not locked out by its own sign-ins. Limits stay fail-closed without Redis.
 
 Redis is used for the request id (one use), the assertion id (so a captured response cannot be replayed) and the
 parked response. The ACS endpoint accepts a form post of up to 400 KB and nothing else is widened.
@@ -149,7 +157,13 @@ failed attempts are limited per address.
   membership back on, and the account too when this was its only organization.
 - Groups: a pushed group's name is looked up in the role mapping above (the same one sign-in uses). Members get the best
   mapped role, or the default role when none of their groups is mapped. With no mapping set, groups never change a role.
-  If a groups claim is also configured for sign-in, each sign-in re-applies the claim, so use the same group names in both.
+  A person's role is rewritten only when the role their mapped groups give actually changes, so someone promoted by hand
+  and pushed into an unrelated group keeps their role.
+- **One source of truth for roles.** If a groups claim or attribute is also configured for sign-in, every sign-in
+  re-applies it (no claim means the default role, on purpose: a person removed from every group must lose access).
+  Use the same group names in SCIM and in the claim, or configure only one of them.
+- A token works without a connection (people get the default role, groups map to nothing). Removing the connection
+  revokes the token. A suspended or deactivated organization's token is refused.
 
 ## Confirm it works
 
