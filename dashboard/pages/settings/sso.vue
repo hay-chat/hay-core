@@ -196,6 +196,9 @@
         </CardContent>
       </Card>
 
+      <!-- Automatic provisioning -->
+      <SsoScimCard :base-url="scim.baseUrl" :token="scim.token" @changed="refreshScim" />
+
       <!-- Enforcement -->
       <Card>
         <CardHeader>
@@ -246,6 +249,7 @@ const newDomain = ref("");
 
 type Protocol = "oidc" | "saml";
 const saml = ref<Settings["saml"]>({ acsUrl: "", entityId: "", metadataUrl: "" });
+const scim = ref<Settings["scim"]>({ baseUrl: "", token: null });
 
 const form = reactive({
   protocol: "oidc" as Protocol,
@@ -283,6 +287,7 @@ const apply = (settings: Settings) => {
   enforced.value = settings.enforced;
   roles.value = settings.assignableRoles;
   saml.value = settings.saml;
+  scim.value = settings.scim;
   if (settings.connection) {
     form.protocol = settings.connection.protocol;
     if (settings.connection.protocol === "saml") {
@@ -309,6 +314,15 @@ const load = async () => {
     loaded.value = true;
   } catch {
     forbidden.value = true;
+  }
+};
+
+/** Only the SCIM card: reloading everything would discard what is typed in the provider form. */
+const refreshScim = async () => {
+  try {
+    scim.value = (await Hay.sso.getSettings.query()).scim;
+  } catch (error) {
+    toast.error(messageOf(error));
   }
 };
 

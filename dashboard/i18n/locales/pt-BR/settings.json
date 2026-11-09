@@ -888,6 +888,24 @@
     },
     "errors": {
       "generic": "Algo deu errado. Tente novamente."
+    },
+    "scim": {
+      "title": "Provisionamento automático (SCIM)",
+      "description": "Deixe seu provedor de identidade adicionar, atualizar e remover pessoas e grupos. Use a URL e o token abaixo nas configurações do conector SCIM (Okta: URL base SCIM 2.0 com autenticação por cabeçalho HTTP; Entra: URL do locatário e token secreto).",
+      "baseUrl": "URL base do SCIM",
+      "noToken": "Nenhum token ainda. Gere um para ativar o provisionamento.",
+      "current": "Token {prefix}… criado em {created}.",
+      "lastUsed": "Último uso em {date}.",
+      "neverUsed": "Ainda não usado.",
+      "generate": "Gerar token",
+      "replace": "Substituir token",
+      "revoke": "Revogar token",
+      "revoked": "Token revogado",
+      "shownOnce": "Copie este token agora. Ele é mostrado uma única vez e não pode ser recuperado.",
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "copyFailed": "Não foi possível copiar. Selecione o token e copie manualmente.",
+      "rules": "Só endereços dos seus domínios verificados podem ser provisionados. Proprietários nunca são alterados nem removidos pelo SCIM. Remover alguém encerra as sessões dele aqui, fecha suas conexões abertas e revoga seus tokens de API nesta organização; se era a única organização, a conta é desativada. Os nomes dos grupos viram funções pelo mapeamento de grupos acima, nunca proprietário."
     }
   }
 }

@@ -888,6 +888,24 @@
     },
     "errors": {
       "generic": "Something went wrong. Please try again."
+    },
+    "scim": {
+      "title": "Automatic provisioning (SCIM)",
+      "description": "Let your identity provider add, update and remove people and groups. Use the URL and token below as the SCIM connector settings (Okta: SCIM 2.0 base URL with HTTP header authentication; Entra: tenant URL and secret token).",
+      "baseUrl": "SCIM base URL",
+      "noToken": "No token yet. Generate one to turn provisioning on.",
+      "current": "Token {prefix}… created {created}.",
+      "lastUsed": "Last used {date}.",
+      "neverUsed": "Not used yet.",
+      "generate": "Generate token",
+      "replace": "Replace token",
+      "revoke": "Revoke token",
+      "revoked": "Token revoked",
+      "shownOnce": "Copy this token now. It is shown only once and cannot be recovered.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyFailed": "Could not copy. Select the token and copy it by hand.",
+      "rules": "Only addresses on your verified domains can be provisioned. Owners are never changed or removed through SCIM. Removing someone ends their sessions here, closes their open connections and revokes their API tokens for this organization; if this was their only organization their account is deactivated. Group names map to roles through the group mapping above, never to owner."
     }
   }
 }
