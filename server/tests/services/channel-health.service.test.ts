@@ -91,7 +91,7 @@ describe("channelHealthService", () => {
       variables: expect.objectContaining({
         companyName: "Hay.chat",
         actionButton: expect.objectContaining({
-          url: "https://app.hay.test/integrations/plugins/hay-channel-whatsapp?org=org-1",
+          url: "https://app.hay.test/org-1/integrations/plugins/hay-channel-whatsapp",
         }),
       }),
     });

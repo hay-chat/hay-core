@@ -5,6 +5,7 @@ import { AppDataSource } from "@server/database/data-source";
 import { PushSubscription } from "@server/database/entities/push-subscription.entity";
 import { createLogger } from "@server/lib/logger";
 import { organizationNotificationLocale } from "./notification-locale";
+import { orgDashboardPath } from "@server/lib/dashboard-links";
 
 const logger = createLogger("push-notifications");
 
@@ -19,7 +20,7 @@ export interface PushPayload {
     | "test";
   title: string;
   body: string;
-  /** Path on the dashboard origin the notification opens, e.g. /conversations/<id>?org=<orgId>. */
+  /** Path on the dashboard origin the notification opens, e.g. /<orgId>/conversations/<id>. */
   url: string;
   /** Collapses repeated notifications about the same conversation. */
   tag: string;
@@ -183,7 +184,7 @@ class PushNotificationService {
       kind: "channel_delivery_failed",
       title: copy.title,
       body: copy.body,
-      url: `/conversations/${args.conversationId}?org=${args.organizationId}`,
+      url: orgDashboardPath(args.organizationId, `/conversations/${args.conversationId}`),
       tag: `delivery-failed:${args.conversationId}`,
     });
   }

@@ -7,6 +7,7 @@ import {
 } from "@server/services/notification-locale";
 import { insightsService } from "./insights.service";
 import { getOrganizationThresholds } from "./insight-settings";
+import { orgDashboardPath } from "@server/lib/dashboard-links";
 
 const logger = createLogger("insight-digest");
 
@@ -205,7 +206,7 @@ export class InsightDigestService {
     locale: NotificationLocale,
   ): Promise<number> {
     const copy = COPY[locale];
-    const base = getDashboardUrl();
+    const base = `${getDashboardUrl()}${orgDashboardPath(organizationId, "")}`;
     const { emailService } = await import("@server/services/email.service");
     let delivered = 0;
     for (const recipient of recipients) {

@@ -24,6 +24,7 @@ import { mayParseLargeBody } from "@server/lib/large-body-auth";
 import { httpIpRateLimit, trpcRetryAfterMeta } from "@server/lib/http-rate-limit";
 import "reflect-metadata";
 import dotenv from "dotenv";
+import { orgDashboardPath } from "@server/lib/dashboard-links";
 
 dotenv.config({ quiet: true });
 
@@ -380,7 +381,8 @@ async function startServer() {
         // allowlisted at initiate time), else the dashboard plugin settings page.
         const dashboardUrl = getDashboardUrl();
         const encodedPluginId = encodeURIComponent(result.pluginId!);
-        let redirectUrl = `${dashboardUrl}/integrations/plugins/${encodedPluginId}?oauth=success`;
+        const pluginPath = `/integrations/plugins/${encodedPluginId}?oauth=success`;
+        let redirectUrl = `${dashboardUrl}${result.organizationId ? orgDashboardPath(result.organizationId, pluginPath) : pluginPath}`;
         if (result.returnTo) {
           // Tell the external page the outcome so it can confirm it to the user.
           const back = new URL(result.returnTo);

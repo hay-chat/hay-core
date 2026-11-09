@@ -26,6 +26,7 @@ import { hookManager } from "@server/services/hooks/hook-manager";
 import type { HandoffTicketConfig, HandoffTicketState } from "@server/types/handoff-ticket.types";
 import { getUTCNow } from "@server/utils/date.utils";
 import { workerFetch } from "@server/lib/worker-client";
+import { orgDashboardPath } from "@server/lib/dashboard-links";
 
 const logger = createLogger("handoff-tickets");
 
@@ -237,7 +238,7 @@ export class HandoffTicketsService {
         fields: config.fields,
         conversation: {
           id: fresh.id,
-          url: `${getDashboardUrl()}/conversations/${fresh.id}?org=${fresh.organization_id}`,
+          url: `${getDashboardUrl()}${orgDashboardPath(fresh.organization_id, `/conversations/${fresh.id}`)}`,
           channel: fresh.channel,
         },
       },
