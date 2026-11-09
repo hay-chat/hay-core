@@ -583,6 +583,26 @@ describe("security keys and passkeys", () => {
       expect(await mfaService.hasSecondFactor(owner.id)).toBe(true);
     });
 
+    it("leaves one factor when the app and the only key are removed at once", async () => {
+      const { credential } = await enrolKey(owner, authenticator);
+      await stepUpWithKey(owner.id, authenticator);
+      const caller = authRouter.createCaller(await jwtCtx(owner.id));
+      const { secret } = await caller.mfa.beginEnrolment({ password: PASSWORD });
+      const step = totpStepAt(Date.now());
+      await caller.mfa.confirmEnrolment({ code: totpCode(base32Decode(secret), step) });
+      await setOrgMfaRequired(true);
+      await stepUpWithKey(owner.id, authenticator);
+      const keys = await keyApi(owner.id);
+
+      const results = await Promise.allSettled([
+        caller.mfa.disable({ code: totpCode(base32Decode(secret), step + 1) }),
+        keys.remove({ id: credential.id }),
+      ]);
+
+      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      expect(await mfaService.hasSecondFactor(owner.id)).toBe(true);
+    });
+
     it("turning the app off leaves the keys working", async () => {
       await enrolKey(owner, authenticator);
       await stepUpWithKey(owner.id, authenticator);

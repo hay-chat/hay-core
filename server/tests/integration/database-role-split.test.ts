@@ -80,6 +80,7 @@ describe("application database role", () => {
     ["truncate the audit trail", `TRUNCATE audit_logs`],
     ["drop a table", `DROP TABLE organizations CASCADE`],
     ["rewrite migration history", `DELETE FROM migrations`],
+    ["delete audit outbox entries", `DELETE FROM audit_log_outbox`],
     ["create an extension", `CREATE EXTENSION IF NOT EXISTS pg_trgm`],
   ])("cannot %s", async (_label, sql) => {
     await expect(app.query(sql)).rejects.toThrow(/permission denied|must be owner/);

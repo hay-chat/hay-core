@@ -226,6 +226,19 @@ describe("audit log external sink", () => {
       expect(await remaining(laterOld.id)).toBe(0);
     });
 
+    it("keeps an expired row whose outbox entry is missing", async () => {
+      const chainKey = randomUUID();
+      const old = await insert(chainKey, 400);
+      await AppDataSource.query(`DELETE FROM audit_log_outbox WHERE audit_log_id = $1`, [old.id]);
+      jest.spyOn(auditSinkService, "enabled", "get").mockReturnValue(true);
+
+      await auditLogService.cleanup();
+
+      expect(
+        await AppDataSource.query(`SELECT 1 FROM audit_logs WHERE id = $1`, [old.id]),
+      ).toHaveLength(1);
+    });
+
     it("does not let an unconfigured sink hold retention back", async () => {
       const chainKey = randomUUID();
       const old = await insert(chainKey, 400);
