@@ -14,7 +14,12 @@ import { Organization } from "../../entities/organization.entity";
 import { User } from "../../entities/user.entity";
 import { Message } from "./message.entity";
 import { Customer } from "./customer.entity";
-import { MessageType, MessageStatus, type MessageAttachment } from "./message.entity";
+import {
+  MessageType,
+  MessageStatus,
+  type MessageAttachment,
+  type MessageTranslations,
+} from "./message.entity";
 import { DeliveryState } from "../../types/message-feedback.types";
 import type { TiptapDoc } from "../../types/tiptap.types";
 import { analyzeTiptapInstructions } from "../../utils/tiptap-formatter";
@@ -933,6 +938,10 @@ The following tools are available for you to use. You MUST return only valid JSO
     attachments?: MessageAttachment[];
     /** Channel provider's message id (e.g. Meta wamid) for inbound messages. */
     providerMessageId?: string;
+    /** Team-facing text by language (a translated reply keeps what was typed here). */
+    translations?: MessageTranslations;
+    /** Language of `content`, when already known. */
+    detectedLanguage?: LanguageCode | null;
   }): Promise<Message> {
     const { messageRepository } = await import("../../repositories/message.repository");
     const { conversationRepository } = await import("../../repositories/conversation.repository");
@@ -1032,6 +1041,8 @@ The following tools are available for you to use. You MUST return only valid JSO
       sender: messageData.sender,
       attachments,
       providerMessageId: messageData.providerMessageId ?? null,
+      ...(messageData.translations ? { translations: messageData.translations } : {}),
+      ...(messageData.detectedLanguage ? { detectedLanguage: messageData.detectedLanguage } : {}),
       status: messageStatus,
       reviewRequired,
       deliveryState,
