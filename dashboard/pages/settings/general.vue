@@ -1,5 +1,21 @@
 <template>
-  <Page :title="$t('general.title')" :description="$t('general.description')">
+  <Page v-if="loadFailed" :title="$t('general.title')" :description="$t('general.description')">
+    <SettingsTabs />
+    <Alert variant="destructive" data-testid="settings-load-error">
+      <AlertTitle>{{ $t("general.loadFailed") }}</AlertTitle>
+      <AlertDescription>
+        <Button variant="outline" size="sm" class="mt-2" @click="loadSettings">
+          {{ $t("common.tryAgain") }}
+        </Button>
+      </AlertDescription>
+    </Alert>
+  </Page>
+  <Page
+    v-else
+    :title="$t('general.title')"
+    :description="$t('general.description')"
+    :disabled="isLoading"
+  >
     <SettingsTabs />
     <!-- Header -->
     <template #header>
@@ -588,6 +604,10 @@ type PlatformSettings = {
 // Reactive state
 const originalSettings = ref<PlatformSettings>({} as PlatformSettings);
 const isSaving = ref(false);
+// Until the real values arrive the form holds placeholders; nothing may be edited or saved.
+const isLoading = ref(true);
+// Without saved values the form would only hold placeholders, and Save would write them.
+const loadFailed = ref(false);
 const settings = ref<PlatformSettings>({
   organizationName: "",
   organizationAbout: "",
@@ -935,8 +955,9 @@ const onOrganizationDeleted = () => {
   showDeleteDialog.value = false;
 };
 
-// Lifecycle
-onMounted(async () => {
+const loadSettings = async () => {
+  isLoading.value = true;
+  loadFailed.value = false;
   try {
     // Load current platform settings from API
     const orgSettings = await Hay.organizations.getSettings.query();
@@ -974,8 +995,14 @@ onMounted(async () => {
   } catch (error) {
     console.error("Failed to load settings:", error);
     toast.error(t("common.error"), t("general.loadFailed"));
+    loadFailed.value = true;
+  } finally {
+    isLoading.value = false;
   }
-});
+};
+
+// Lifecycle
+onMounted(loadSettings);
 
 // Set page meta
 definePageMeta({

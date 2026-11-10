@@ -420,6 +420,7 @@
     "requestHistoryDescription": "View and track all customer privacy requests initiated by your organization",
     "retentionSaveSuccess": "Retention policy saved successfully",
     "retentionSaveFailed": "Failed to save retention policy",
+    "retentionLoadFailed": "Could not load the retention policy, so it cannot be changed right now.",
     "aiProcessing": {
       "title": "AI processing",
       "description": "Where Hay.chat processes your customers' messages with AI.",

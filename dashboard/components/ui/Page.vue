@@ -1,5 +1,9 @@
 <template>
-  <div :class="['page', 'page-' + width]">
+  <component
+    :is="disabled === undefined ? 'div' : 'fieldset'"
+    :class="['page', 'page-' + width]"
+    :disabled="disabled"
+  >
     <div v-if="title || description || $slots.header || $slots.title" class="page-header">
       <div class="page-header-start">
         <h1 class="page-title">
@@ -14,7 +18,7 @@
     <div class="page-content">
       <slot />
     </div>
-  </div>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -23,18 +27,24 @@ withDefaults(
     title?: string;
     description?: string;
     width?: "max" | "full";
+    /**
+     * Pass it (even as false) to render the page as a fieldset, so one flag natively disables
+     * every control inside, header actions included. Omit it to keep a plain div.
+     */
+    disabled?: boolean;
   }>(),
   {
     title: "",
     description: "",
     width: "full",
+    disabled: undefined,
   },
 );
 </script>
 
 <style lang="postcss">
 .page {
-  @apply p-4 md:p-6 mx-auto;
+  @apply p-4 md:p-6 mx-auto min-w-0;
 }
 .page-header {
   @apply flex flex-col mb-4 gap-3 sm:flex-row sm:justify-between sm:gap-4;

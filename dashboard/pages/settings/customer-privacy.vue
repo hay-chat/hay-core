@@ -55,7 +55,11 @@
       <CardContent class="space-y-4">
         <div class="space-y-2">
           <Label for="retentionDays">{{ $t("customerPrivacy.retentionPeriod") }}</Label>
-          <Select id="retentionDays" v-model="retentionDays">
+          <Select
+            id="retentionDays"
+            v-model="retentionDays"
+            :disabled="isLoadingRetention || retentionLoadFailed"
+          >
             <SelectTrigger>
               <SelectValue :placeholder="$t('customerPrivacy.selectRetentionPeriod')" />
             </SelectTrigger>
@@ -100,7 +104,19 @@
           </div>
         </div>
 
-        <Button :disabled="isSavingRetention" @click="saveRetentionPolicy">
+        <Alert v-if="retentionLoadFailed" variant="destructive" data-testid="retention-load-error">
+          <AlertTitle>{{ $t("customerPrivacy.retentionLoadFailed") }}</AlertTitle>
+          <AlertDescription>
+            <Button variant="outline" size="sm" class="mt-2" @click="fetchRetentionPolicy">
+              {{ $t("common.tryAgain") }}
+            </Button>
+          </AlertDescription>
+        </Alert>
+
+        <Button
+          :disabled="isSavingRetention || isLoadingRetention || retentionLoadFailed"
+          @click="saveRetentionPolicy"
+        >
           <Save class="h-4 w-4 mr-2" />
           {{
             isSavingRetention
@@ -243,6 +259,8 @@ import MediaSettingsCard from "@/components/settings/MediaSettingsCard.vue";
 // Retention policy state
 const retentionDays = ref<number | null>(null);
 const isSavingRetention = ref(false);
+const isLoadingRetention = ref(true);
+const retentionLoadFailed = ref(false);
 
 // Form state
 const identifierType = ref<"email" | "phone" | "externalId">("email");
@@ -431,11 +449,16 @@ const fetchRequests = async () => {
 
 // Retention policy methods
 const fetchRetentionPolicy = async () => {
+  isLoadingRetention.value = true;
+  retentionLoadFailed.value = false;
   try {
     const result = await Hay.organizations.getSettings.query();
     retentionDays.value = result.retentionDays ?? null;
   } catch (error) {
     console.error("Failed to fetch retention policy:", error);
+    retentionLoadFailed.value = true;
+  } finally {
+    isLoadingRetention.value = false;
   }
 };
 

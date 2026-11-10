@@ -1,5 +1,10 @@
 <template>
-  <Page :title="$t('webchat.title')" :description="$t('webchat.description')" width="max">
+  <Page
+    :title="$t('webchat.title')"
+    :description="$t('webchat.description')"
+    width="max"
+    :disabled="isLoading"
+  >
     <SettingsTabs />
     <!-- Appearance -->
     <Card>
@@ -339,6 +344,7 @@ const originalSettings = ref<WebchatSettingsSnapshot>({
   allowedDomains: [],
 });
 const isSaving = ref(false);
+const isLoading = ref(true);
 
 // Under-attack mode (D9-10). The period length is a server setting (UNDER_ATTACK_HOURS).
 const underAttackHours = ref(4);
@@ -406,6 +412,8 @@ async function loadSettings() {
   } catch (error) {
     console.error("Failed to load webchat settings:", error);
     toast.error(t("webchat.loadFailed"));
+  } finally {
+    isLoading.value = false;
   }
 }
 

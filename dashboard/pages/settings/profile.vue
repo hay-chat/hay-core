@@ -1,5 +1,10 @@
 <template>
-  <Page :title="$t('profile.title')" :description="$t('profile.description')" width="max">
+  <Page
+    :title="$t('profile.title')"
+    :description="$t('profile.description')"
+    width="max"
+    :disabled="isLoadingProfile"
+  >
     <!-- Profile Picture -->
     <Card>
       <CardHeader>
@@ -375,6 +380,7 @@ const avatarUpload = useFileUpload({
 const fileInputRef = ref<HTMLInputElement | null>(null);
 
 // Profile form
+const isLoadingProfile = ref(true);
 const profileForm = reactive({
   firstName: "",
   lastName: "",
@@ -538,13 +544,17 @@ const removeAvatar = async () => {
 // Load user data
 onMounted(async () => {
   // Refresh user data from server to get latest info including pendingEmail
-  await refreshUserData();
+  try {
+    await refreshUserData();
 
-  if (currentUser.value) {
-    profileForm.firstName = currentUser.value.firstName || "";
-    profileForm.lastName = currentUser.value.lastName || "";
-    originalProfile.firstName = currentUser.value.firstName || "";
-    originalProfile.lastName = currentUser.value.lastName || "";
+    if (currentUser.value) {
+      profileForm.firstName = currentUser.value.firstName || "";
+      profileForm.lastName = currentUser.value.lastName || "";
+      originalProfile.firstName = currentUser.value.firstName || "";
+      originalProfile.lastName = currentUser.value.lastName || "";
+    }
+  } finally {
+    isLoadingProfile.value = false;
   }
 
   await Promise.all([loadSecurityEvents(), loadSessions()]);
