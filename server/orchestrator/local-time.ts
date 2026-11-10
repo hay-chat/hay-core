@@ -46,6 +46,17 @@ export function describeLocalTime(
   };
 }
 
+/** The calendar day of an instant in a zone, as YYYY-MM-DD. */
+export function localIsoDate(date: Date, timezone: string): string {
+  // en-CA formats as YYYY-MM-DD.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
 function isValidTimeZone(timezone: string | null | undefined): timezone is string {
   if (!timezone) return false;
   try {

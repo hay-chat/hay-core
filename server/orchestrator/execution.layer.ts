@@ -38,6 +38,12 @@ import {
   removeLinks,
   type BadLink,
 } from "@server/services/core/link-guardrail.service";
+import {
+  assessReplyDates,
+  type BadDate,
+  extractReplyDates,
+  isUnsourcedDateEnforced,
+} from "@server/services/core/date-guardrail.service";
 import { messageLinkText } from "./reply-media";
 import { MessageIntent, MessageType, Message } from "@server/database/entities/message.entity";
 import { isPageToolResult } from "@server/services/webchat/page-tools.service";
@@ -51,6 +57,12 @@ import {
 } from "@server/types/organization-settings.types";
 import type { FormSchema } from "@hay/form-schema";
 import { formSchemaSchema } from "@hay/form-schema";
+
+function describeBadDate(date: BadDate): string {
+  if (date.reason === "impossible") return "that date does not exist";
+  if (date.reason === "wrong_weekday") return `wrong weekday: that date is a ${date.actualWeekday}`;
+  return "no tool result, document or message gives that date";
+}
 
 /** Tool loop steps (15) plus one retry per guardrail and a recheck. */
 const MAX_PLANNER_CALLS_PER_TURN = 20;
@@ -94,6 +106,7 @@ export interface ExecuteOptions {
     actionClaimRetries: number;
     companyInterestRetries: number;
     linkRetries: number;
+    dateRetries?: number;
     /** Planner calls so far this turn, across tool steps, retries and rechecks. */
     plannerCalls?: number;
   };
@@ -140,6 +153,7 @@ export interface ExecutionResult {
   actionClaimRetryAttempted?: boolean;
   badLinks?: BadLink[]; // Link check: links in the reply that are dead or not on the site
   linkRetryAttempted?: boolean;
+  badDates?: BadDate[]; // Date check: impossible, wrong-weekday or unsourced dates in the reply
   companyInterest?: CompanyInterestAssessment; // Stage 1: Company interest protection
   companyInterestRetryAttempted?: boolean;
   confidence?: ConfidenceAssessment; // Stage 2: Fact grounding
@@ -689,6 +703,17 @@ export class ExecutionLayer {
       return linkResult;
     }
 
+    // Date check (no LLM, and no work at all unless the reply states a date).
+    const dateResult = await this.applyDateGuardrail(
+      result,
+      conversation,
+      customerLanguage,
+      options,
+    );
+    if (dateResult) {
+      return dateResult;
+    }
+
     // Greetings and goodbyes skip the remaining stages, unless the reply states
     // numbers, amounts or links: those get checked whatever the intent.
     const lastCustomerMessage = await conversation.getLastCustomerMessage();
@@ -1176,6 +1201,104 @@ export class ExecutionLayer {
       },
       badLinks,
       linkRetryAttempted: retriesUsed > 0 || undefined,
+      originalMessage: response,
+    };
+  }
+
+  /**
+   * Reject a reply stating a date that cannot be right or has no source: one
+   * re-plan, then a hand-off, since a wrong delivery date is worse than a person.
+   */
+  private async applyDateGuardrail(
+    result: ExecutionResult,
+    conversation: Conversation,
+    customerLanguage?: string,
+    options: ExecuteOptions = {},
+  ): Promise<ExecutionResult | null> {
+    const response = result.userMessage;
+    const dates = response ? extractReplyDates(response) : [];
+    if (!response || dates.length === 0) {
+      return null;
+    }
+
+    const log = logger.child({
+      organizationId: conversation.organization_id,
+      conversationId: conversation.id,
+    });
+
+    let assessed: BadDate[];
+    try {
+      const [messages, knowledge, context] = await Promise.all([
+        conversation.getMessages(),
+        this.buildKnowledgePrompt(conversation),
+        this.buildContextPrompt(conversation),
+      ]);
+      assessed = assessReplyDates({
+        dates,
+        // Not the AI's own replies: a wrong date must not vouch for itself next turn.
+        contextTexts: [
+          ...messages
+            .filter((message) => message.type !== MessageType.BOT_AGENT)
+            .map(messageLinkText),
+          knowledge,
+          context,
+        ],
+        timezone: describeLocalTime(conversation.organization?.timezone).timezone,
+      });
+    } catch (error) {
+      // The check must never break a turn.
+      log.warn({ error }, "Date check failed, sending the reply unchecked");
+      return null;
+    }
+
+    const badDates = isUnsourcedDateEnforced()
+      ? assessed
+      : assessed.filter((date) => date.reason !== "unsourced");
+    if (assessed.length > badDates.length) {
+      log.warn(
+        { unsourcedDates: assessed.filter((date) => date.reason === "unsourced") },
+        "Date check (log only): reply states a date with no source",
+      );
+    }
+    if (badDates.length === 0) {
+      return null;
+    }
+    result.badDates = badDates;
+
+    const state = options.turnGuardrailState;
+    if (state && (state.dateRetries ?? 0) < 1) {
+      state.dateRetries = (state.dateRetries ?? 0) + 1;
+
+      const list = badDates.map((date) => `"${date.raw}" (${describeBadDate(date)})`).join("; ");
+      log.warn({ badDates }, "Date check: re-planning with corrective feedback");
+
+      const retryResult = await this.execute(conversation, customerLanguage, {
+        ...options,
+        plannerFeedback:
+          `Your previous response stated: ${list}. Use calculate_date for any date you need to ` +
+          `work out and quote its label exactly, quote a date exactly as a tool result or ` +
+          `document gives it, or give the time span without a date (for example "3-7 business ` +
+          `days").`,
+      });
+      if (retryResult) {
+        return retryResult;
+      }
+    }
+
+    log.warn({ badDates }, "Date check: bad date after the re-plan, handing off");
+    const confidenceConfig = await this.getConfidenceConfig(conversation);
+    return {
+      step: "HANDOFF",
+      userMessage: await this.composeContextualFallbackMessage(
+        conversation,
+        confidenceConfig.fallbackMessage,
+        customerLanguage,
+      ),
+      handoff: {
+        reason: "Reply stated a date that could not be verified",
+        fields: { badDates: badDates.map((date) => date.raw) },
+      },
+      badDates,
       originalMessage: response,
     };
   }

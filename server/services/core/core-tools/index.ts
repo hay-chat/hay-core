@@ -13,6 +13,7 @@
 import type { Conversation } from "@server/database/entities/conversation.entity";
 import { createLogger } from "@server/lib/logger";
 import type { ToolRisk } from "../tool-risk";
+import { calculateDateTool } from "./calculate-date";
 import { completeProductCaseTool } from "./complete-product-case";
 import { createTicketTool } from "./create-ticket";
 import { findPageUrlTool } from "./find-page-url";
@@ -81,3 +82,4 @@ coreToolRegistry.register(inspectAttachmentTool);
 coreToolRegistry.register(completeProductCaseTool);
 coreToolRegistry.register(createTicketTool);
 coreToolRegistry.register(findPageUrlTool);
+coreToolRegistry.register(calculateDateTool);
