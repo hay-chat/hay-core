@@ -423,3 +423,18 @@
 - **Failure mode**: Resetting section-edit state on close also cleared the compose draft, so closing a "missing" card lost the half-written answer.
 - **Detection signal**: The existing "draft survives closing and a board poll" test failed after the rewrite.
 - **Prevention**: Keep "a section being edited" state separate from "an answer being written"; only the first ends when the card closes.
+
+## 2026-11-10: Analytics must-haves
+
+### A planning doc said data was "already captured" when it was not
+
+- **Failure mode**: The analytics benchmark listed hand-off reasons as "collected, not shown" because `handoffReason` exists on the planner's result. It is never written to the database, so the "S-M, just put it on screen" estimate was wrong and the report needed a write path first.
+- **Detection signal**: A field named in a plan that appears only in an in-memory type or a log line, with no column, jsonb key or migration behind it.
+- **Prevention**: Before sizing a report, trace each field to where it is persisted and since when. "The code has a variable for it" is not "we have the data".
+
+### Re-serialising a JSON locale file rewrote its formatting
+
+- **Failure mode**: Editing `dashboard.json` with `json.load` + `json.dump` reindented the whole file: a 3-key change became a 100-line diff.
+- **Detection signal**: `git diff --stat` far larger than the edit.
+- **Prevention**: Change locale files with targeted text edits, then validate with a JSON parse. Check `git diff --stat` after scripted edits.
+
