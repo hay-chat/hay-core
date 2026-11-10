@@ -423,3 +423,21 @@
 - **Failure mode**: Resetting section-edit state on close also cleared the compose draft, so closing a "missing" card lost the half-written answer.
 - **Detection signal**: The existing "draft survives closing and a board poll" test failed after the rewrite.
 - **Prevention**: Keep "a section being edited" state separate from "an answer being written"; only the first ends when the card closes.
+
+## 2026-11-14: Help center (public site on tenant hostnames)
+
+### Parsing tenant content on the request thread
+
+- **Failure mode**: article pages ran `marked` synchronously per request. A 40 KB crafted document took 11 s to parse, so one tenant could freeze the API for everyone by requesting its own article.
+- **Detection signal**: an independent review timed the parser on adversarial input; tests with ordinary content were all fast.
+- **Prevention**: any parser fed tenant content on a public path runs in a worker with a time limit (`processors/run-worker.ts`) and its output is cached by document version.
+
+### `req.hostname` follows X-Forwarded-Host
+
+- **Failure mode**: tenant selection used `req.hostname`. With `trust proxy` set, Express prefers `X-Forwarded-Host`, which many proxies pass through from the client, so a caller could choose which tenant (or the API) answered on any host.
+- **Prevention**: route by `req.headers.host` when the hostname decides tenancy or the security boundary.
+
+### `repository.save(entity)` after a slow await writes stale columns back
+
+- **Failure mode**: the domain check loaded a help center, awaited DNS for seconds, then saved the whole entity, which could restore `is_published` or a removed domain changed meanwhile.
+- **Prevention**: after any slow await, write with `update(where, { only the columns this step owns })` and put the value that was checked in the `where`.
