@@ -4,6 +4,7 @@ export default {
   "widget.defaultGreeting": "¡Hola! ¿Cómo podemos ayudarte hoy?",
   "chat.close": "Cerrar chat",
   "chat.open": "Abrir chat",
+  "chat.dismissTeaser": "Descartar mensaje",
   "chat.expand": "Expandir chat",
   "chat.collapse": "Contraer chat",
   "chat.conversationEnded": "Esta conversación ha finalizado",

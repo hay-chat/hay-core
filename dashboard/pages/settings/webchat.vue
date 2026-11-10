@@ -81,6 +81,18 @@
           :placeholder="$t('webchat.greetingMessagePlaceholder')"
           :rows="3"
         />
+
+        <div class="space-y-2">
+          <Label for="teaserMessage">{{ $t("webchat.teaserMessage") }}</Label>
+          <Textarea
+            id="teaserMessage"
+            v-model="settingsForm.teaserMessage"
+            :placeholder="$t('webchat.teaserMessagePlaceholder')"
+            :rows="2"
+            :maxlength="200"
+          />
+          <p class="text-sm text-neutral-muted">{{ $t("webchat.teaserMessageDescription") }}</p>
+        </div>
       </CardContent>
     </Card>
 
@@ -327,6 +339,7 @@ const settingsForm = ref({
   theme: "blue" as NonNullable<UpdateSettingsInput["theme"]>,
   showGreeting: true,
   greetingMessage: "Hello! How can we help you today?",
+  teaserMessage: "",
   csatEnabled: true,
   csatQuestion: "",
   isEnabled: true,
@@ -395,6 +408,7 @@ async function loadSettings() {
       theme: settings.theme,
       showGreeting: settings.showGreeting,
       greetingMessage: settings.greetingMessage || "",
+      teaserMessage: settings.teaserMessage || "",
       csatEnabled: settings.csatEnabled,
       csatQuestion: settings.csatQuestion || "",
       isEnabled: settings.isEnabled,
@@ -428,6 +442,7 @@ async function saveSettings() {
       theme: settingsForm.value.theme,
       showGreeting: settingsForm.value.showGreeting,
       greetingMessage: settingsForm.value.greetingMessage || null,
+      teaserMessage: settingsForm.value.teaserMessage.trim() || null,
       csatEnabled: settingsForm.value.csatEnabled,
       csatQuestion: settingsForm.value.csatQuestion.trim() || null,
       allowedDomains: allowedDomainsArray.value,

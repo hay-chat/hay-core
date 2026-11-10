@@ -30,6 +30,7 @@ declare global {
         theme?: string;
         showGreeting?: boolean;
         greetingMessage?: string;
+        teaserMessage?: string;
         context?: Record<string, unknown>;
       };
       addContext?: (key: string, value: unknown) => void;

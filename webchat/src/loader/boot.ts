@@ -1,7 +1,7 @@
 import { resolveLocale } from "@/i18n/resolve";
 import type { ChatHandle, ChatMountOptions, HayChatConfig, PublicConfig } from "@/types";
 import { installHostApi } from "./hostApi";
-import { openChatLabels } from "./labels";
+import { launcherLabels } from "./labels";
 import { createLauncher } from "./launcher";
 import { fetchPublicConfig } from "./publicConfig";
 
@@ -44,10 +44,22 @@ export function boot(
   if (!config.baseUrl) console.error("[Hay Webchat] baseUrl is required in config");
 
   const hostCalls = installHostApi();
-  const launcher = createLauncher(config, openChatLabels[resolveLocale(config.locale)]);
+  const launcher = createLauncher(config, launcherLabels[resolveLocale(config.locale)]);
+
+  // The teaser invites a first conversation, so a visitor who already has one
+  // in this tab is not shown it. The page's own message (even an empty one)
+  // wins over the one from the settings.
+  const wantsTeaser = !hasConversationInTab();
+  if (wantsTeaser && config.teaserMessage) launcher.showTeaser(config.teaserMessage);
 
   let publicConfig: Promise<PublicConfig | null> | null = null;
-  const getPublicConfig = () => (publicConfig ??= fetchPublicConfig(config));
+  const getPublicConfig = () =>
+    (publicConfig ??= fetchPublicConfig(config).then((settings) => {
+      if (wantsTeaser && config.teaserMessage === undefined && settings?.teaserMessage) {
+        launcher.showTeaser(settings.teaserMessage);
+      }
+      return settings;
+    }));
 
   // Widget turned off (or organization suspended): remove the button.
   let disabled = false;
@@ -95,6 +107,7 @@ export function boot(
       return;
     }
     wantOpen = true;
+    launcher.hideTeaser();
     launcher.setBusy(true);
     void startChat();
   });

@@ -73,6 +73,10 @@ export class WebchatSettings {
   })
   greetingMessage!: string | null;
 
+  // Shown next to the chat button before the visitor opens the chat (null = none)
+  @Column({ type: "varchar", length: 200, name: "teaser_message", nullable: true })
+  teaserMessage!: string | null;
+
   // CSAT (customer satisfaction rating shown when a conversation ends)
   @Column({ type: "boolean", name: "csat_enabled", default: true })
   csatEnabled!: boolean;

@@ -205,6 +205,8 @@ Embed the chat widget on any website:
       position: "right",
       theme: "blue",
       greetingMessage: "Hi! How can we help?",
+      // Shown next to the chat button before it is opened. Overrides Settings > Webchat.
+      teaserMessage: "Questions? Chat with us!",
     },
   };
 </script>

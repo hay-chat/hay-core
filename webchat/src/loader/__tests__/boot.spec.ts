@@ -173,6 +173,91 @@ describe("widget loader", () => {
     expect(chunk.mountChat).toHaveBeenCalledTimes(1);
   });
 
+  describe("teaser message", () => {
+    const teaser = () => document.querySelector<HTMLElement>(".hay-chat-teaser");
+    const teaserMessage = () =>
+      document.querySelector<HTMLButtonElement>(".hay-chat-teaser__message");
+
+    it("shows the message from the settings once they arrive", async () => {
+      mockPublicConfig({ enabled: true, teaserMessage: "Need a hand?" });
+      boot(config, fakeChunk().loadChat);
+
+      expect(teaser()).toBeNull();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(teaserMessage()!.textContent).toBe("Need a hand?");
+    });
+
+    it("shows the page's own message at once, over the one from the settings", async () => {
+      mockPublicConfig({ enabled: true, teaserMessage: "From the dashboard" });
+      boot({ ...config, teaserMessage: "From the page" }, fakeChunk().loadChat);
+
+      expect(teaserMessage()!.textContent).toBe("From the page");
+      await vi.advanceTimersByTimeAsync(0);
+      expect(teaserMessage()!.textContent).toBe("From the page");
+    });
+
+    it("an empty message on the page shows none, whatever the settings say", async () => {
+      mockPublicConfig({ enabled: true, teaserMessage: "From the dashboard" });
+      boot({ ...config, teaserMessage: "" }, fakeChunk().loadChat);
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(teaser()).toBeNull();
+    });
+
+    it("renders the message as text, never as HTML", () => {
+      mockPublicConfig({ enabled: true });
+      boot({ ...config, teaserMessage: "<img src=x onerror=alert(1)>" }, fakeChunk().loadChat);
+
+      expect(teaser()!.querySelector("img")).toBeNull();
+      expect(teaserMessage()!.textContent).toBe("<img src=x onerror=alert(1)>");
+    });
+
+    it("clicking the message opens the chat and removes the teaser", async () => {
+      mockPublicConfig({ enabled: true });
+      const chunk = fakeChunk();
+      const loader = boot({ ...config, teaserMessage: "Need a hand?" }, chunk.loadChat);
+
+      teaserMessage()!.click();
+      expect(teaser()).toBeNull();
+      await loader.chatReady();
+      expect(chunk.mountChat).toHaveBeenCalledWith(expect.objectContaining({ open: true }));
+    });
+
+    it("dismissing removes it for good without opening the chat", async () => {
+      mockPublicConfig({ enabled: true, teaserMessage: "Need a hand?" });
+      const chunk = fakeChunk();
+      boot({ ...config, loading: "eager" }, chunk.loadChat);
+      await vi.advanceTimersByTimeAsync(0);
+
+      const dismiss = document.querySelector<HTMLButtonElement>(".hay-chat-teaser__dismiss")!;
+      expect(dismiss.getAttribute("aria-label")).toBe("Dismiss message");
+      dismiss.click();
+
+      expect(teaser()).toBeNull();
+      expect(chunk.mountChat).not.toHaveBeenCalledWith(expect.objectContaining({ open: true }));
+    });
+
+    it("goes away when the chat opens", async () => {
+      mockPublicConfig({ enabled: true });
+      const chunk = fakeChunk();
+      const loader = boot({ ...config, teaserMessage: "Need a hand?" }, chunk.loadChat);
+      await vi.advanceTimersByTimeAsync(3000);
+      await loader.chatReady();
+
+      chunk.mountChat.mock.calls[0][0].launcher.setOpen(true);
+      expect(teaser()).toBeNull();
+    });
+
+    it("is not shown to a visitor who already has a conversation in this tab", async () => {
+      sessionStorage.setItem("hay-conversation-id", "conv-1");
+      mockPublicConfig({ enabled: true, teaserMessage: "From the dashboard" });
+      boot({ ...config, teaserMessage: "From the page" }, fakeChunk().loadChat);
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(teaser()).toBeNull();
+    });
+  });
+
   it("labels the button in the visitor's language", () => {
     mockPublicConfig({ enabled: true });
     boot({ ...config, locale: "pt-BR", loading: "interaction" }, fakeChunk().loadChat);

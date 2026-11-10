@@ -1,6 +1,7 @@
 // The chat button, in plain DOM so it paints without Vue. Once the chat chunk
 // mounts, it drives the button through the LauncherBridge.
 import type { HayChatConfig, LauncherBridge } from "@/types";
+import type { LauncherLabels } from "./labels";
 import css from "./launcher.css?inline";
 
 const ICON_OPEN = '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>';
@@ -17,10 +18,16 @@ export interface Launcher extends LauncherBridge {
   /** Where the chat chunk mounts. */
   chatContainer: HTMLElement;
   setBusy(busy: boolean): void;
+  /**
+   * Show a message next to the button, until the visitor opens the chat or
+   * dismisses it. Does nothing once either has happened.
+   */
+  showTeaser(text: string): void;
+  hideTeaser(): void;
   remove(): void;
 }
 
-export function createLauncher(config: HayChatConfig, label: string): Launcher {
+export function createLauncher(config: HayChatConfig, labels: LauncherLabels): Launcher {
   const style = document.createElement("style");
   style.textContent = css;
   document.head.appendChild(style);
@@ -39,7 +46,7 @@ export function createLauncher(config: HayChatConfig, label: string): Launcher {
   button.type = "button";
   button.className =
     config.position === "left" ? "hay-chat-button hay-chat-button--left" : "hay-chat-button";
-  button.setAttribute("aria-label", label);
+  button.setAttribute("aria-label", labels.open);
   button.setAttribute("aria-expanded", "false");
   button.innerHTML =
     icon("hay-chat-button__icon-open", ICON_OPEN) +
@@ -51,12 +58,22 @@ export function createLauncher(config: HayChatConfig, label: string): Launcher {
   root.appendChild(widget);
   document.body.appendChild(root);
 
+  let teaser: HTMLElement | null = null;
+  // Set once the chat was opened or the teaser dismissed: it never comes back.
+  let teaserDone = false;
+  const hideTeaser = () => {
+    teaserDone = true;
+    teaser?.remove();
+    teaser = null;
+  };
+
   return {
     root,
     button,
     chatContainer,
     setOpen(open) {
       button.setAttribute("aria-expanded", String(open));
+      if (open) hideTeaser();
     },
     setUnread(count) {
       badge.textContent = count > 0 ? String(count) : "";
@@ -66,6 +83,34 @@ export function createLauncher(config: HayChatConfig, label: string): Launcher {
       if (busy) button.setAttribute("aria-busy", "true");
       else button.removeAttribute("aria-busy");
     },
+    showTeaser(text) {
+      const message = text.trim();
+      if (teaserDone || !message) return;
+      teaser?.remove();
+
+      teaser = document.createElement("div");
+      teaser.className =
+        config.position === "left" ? "hay-chat-teaser hay-chat-teaser--left" : "hay-chat-teaser";
+
+      // The message opens the chat, exactly like the button.
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "hay-chat-teaser__message";
+      open.textContent = message;
+      open.addEventListener("click", () => button.click());
+
+      const dismiss = document.createElement("button");
+      dismiss.type = "button";
+      dismiss.className = "hay-chat-teaser__dismiss";
+      dismiss.setAttribute("aria-label", labels.dismissTeaser);
+      dismiss.innerHTML = icon("hay-chat-teaser__dismiss-icon", ICON_CLOSE);
+      dismiss.addEventListener("click", hideTeaser);
+
+      teaser.append(open, dismiss);
+      // Before the button, so keyboard users reach the message first.
+      widget.insertBefore(teaser, button);
+    },
+    hideTeaser,
     remove() {
       root.remove();
       style.remove();
