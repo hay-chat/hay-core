@@ -56,6 +56,7 @@ import {
   type OrganizationSettings,
 } from "@server/types/organization-settings.types";
 import type { FormSchema } from "@hay/form-schema";
+import { languageName as languageNameOf } from "@server/types/language.types";
 import { formSchemaSchema } from "@hay/form-schema";
 
 function describeBadDate(date: BadDate): string {
@@ -400,23 +401,7 @@ export class ExecutionLayer {
         const shouldEnforceLanguage = customerMessages.length <= 3;
 
         if (shouldEnforceLanguage) {
-          const languageNames: Record<string, string> = {
-            en: "English",
-            pt: "Portuguese",
-            es: "Spanish",
-            de: "German",
-            fr: "French",
-            it: "Italian",
-            nl: "Dutch",
-            pl: "Polish",
-            ru: "Russian",
-            ja: "Japanese",
-            zh: "Chinese",
-            ko: "Korean",
-            ar: "Arabic",
-            hi: "Hindi",
-          };
-          const languageName = languageNames[customerLanguage] || customerLanguage.toUpperCase();
+          const languageName = languageNameOf(customerLanguage);
           const languageInstruction = `\n\nIMPORTANT LANGUAGE REQUIREMENT: The customer is communicating in ${languageName}. You MUST respond ONLY in ${languageName}, regardless of the language used in the prompts, instructions, or system messages. This is a critical requirement that overrides all other language-related instructions.`;
           finalPrompt = responsePrompt + languageInstruction;
         }

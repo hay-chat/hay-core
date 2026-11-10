@@ -75,7 +75,7 @@ describe("inactivity messages follow the customer's language", () => {
   it("asks for the language the customer last wrote in, over the English defaults", async () => {
     conversationWith([bot("Hello!"), customer("Como convido minha equipe?", "pt"), bot("Claro")]);
     await sendInactivityWarning("conversation-1", "org-1");
-    expect(mockGetPrompt.mock.calls[0][1].languageName).toBe("Portuguese");
+    expect(mockGetPrompt.mock.calls[0][1].languageName).toBe("Brazilian Portuguese");
   });
 
   it("uses the latest detected language when the customer switches", async () => {
@@ -87,7 +87,7 @@ describe("inactivity messages follow the customer's language", () => {
   it("falls back to the conversation language when nothing was detected", async () => {
     conversationWith([customer("ok", null), bot("Oi")], "pt");
     await sendInactivityWarning("conversation-1", "org-1");
-    expect(mockGetPrompt.mock.calls[0][1].languageName).toBe("Portuguese");
+    expect(mockGetPrompt.mock.calls[0][1].languageName).toBe("Brazilian Portuguese");
   });
 
   it("closes in the customer's language after a warning", async () => {
@@ -103,7 +103,7 @@ describe("inactivity messages follow the customer's language", () => {
     conversationWith([customer("Como convido minha equipe?", "pt"), bot("Claro")]);
     await closeInactiveConversation("conversation-1", "org-1", 1000);
     expect(mockGetPrompt.mock.calls[0][0]).toBe("conversation/closure-message");
-    expect(mockGetPrompt.mock.calls[0][1].languageName).toBe("Portuguese");
+    expect(mockGetPrompt.mock.calls[0][1].languageName).toBe("Brazilian Portuguese");
   });
 
   it.each([

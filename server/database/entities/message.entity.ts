@@ -331,7 +331,7 @@ export class Message {
   async savePerception(perception: {
     intent: MessageIntent;
     sentiment: MessageSentiment;
-    language?: string;
+    language: LanguageCode | null;
   }): Promise<Message | null> {
     const { MessageRepository } = await import("../../repositories/message.repository");
     const messageRepository = new MessageRepository();

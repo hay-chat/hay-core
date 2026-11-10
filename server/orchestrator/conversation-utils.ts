@@ -9,7 +9,7 @@ import { createLogger } from "@server/lib/logger";
 import { getAiReplyBlocker, recheckAiReply } from "./reply-guard";
 import { closureCopy } from "./closure-copy";
 import type { Conversation } from "@server/database/entities/conversation.entity";
-import { languageName } from "@server/services/setup/playbook-generation";
+import { languageName } from "@server/types/language.types";
 
 const logger = createLogger("conversation-utils");
 

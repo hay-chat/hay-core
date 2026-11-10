@@ -11,6 +11,7 @@ import { MessageType } from "@server/database/entities/message.entity";
 import { conversationRepository } from "@server/repositories/conversation.repository";
 import { createLogger } from "@server/lib/logger";
 import { resolveQuickCheckSettings } from "@server/types/organization-settings.types";
+import { languageName } from "@server/types/language.types";
 import { CLOSED_STATUSES, isTestConversation } from "../close-classification/outcome-rules";
 import { aiRepliesHeldForReview } from "../ai-reply-review";
 import { getAvailability } from "../business-hours.service";
@@ -67,21 +68,6 @@ function languagesOf(conversation: Conversation, language?: string | null) {
 function contactEmailOf(conversation: Conversation): string | null {
   const contact = conversation.metadata?.contactEmail;
   return (typeof contact === "string" && contact) || conversation.customer?.email || null;
-}
-
-const LANGUAGE_NAMES: Record<string, string> = {
-  en: "English",
-  pt: "Brazilian Portuguese",
-  es: "Spanish",
-  fr: "French",
-  de: "German",
-  it: "Italian",
-  nl: "Dutch",
-};
-
-function languageName(language: string | null | undefined): string {
-  const base = (language ?? "en").toLowerCase().split(/[-_]/)[0];
-  return LANGUAGE_NAMES[base] ?? language ?? "English";
 }
 
 function clip(text: string, max: number): string {

@@ -229,14 +229,21 @@ export function normalizeLanguage(value: string | null | undefined): LanguageCod
   return isLanguageCode(language) ? language : null;
 }
 
-/** Name of a language, written in `displayLocale` ("Dutch", or "Nederlands" for `nl`). */
+/**
+ * Name of a language, written in `displayLocale` ("Dutch", or "Nederlands" for `nl`).
+ * `pt` is Brazilian Portuguese in Hay, so it is named as `pt-BR`.
+ */
 export function languageName(
   code: string | null | undefined,
   displayLocale: string = DEFAULT_LANGUAGE,
 ): string {
   const value = code?.trim() || DEFAULT_LANGUAGE;
   try {
-    return new Intl.DisplayNames([displayLocale], { type: "language" }).of(value) ?? value;
+    return (
+      new Intl.DisplayNames([displayLocale], { type: "language" }).of(
+        value === "pt" ? "pt-BR" : value,
+      ) ?? value
+    );
   } catch {
     return value;
   }
