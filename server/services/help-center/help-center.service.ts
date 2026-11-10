@@ -14,7 +14,7 @@ import { deriveServiceKey } from "@server/lib/auth/utils/service-keys";
 import { createLogger } from "@server/lib/logger";
 import { auditLogService } from "@server/services/audit-log.service";
 import { normalizeDomain } from "@server/services/sso.service";
-import { clearHelpCenterHostCache } from "./host-resolver";
+import { clearHelpCenterHostCache, isPlatformHostname } from "./host-resolver";
 import {
   CUSTOM_DOMAIN_TARGET_PREFIX,
   normalizeSubdomain,
@@ -101,8 +101,8 @@ export function signPreviewToken(helpCenterId: string, now = Date.now()): string
 export function verifyPreviewToken(helpCenterId: string, token: unknown, now = Date.now()) {
   if (typeof token !== "string") return false;
   const [expiresPart, signature, ...rest] = token.split(".");
+  if (rest.length > 0 || !signature || !/^\d{1,12}$/.test(expiresPart)) return false;
   const expires = Number(expiresPart);
-  if (rest.length > 0 || !signature || !Number.isInteger(expires)) return false;
   if (expires * 1000 < now) return false;
   const expected = Buffer.from(previewSignature(helpCenterId, expires));
   const given = Buffer.from(signature);
@@ -420,7 +420,7 @@ export class HelpCenterService {
     const helpCenter = await this.require(organizationId);
     const domain = normalizeDomain(rawDomain);
     const base = helpCenterBaseHostname();
-    if (domain === base || domain.endsWith(`.${base}`)) {
+    if (domain === base || domain.endsWith(`.${base}`) || isPlatformHostname(domain)) {
       throw new TRPCError({
         code: "BAD_REQUEST",
         message: "Use a domain you own, such as help.yourcompany.com",

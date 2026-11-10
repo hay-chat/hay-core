@@ -29,7 +29,7 @@ function hostnameOf(domain: string): string {
 }
 
 /** Hosts that always belong to the dashboard and API, whatever anyone claims. */
-function isPlatformHostname(hostname: string): boolean {
+export function isPlatformHostname(hostname: string): boolean {
   return [config.domain.api, config.domain.dashboard, config.domain.base]
     .filter(Boolean)
     .some((domain) => hostnameOf(domain) === hostname);
