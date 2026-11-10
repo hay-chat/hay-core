@@ -420,6 +420,7 @@
     "requestHistoryDescription": "Visualize e acompanhe todas as solicitações de privacidade de clientes iniciadas pela sua organização",
     "retentionSaveSuccess": "Política de retenção salva com sucesso",
     "retentionSaveFailed": "Falha ao salvar política de retenção",
+    "retentionLoadFailed": "Não foi possível carregar a política de retenção, por isso ela não pode ser alterada agora.",
     "aiProcessing": {
       "title": "Processamento de IA",
       "description": "Onde o Hay.chat processa com IA as mensagens dos seus clientes.",
