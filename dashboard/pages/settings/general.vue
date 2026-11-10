@@ -522,7 +522,7 @@ import { TIMEZONE_GROUPS } from "@/utils/timezones";
 // Vite runtime alias. A value import of these enums leaves them in the browser
 // bundle and breaks the Rollup build. Import the types only and use the enums'
 // string values (cast to the type) for defaults — the casts erase at build time.
-import type { SupportedLanguage } from "@server/types/language.types";
+import type { LanguageCode } from "@server/types/language.types";
 import type { DateFormat, TimeFormat, Timezone } from "@server/types/organization-settings.types";
 import type { RouterInputs } from "@/types/trpc";
 
@@ -612,7 +612,7 @@ const settings = ref<PlatformSettings>({
   organizationName: "",
   organizationAbout: "",
   organizationWebsite: "",
-  defaultLanguage: "en" as SupportedLanguage,
+  defaultLanguage: "en" as LanguageCode,
   timezone: "UTC" as Timezone,
   dateFormat: "MM/DD/YYYY" as DateFormat,
   timeFormat: "12h" as TimeFormat,
@@ -900,7 +900,7 @@ const resetToDefaults = () => {
       organizationName: originalSettings.value.organizationName,
       organizationAbout: originalSettings.value.organizationAbout,
       organizationWebsite: originalSettings.value.organizationWebsite,
-      defaultLanguage: "en" as SupportedLanguage,
+      defaultLanguage: "en" as LanguageCode,
       timezone: "UTC" as Timezone,
       dateFormat: "MM/DD/YYYY" as DateFormat,
       timeFormat: "12h" as TimeFormat,

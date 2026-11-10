@@ -12,6 +12,9 @@ import { Conversation } from "./conversation.entity";
 import { Source } from "./source.entity";
 import { User } from "../../entities/user.entity";
 import { DeliveryState } from "../../types/message-feedback.types";
+import type { LanguageCode } from "../../types/language.types";
+
+export type MessageTranslations = Partial<Record<LanguageCode, string>>;
 
 export enum MessageType {
   CUSTOMER = "Customer",
@@ -304,6 +307,14 @@ export class Message {
 
   @Column({ type: "text", nullable: true })
   originalContent!: string | null;
+
+  /**
+   * The message in team members' languages, keyed by language code. `content`
+   * stays the customer-facing text; for a team member's reply, the text they
+   * typed is stored here under their language.
+   */
+  @Column({ type: "jsonb", nullable: true })
+  translations!: MessageTranslations | null;
 
   async saveIntent(intent: MessageIntent): Promise<Message | null> {
     const { MessageRepository } = await import("../../repositories/message.repository");

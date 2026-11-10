@@ -23,7 +23,7 @@ import type { PlaybookInstructions } from "./playbook.entity";
 import { documentRepository } from "../../repositories/document.repository";
 import { signDocumentImageUrls } from "../../services/media-url.service";
 import { createLogger } from "@server/lib/logger";
-import { SupportedLanguage } from "../../types/language.types";
+import type { LanguageCode } from "../../types/language.types";
 
 const logger = createLogger("conversation-entity");
 
@@ -249,7 +249,7 @@ export class Conversation {
   previous_status!: string | null;
 
   @Column({ type: "varchar", length: 10, nullable: true })
-  language!: SupportedLanguage | null;
+  language!: LanguageCode | null;
 
   // Data retention fields
   @Column({ type: "timestamptz", nullable: true })
@@ -1202,7 +1202,7 @@ The following tools are available for you to use. You MUST return only valid JSO
    */
   private async generateLocalizedGreeting(
     greeting: string,
-    targetLanguage: SupportedLanguage,
+    targetLanguage: LanguageCode,
   ): Promise<string> {
     const { LLMService } = await import("../../services/core/llm.service");
     const llmService = new LLMService();

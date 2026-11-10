@@ -2,6 +2,7 @@ import { Entity, Column, Index, ManyToOne, OneToMany, JoinColumn } from "typeorm
 import { BaseEntity } from "./base.entity";
 import { Organization } from "./organization.entity";
 import { UserOrganization } from "./user-organization.entity";
+import type { LanguageCode } from "../types/language.types";
 
 @Entity("users")
 @Index("idx_users_email", ["email"])
@@ -23,6 +24,14 @@ export class User extends BaseEntity {
 
   @Column({ type: "varchar", length: 500, nullable: true })
   avatarUrl?: string;
+
+  /** Dashboard UI language (a dashboard locale code); null follows the browser. */
+  @Column({ type: "varchar", length: 10, nullable: true })
+  interfaceLanguage?: string | null;
+
+  /** Language this person reads and writes conversations in; null turns translation off. */
+  @Column({ type: "varchar", length: 10, nullable: true })
+  translationLanguage?: LanguageCode | null;
 
   @Column({ type: "boolean", default: true })
   isActive!: boolean;

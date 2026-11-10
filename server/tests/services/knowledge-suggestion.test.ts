@@ -1,7 +1,6 @@
 import { tiptapDocumentToMarkdown } from "../../utils/tiptap-document-markdown";
 import { KnowledgeSuggestionService } from "../../services/knowledge-suggestion.service";
 import { PromptService } from "../../services/prompt.service";
-import { SupportedLanguage } from "../../types/language.types";
 import { sanitizeRevisedMarkdown } from "../../services/playbook-suggestion.service";
 
 const text = (value: string, marks?: Array<{ type: string; attrs?: Record<string, unknown> }>) => ({
@@ -167,7 +166,7 @@ describe("Improve prompts", () => {
             { id: "doc-1", title: "Shipping", editable: "yes", content: "Ships in 3 days." },
           ],
         },
-        { language: lang === "pt" ? SupportedLanguage.PORTUGUESE : SupportedLanguage.ENGLISH },
+        { language: lang === "pt" ? "pt" as const : "en" as const },
       );
       expect(prompt).toContain("Document id: doc-1");
       expect(prompt).toContain("Ships in 3 days.");
@@ -178,7 +177,7 @@ describe("Improve prompts", () => {
   );
 
   it("has Portuguese playbook prompts, and strips their echoed headings", async () => {
-    const pt = { language: SupportedLanguage.PORTUGUESE };
+    const pt = { language: "pt" as const };
     const suggest: string = await PromptService.getInstance().getPrompt(
       "playbook/suggest-edits",
       {
