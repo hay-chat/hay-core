@@ -9,6 +9,27 @@
       </DialogHeader>
 
       <div class="space-y-4">
+        <!-- The reviewer's translation of the reply; the editor below holds the original -->
+        <div
+          v-if="translation"
+          class="bg-neutral-100 dark:bg-neutral-800 p-3 rounded-md"
+          data-testid="approval-translation"
+        >
+          <p class="text-xs font-medium text-neutral-muted mb-1">
+            {{
+              translation.sourceLanguage
+                ? t("conversations.translation.approvalTranslatedFrom", {
+                    language: languageName(translation.sourceLanguage, locale),
+                  })
+                : t("conversations.translation.approvalTranslated")
+            }}
+          </p>
+          <p class="text-sm whitespace-pre-wrap">{{ translation.text }}</p>
+          <p class="text-xs text-neutral-muted mt-2">
+            {{ t("conversations.translation.approvalEditsOriginal") }}
+          </p>
+        </div>
+
         <!-- Original Content (if edited) -->
         <div v-if="isEdited" class="bg-neutral-100 dark:bg-neutral-800 p-3 rounded-md">
           <p class="text-xs font-medium text-neutral-muted mb-1">
@@ -19,10 +40,15 @@
 
         <!-- Editable Content -->
         <div>
+          <!-- TODO: let the reviewer edit in their own language and translate the edit back. -->
           <Input
             id="message-content"
             v-model="editedContent"
-            :label="t('conversations.draftApproval.content')"
+            :label="
+              translation
+                ? t('conversations.translation.approvalOriginalLabel')
+                : t('conversations.draftApproval.content')
+            "
             type="textarea"
             rows="8"
             class="w-full mt-1"
@@ -68,13 +94,17 @@ import { ref, computed, watch } from "vue";
 import { Check, Ban } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { useMessageApproval } from "@/composables/useMessageApproval";
+import { languageName } from "@/utils/languages";
+import type { DisplayTranslation } from "@/composables/useMessageTranslations";
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 const props = defineProps<{
   open: boolean;
   messageId: string;
   originalContent: string;
+  /** The reviewer's translation of the pending reply, when they have a translation language. */
+  translation?: DisplayTranslation | null;
 }>();
 
 const emit = defineEmits<{

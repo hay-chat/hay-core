@@ -294,6 +294,28 @@
       "aiRegionEu": "Data centers na UE",
       "aiRegionDefault": "Qualquer região (provedor de IA padrão)"
     },
+    "translation": {
+      "translating": "Traduzindo…",
+      "translatedFrom": "Traduzido do {language}",
+      "translated": "Traduzido",
+      "sentIn": "Enviado em {language}",
+      "sentTranslated": "Enviado traduzido",
+      "showOriginal": "Ver original",
+      "showSent": "Ver versão enviada",
+      "showTranslation": "Ver tradução",
+      "customerLanguage": "Idioma do cliente",
+      "replySentIn": "Sua resposta será enviada em {language}",
+      "changeLanguage": "Alterar",
+      "targetLanguage": "Enviar respostas em",
+      "sendWithoutTranslating": "Enviar sem traduzir",
+      "sendFailedTitle": "Resposta não enviada",
+      "sendFailedMessage": "Não conseguimos traduzir sua resposta. Ela continua na caixa de mensagem.",
+      "sendUntranslated": "Enviar sem tradução",
+      "approvalTranslatedFrom": "Sua tradução (do {language})",
+      "approvalTranslated": "Sua tradução",
+      "approvalEditsOriginal": "As edições valem para a resposta original abaixo, que é o que o cliente recebe.",
+      "approvalOriginalLabel": "Resposta original (enviada ao cliente)"
+    },
     "draftApproval": {
       "queued": "Aguardando aprovação",
       "approve": "Aprovar e enviar",

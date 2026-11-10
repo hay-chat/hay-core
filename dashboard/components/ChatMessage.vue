@@ -173,9 +173,34 @@
             v-else
             ref="systemMessageRef"
             class="chat-message__text"
-            v-html="renderMarkdown(message.content)"
+            v-html="renderMarkdown(displayedContent)"
           />
         </div>
+      </div>
+      <!-- Translation into the reader's language: a muted line with a real toggle button -->
+      <div
+        v-if="showsTranslation"
+        class="chat-message__translation"
+        data-testid="message-translation"
+      >
+        <span>{{ translationLabel }}</span>
+        <span aria-hidden="true">·</span>
+        <button
+          type="button"
+          class="chat-message__translation-toggle"
+          @click="showOriginal = !showOriginal"
+        >
+          {{ translationToggleLabel }}
+        </button>
+      </div>
+      <div
+        v-else-if="showsTranslating"
+        class="chat-message__translation"
+        role="status"
+        data-testid="message-translating"
+      >
+        <Loader2 class="h-3 w-3 animate-spin" aria-hidden="true" />
+        <span>{{ t("conversations.translation.translating") }}</span>
       </div>
       <!-- Timestamp below the bubble. Hidden for grouped same-minute messages.
            For sent BotAgent messages the timestamp moves inline next to the
@@ -408,6 +433,7 @@
       v-model:open="showApprovalDialog"
       :message-id="message.id"
       :original-content="message.content"
+      :translation="pendingReplyTranslation"
       @approved="handleMessageApproved"
       @blocked="handleMessageBlocked"
     />
@@ -625,6 +651,7 @@ import {
   EyeOff,
   Hourglass,
   ShieldAlert,
+  Loader2,
 } from "lucide-vue-next";
 import {
   TooltipProvider,
@@ -641,8 +668,10 @@ import { resolveMediaUrl } from "@/composables/useMediaUrl";
 import { MessageStatus, type Message, MessageSentiment } from "@/types/message";
 import { useI18n } from "vue-i18n";
 import { agentNotice } from "@/utils/agentNotice";
+import { languageName } from "@/utils/languages";
+import type { DisplayTranslation } from "@/composables/useMessageTranslations";
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 /** Provider error codes that mean "outside the 24h customer service window". */
 const WINDOW_EXPIRED_CODES = new Set(["24h_window_expired", "131047", 131047]);
@@ -672,6 +701,10 @@ interface Props {
   botAvatarUrl?: string | null;
   /** Avatar URL of the assigned human agent (used for HumanAgent messages). */
   humanAvatarUrl?: string | null;
+  /** This message in the reader's translation language (useMessageTranslations). */
+  translation?: DisplayTranslation | null;
+  /** A translation for this message is being fetched. */
+  translating?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -681,6 +714,8 @@ const props = withDefaults(defineProps<Props>(), {
   showTimestamp: true,
   botAvatarUrl: null,
   humanAvatarUrl: null,
+  translation: null,
+  translating: false,
 });
 
 // Takeover/release System messages read as "Marina Souza joined the chat"
@@ -718,8 +753,57 @@ const renderMarkdown = (markdown: string): string =>
         : undefined,
   });
 
+// Translation into the reader's language (multilingual inbox). `content` is always
+// what the customer saw; the translation is shown by default when it differs.
+const TRANSLATED_TYPES = ["Customer", "BotAgent", "HumanAgent"];
+const showOriginal = ref(false);
+const hasTranslation = computed(() => {
+  const text = props.translation?.text.trim();
+  return (
+    TRANSLATED_TYPES.includes(props.message.type) &&
+    !props.message.metadata?.originalMessage &&
+    !!text &&
+    text !== props.message.content.trim()
+  );
+});
+const displayedContent = computed(() =>
+  hasTranslation.value && !showOriginal.value
+    ? props.translation!.text
+    : props.message.content || "",
+);
+const showsTranslation = computed(() => hasTranslation.value && !hidesMediaPlaceholder.value);
+const showsTranslating = computed(
+  () =>
+    props.translating &&
+    !hasTranslation.value &&
+    TRANSLATED_TYPES.includes(props.message.type) &&
+    !hidesMediaPlaceholder.value,
+);
+const nameOf = (code: string) => languageName(code, locale?.value);
+// A team member's reply: `content` is what was sent, the translation is what they wrote.
+const isTeamReply = computed(() => props.message.type === "HumanAgent");
+const translationLabel = computed(() => {
+  const source = props.translation?.sourceLanguage;
+  if (isTeamReply.value) {
+    return source
+      ? t("conversations.translation.sentIn", { language: nameOf(source) })
+      : t("conversations.translation.sentTranslated");
+  }
+  return source
+    ? t("conversations.translation.translatedFrom", { language: nameOf(source) })
+    : t("conversations.translation.translated");
+});
+const translationToggleLabel = computed(() => {
+  if (showOriginal.value) return t("conversations.translation.showTranslation");
+  return isTeamReply.value
+    ? t("conversations.translation.showSent")
+    : t("conversations.translation.showOriginal");
+});
+// The approval dialog shows the reviewer's translation of a pending AI reply.
+const pendingReplyTranslation = computed(() => (hasTranslation.value ? props.translation : null));
+
 const SPLIT_EXCLUDED_TYPES = ["Playbook", "Document", "Tool", "ProductRecommendation", "System"];
-const contentSegments = computed(() => splitMarkdownImages(props.message.content || ""));
+const contentSegments = computed(() => splitMarkdownImages(displayedContent.value));
 const isImageSegment = (segment: string): boolean =>
   /^!\[[^\]]*\]\([^)]*\)\s*$/.test(segment.trim());
 // "[Customer sent a photo]" is the line the AI reads; staff see the files themselves.
@@ -1364,6 +1448,36 @@ const getConfidenceIcon = (tier: string | undefined) => {
    per-type avatar rules above so it reliably wins. */
 .chat-message__avatar.chat-message__avatar--empty {
   background-color: transparent;
+}
+
+.chat-message__translation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--color-neutral-muted);
+}
+
+.chat-message:not(.chat-message--Customer):not(.chat-message--inverted) .chat-message__translation,
+.chat-message--inverted.chat-message--Customer .chat-message__translation {
+  justify-content: flex-end;
+}
+
+.chat-message__translation-toggle {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  border-radius: 0.125rem;
+}
+
+.chat-message__translation-toggle:hover {
+  color: var(--color-neutral);
+}
+
+.chat-message__translation-toggle:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
 }
 
 .chat-message__time {
