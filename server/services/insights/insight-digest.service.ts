@@ -3,6 +3,7 @@ import { getDashboardUrl } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
 import {
   organizationNotificationLocale,
+  recipientNotificationLocale,
   type NotificationLocale,
 } from "@server/services/notification-locale";
 import { insightsService } from "./insights.service";
@@ -92,7 +93,31 @@ const COPY: Record<
     footer:
       "Recibes este resumen semanal como dueño o administrador. Desactívalo en la configuración de Insights.",
   },
+  nl: {
+    subject: (count) => `Insights van deze week: ${count} nieuw`,
+    title: "Je wekelijkse Insights",
+    message: (count) =>
+      count > 0
+        ? `Hay.chat heeft deze week ${count} nieuwe patronen in je gesprekken gevonden. De patronen met de meeste impact staan hieronder.`
+        : "Deze week geen nieuwe patronen. Zo staan je openstaande insights ervoor.",
+    newLabel: "Nieuw",
+    recurringLabel: "Teruggekomen na aanpak",
+    positiveLabel: "Werkt goed",
+    fixedLabel: "Opgelost na aanpak",
+    fixedValue: (fixed, measured) => `${fixed} van ${measured}`,
+    item: (title, size) => `${title} (${size} gesprekken)`,
+    untitled: "Naamloos patroon",
+    button: "Insights openen",
+    footer:
+      "Je ontvangt dit wekelijkse overzicht als eigenaar of beheerder. Zet het uit in de instellingen van Insights.",
+  },
 };
+
+interface DigestRecipient {
+  email: string;
+  first_name: string | null;
+  interface_language: string | null;
+}
 
 /**
  * Weekly Insights digest to owners and admins (Roger: weekly digest only, no
@@ -154,15 +179,14 @@ export class InsightDigestService {
     const thresholds = await getOrganizationThresholds(organizationId);
     if (!thresholds.digestEnabled) return false;
 
-    const recipients: Array<{ email: string; first_name: string | null }> =
-      await AppDataSource.query(
-        `SELECT u.email, u.first_name
+    const recipients: DigestRecipient[] = await AppDataSource.query(
+      `SELECT u.email, u.first_name, u.interface_language
            FROM user_organizations uo
            JOIN users u ON u.id = uo.user_id
           WHERE uo.organization_id = $1 AND uo.is_active = true AND u.is_active = true
             AND uo.role IN ('owner', 'admin')`,
-        [organizationId],
-      );
+      [organizationId],
+    );
     if (recipients.length === 0) return false;
 
     const content = await this.buildContent(organizationId);
@@ -170,7 +194,7 @@ export class InsightDigestService {
       return false;
     }
 
-    const locale = await organizationNotificationLocale(organizationId);
+    const organizationLocale = await organizationNotificationLocale(organizationId);
     return AppDataSource.transaction(async (manager) => {
       await manager.query(
         `INSERT INTO insight_org_state (organization_id) VALUES ($1)
@@ -186,7 +210,7 @@ export class InsightDigestService {
       );
       if (!state?.due) return false;
 
-      const delivered = await this.deliver(organizationId, recipients, content, locale);
+      const delivered = await this.deliver(organizationId, recipients, content, organizationLocale);
       if (delivered > 0) {
         await manager.query(
           `UPDATE insight_org_state SET digest_last_sent_at = now(), updated_at = now()
@@ -201,15 +225,16 @@ export class InsightDigestService {
   /** Send to each recipient; returns how many sends succeeded. */
   private async deliver(
     organizationId: string,
-    recipients: Array<{ email: string; first_name: string | null }>,
+    recipients: DigestRecipient[],
     content: DigestContent,
-    locale: NotificationLocale,
+    organizationLocale: NotificationLocale,
   ): Promise<number> {
-    const copy = COPY[locale];
     const base = `${getDashboardUrl()}${orgDashboardPath(organizationId, "")}`;
     const { emailService } = await import("@server/services/email.service");
     let delivered = 0;
     for (const recipient of recipients) {
+      const locale = recipientNotificationLocale(recipient.interface_language, organizationLocale);
+      const copy = COPY[locale];
       try {
         const result = await emailService.sendTemplateEmail({
           to: recipient.email,

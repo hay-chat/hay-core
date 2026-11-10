@@ -20,7 +20,10 @@ import { conversationRepository } from "@server/repositories/conversation.reposi
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { resolveMediaSettings } from "@server/types/organization-settings.types";
 import { HANDOFF_SIGNED_URL_TTL_SECONDS, signMediaUrl } from "@server/services/media-url.service";
-import { organizationNotificationLocale } from "@server/services/notification-locale";
+import {
+  organizationNotificationLocale,
+  type NotificationLocale,
+} from "@server/services/notification-locale";
 import {
   readProductCase,
   saveProductCase,
@@ -33,7 +36,7 @@ const logger = createLogger("product-case-forward");
 
 const emailSchema = z.string().trim().email().max(254);
 
-type CopyLocale = "en" | "pt-BR";
+type CopyLocale = "en" | "pt-BR" | "nl";
 
 const COPY: Record<
   CopyLocale,
@@ -85,7 +88,29 @@ const COPY: Record<
       "Os links dos arquivos expiram em 7 dias. Você recebe este e-mail porque este endereço está definido para casos de produto no Hay.chat.",
     unknownProduct: "produto não informado",
   },
+  nl: {
+    subject: (product) => `Productprobleem: ${product}`,
+    title: "Een melding van een productprobleem is compleet",
+    message:
+      "Hay.chat heeft het bewijs verzameld voor een productprobleem dat een klant heeft gemeld.",
+    product: "Product",
+    lot: "Lot / batch",
+    invoice: "Factuurnummer",
+    invoiceFile: "Factuur",
+    howUsed: "Hoe het is gebruikt",
+    timeline: "Tijdlijn",
+    photo: (n) => `Foto ${n}`,
+    button: "Gesprek openen",
+    footer:
+      "Links naar bestanden verlopen na 7 dagen. Je ontvangt deze e-mail omdat dit adres in Hay.chat is ingesteld voor productmeldingen.",
+    unknownProduct: "product niet genoemd",
+  },
 };
+
+/** Case emails go to a configured address, not a person: the organization's language decides. */
+function copyLocale(locale: NotificationLocale): CopyLocale {
+  return locale === "pt-BR" || locale === "nl" ? locale : "en";
+}
 
 /** The configured case address, or null when none or invalid. */
 export function validCaseEmail(value: string | null | undefined): string | null {
@@ -144,8 +169,7 @@ async function sendCaseEmail(
         .map((attachment) => [attachment.id, attachment] as const),
     );
 
-    const locale: CopyLocale =
-      (await organizationNotificationLocale(organizationId)) === "pt-BR" ? "pt-BR" : "en";
+    const locale = copyLocale(await organizationNotificationLocale(organizationId));
     const copy = COPY[locale];
     const { evidence } = productCase;
 

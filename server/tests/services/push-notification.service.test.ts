@@ -26,6 +26,7 @@ const mockRepo = {
   findOne: jest.fn<(options: unknown) => Promise<unknown>>(),
   update: jest.fn<(criteria: unknown, data: unknown) => Promise<unknown>>(async () => ({})),
   delete: jest.fn<(criteria: unknown) => Promise<{ affected: number }>>(),
+  createQueryBuilder: jest.fn<() => unknown>(),
 };
 jest.mock("@server/database/data-source", () => ({
   AppDataSource: { getRepository: () => mockRepo },
@@ -37,7 +38,11 @@ jest.mock("@server/services/email.service", () => ({
 }));
 
 import { pushNotificationService } from "@server/services/push-notification.service";
-import { notificationLocale } from "@server/services/notification-locale";
+import {
+  groupByNotificationLocale,
+  notificationLocale,
+  recipientNotificationLocale,
+} from "@server/services/notification-locale";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const USER_ID = "22222222-2222-4222-8222-222222222222";
@@ -147,7 +152,7 @@ describe("sendTest", () => {
     mockRepo.find.mockResolvedValue([subscription("mine")]);
     mockSendNotification.mockResolvedValue({ statusCode: 201 });
 
-    const result = await pushNotificationService.sendTest(USER_ID, ORG_ID);
+    const result = await pushNotificationService.sendTest({ id: USER_ID }, ORG_ID);
 
     expect(mockRepo.find).toHaveBeenCalledWith({ where: { user_id: USER_ID } });
     expect(result).toEqual({ sent: 1, removed: 0 });
@@ -157,6 +162,60 @@ describe("sendTest", () => {
       url: "/",
     });
   });
+
+  it("uses the caller's interface language over the organization's", async () => {
+    configure();
+    mockGetOrganizationLocale.mockResolvedValue("pt");
+    mockRepo.find.mockResolvedValue([subscription("mine")]);
+    mockSendNotification.mockResolvedValue({ statusCode: 201 });
+
+    await pushNotificationService.sendTest({ id: USER_ID, interfaceLanguage: "nl" }, ORG_ID);
+
+    expect(mockGetOrganizationLocale).not.toHaveBeenCalled();
+    expect(JSON.parse(mockSendNotification.mock.calls[0][1])).toMatchObject({
+      title: "Hay.chat-meldingen staan aan",
+    });
+  });
+});
+
+describe("owner and admin alerts", () => {
+  it("sends each device its user's language, falling back to the organization's", async () => {
+    configure();
+    mockGetOrganizationLocale.mockResolvedValue("es");
+    const rows = [
+      { ...subscription("pt"), user: { id: "u-pt", interfaceLanguage: "pt-BR" } },
+      { ...subscription("nl"), user: { id: "u-nl", interfaceLanguage: "nl" } },
+      { ...subscription("org"), user: { id: "u-org", interfaceLanguage: null } },
+    ];
+    const builder = {
+      innerJoin: () => builder,
+      leftJoin: () => builder,
+      addSelect: () => builder,
+      getMany: async () => rows,
+    };
+    mockRepo.createQueryBuilder.mockReturnValue(builder);
+    mockSendNotification.mockResolvedValue({ statusCode: 201 });
+
+    await pushNotificationService.onChannelDeliveryFailed({
+      organizationId: ORG_ID,
+      conversationId: "c1",
+    });
+
+    const titles = new Map(
+      mockSendNotification.mock.calls.map(([target, body]) => [
+        (target as { endpoint: string }).endpoint,
+        (JSON.parse(body) as { title: string }).title,
+      ]),
+    );
+    expect(mockGetOrganizationLocale).toHaveBeenCalledTimes(1);
+    expect(titles).toEqual(
+      new Map([
+        ["https://push.example.com/pt", "Uma resposta não pôde ser entregue"],
+        ["https://push.example.com/nl", "Een antwoord kon niet worden afgeleverd"],
+        ["https://push.example.com/org", "No se pudo entregar una respuesta"],
+      ]),
+    );
+  });
 });
 
 describe("notification locale", () => {
@@ -164,6 +223,8 @@ describe("notification locale", () => {
     ["pt", "pt-BR"],
     ["pt-BR", "pt-BR"],
     ["es", "es"],
+    ["nl", "nl"],
+    ["nl-BE", "nl"],
     ["en", "en"],
     ["fr", "en"],
     [null, "en"],
@@ -177,10 +238,31 @@ describe("notification locale", () => {
     mockRepo.find.mockResolvedValue([subscription("mine")]);
     mockSendNotification.mockResolvedValue({ statusCode: 201 });
 
-    await pushNotificationService.sendTest(USER_ID, ORG_ID);
+    await pushNotificationService.sendTest({ id: USER_ID, interfaceLanguage: null }, ORG_ID);
 
     expect(JSON.parse(mockSendNotification.mock.calls[0][1])).toMatchObject({
       title: "Las alertas de Hay.chat están activadas",
+    });
+  });
+
+  it("resolves each recipient: their interface language, else the organization's", () => {
+    expect(recipientNotificationLocale("nl", "pt-BR")).toBe("nl");
+    expect(recipientNotificationLocale("en", "pt-BR")).toBe("en");
+    expect(recipientNotificationLocale(null, "pt-BR")).toBe("pt-BR");
+
+    const people = [
+      { id: "a", interfaceLanguage: "en" },
+      { id: "b", interfaceLanguage: "nl" },
+      { id: "c", interfaceLanguage: null },
+      { id: "d", interfaceLanguage: "nl" },
+    ];
+    const groups = groupByNotificationLocale(people, (p) => p.interfaceLanguage, "pt-BR");
+    expect(
+      Object.fromEntries([...groups].map(([locale, g]) => [locale, g.map((p) => p.id)])),
+    ).toEqual({
+      en: ["a"],
+      nl: ["b", "d"],
+      "pt-BR": ["c"],
     });
   });
 });

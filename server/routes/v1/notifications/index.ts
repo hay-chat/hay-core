@@ -71,7 +71,7 @@ export const notificationsRouter = t.router({
   /** Sends a notification to the caller's own devices so they can confirm the setup. */
   sendTestPush: authenticatedProcedure.mutation(async ({ ctx }) => {
     assertConfigured();
-    return pushNotificationService.sendTest(ctx.user!.id, ctx.organizationId!);
+    return pushNotificationService.sendTest(ctx.user!.getUser(), ctx.organizationId!);
   }),
 
   /** Lock-screen privacy: alerts say only "A customer needs a human" (per person, all devices). */

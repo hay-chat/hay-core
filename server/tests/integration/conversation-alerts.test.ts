@@ -176,6 +176,43 @@ describe("conversation alert ladder", () => {
     }
   });
 
+  it("alerts each member in their own interface language, else the organization's", async () => {
+    const users = AppDataSource.getRepository(User);
+    await users.update({ id: awayId }, { status: "available", interfaceLanguage: "nl" });
+    try {
+      const conversation = await waitingConversation();
+      const pushes = new Map(
+        mockSendToUser.mock.calls.map(([userId, payload]) => [userId, payload]),
+      );
+      expect(pushes.get(availableId)).toMatchObject({ title: "Um cliente precisa de um humano" });
+      expect(pushes.get(awayId)).toMatchObject({
+        title: "Een klant heeft een mens nodig",
+        body: "Refund: Wants a refund for a damaged item.",
+      });
+
+      await backdate(conversation.id, 11);
+      await conversationAlertService.runEscalationSweep();
+      await backdate(conversation.id, 11);
+      await conversationAlertService.runEscalationSweep();
+      const emails = new Map(
+        mockSendTemplateEmail.mock.calls.map(([options]) => [
+          options.to,
+          options as { locale: string; subject: string },
+        ]),
+      );
+      expect(emails.get(`${availableId}@example.com`)).toMatchObject({
+        locale: "pt-BR",
+        subject: "Refund ainda está esperando uma resposta",
+      });
+      expect(emails.get(`${awayId}@example.com`)).toMatchObject({
+        locale: "nl",
+        subject: "Refund wacht nog steeds op een antwoord",
+      });
+    } finally {
+      await users.update({ id: awayId }, { status: "away", interfaceLanguage: null });
+    }
+  });
+
   it("records no_device for a member without devices", async () => {
     mockSendToUser.mockResolvedValue({ devices: 0, sent: 0, removed: 0 });
     const conversation = await waitingConversation();

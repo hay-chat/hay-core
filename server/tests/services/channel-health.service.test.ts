@@ -29,6 +29,7 @@ jest.mock("@server/repositories/plugin-instance.repository", () => ({
   },
 }));
 jest.mock("@server/services/notification-locale", () => ({
+  ...jest.requireActual<object>("@server/services/notification-locale"),
   organizationNotificationLocale: jest.fn(async () => "pt-BR"),
 }));
 const sendTemplateEmail = jest.fn(async (_options: Record<string, unknown>) => ({ success: true }));
@@ -44,8 +45,8 @@ jest.mock("@server/services/plugin-manager.service", () => ({
 import { channelHealthService } from "@server/services/channel-health.service";
 
 const admins = [
-  { id: "u1", email: "owner@acme.com", first_name: "Ana" },
-  { id: "u2", email: "admin@acme.com", first_name: null },
+  { id: "u1", email: "owner@acme.com", first_name: "Ana", interface_language: null },
+  { id: "u2", email: "admin@acme.com", first_name: null, interface_language: "nl" },
 ];
 
 function mockQueries(failures: number) {
@@ -95,12 +96,23 @@ describe("channelHealthService", () => {
         }),
       }),
     });
+    // An admin with an interface language of their own reads it instead of the organization's.
+    expect(sendTemplateEmail.mock.calls[1][0]).toMatchObject({
+      to: "admin@acme.com",
+      locale: "nl",
+      subject: "WhatsApp werkt niet goed op Hay.chat",
+    });
     expect(onChannelFailing).toHaveBeenCalledWith(
       expect.objectContaining({
         organizationId: "org-1",
         tag: "channel-failing:hay-channel-whatsapp",
       }),
     );
+    const { copy } = onChannelFailing.mock.calls[0][0] as {
+      copy: (locale: string) => { title: string };
+    };
+    expect(copy("pt-BR").title).toBe("WhatsApp precisa de atenção");
+    expect(copy("nl").title).toBe("WhatsApp heeft aandacht nodig");
     // The admin query is limited to active owners and admins.
     const adminSql = query.mock.calls.find(([sql]) => sql.includes("uo.role"))?.[0];
     expect(adminSql).toMatch(/uo\.role IN \('owner', 'admin'\)/);
