@@ -1,0 +1,32 @@
+{
+  "name": "Correios",
+  "description": "Connect your Correios contract so the agent can track a shipment by its tracking code: current status, latest event, history, delivery date, and whether the parcel has stopped moving.",
+  "tools": {
+    "correios_track_shipment": {
+      "label": "Track Shipment",
+      "description": "Track a Correios shipment by its tracking code: current status, latest event, history and delivery date. Only parcels posted under your own Correios contract."
+    }
+  },
+  "config": {
+    "username": {
+      "label": "Correios user",
+      "description": "The Meu Correios user of your company account (idCorreios, usually the CNPJ) that holds the contract."
+    },
+    "accessCode": {
+      "label": "API access code",
+      "description": "The \"código de acesso\" generated in CWS (cws.correios.com.br → Gestão de acesso a APIs). It is not your Meu Correios password."
+    },
+    "postingCard": {
+      "label": "Cartão de postagem",
+      "description": "The number of the cartão de postagem you post your parcels with. Enter this, the contract number, or both."
+    },
+    "contractNumber": {
+      "label": "Contract number",
+      "description": "Your Correios contract number. Needed only when you do not enter a cartão de postagem."
+    },
+    "staleTrackingDomesticDays": {
+      "label": "Stale tracking (days)",
+      "description": "Treat a shipment as stuck when its tracking has not moved for more than this many days."
+    }
+  }
+}
