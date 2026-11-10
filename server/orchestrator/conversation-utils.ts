@@ -174,7 +174,10 @@ export async function generateHandoffSummary(
 }
 
 /** The language the customer last wrote in, then the conversation's, then the organization's. */
-function customerLanguage(messages: Message[], conversation: Conversation): string | undefined {
+export function customerLanguage(
+  messages: Message[],
+  conversation: Conversation,
+): string | undefined {
   const detected = messages.filter((m) => m.type === MessageType.CUSTOMER && m.detectedLanguage);
   return (
     detected[detected.length - 1]?.detectedLanguage ||

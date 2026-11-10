@@ -241,3 +241,25 @@ export function languageName(
     return value;
   }
 }
+
+/** Fewest letters a message needs before its detected language is trusted. */
+const MIN_LETTERS_TO_TRUST_LANGUAGE = 12;
+
+/**
+ * Whether a customer message's detected language should replace the
+ * conversation's. Short replies ("ok", "👍", "merci") are often detected as
+ * the wrong language, so they never switch it.
+ */
+export function shouldAdoptLanguage(
+  text: string | null | undefined,
+  detected: string | null | undefined,
+  current: string | null | undefined,
+): detected is LanguageCode {
+  if (!isLanguageCode(detected) || detected === current) return false;
+  // One Chinese, Japanese or Korean character carries about a word's worth of text.
+  const ideographs =
+    text?.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu)
+      ?.length ?? 0;
+  const letters = text?.match(/\p{L}/gu)?.length ?? 0;
+  return letters + ideographs * 2 >= MIN_LETTERS_TO_TRUST_LANGUAGE;
+}
