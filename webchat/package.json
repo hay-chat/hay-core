@@ -15,18 +15,18 @@
     "perf:lighthouse": "node scripts/perf/lighthouse.mjs"
   },
   "dependencies": {
-    "vue": "^3.5.44"
+    "vue": "^3.5.45"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.10",
     "@vue/test-utils": "^2.5.1",
     "@vue/tsconfig": "^0.9.1",
     "fake-indexeddb": "^6.2.7",
-    "jsdom": "^24.0.0",
+    "jsdom": "^31.0.0",
     "terser": "^5.51.2",
     "typescript": "^5.4.2",
     "vite": "^6.4.5",
-    "vitest": "^3.2.7",
+    "vitest": "^5.1.0",
     "vue-tsc": "^2.0.6"
   }
 }
