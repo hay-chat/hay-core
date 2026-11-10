@@ -1,0 +1,28 @@
+{
+  "name": "Melhor Envio",
+  "description": "Connect your Melhor Envio account so the agent can answer where-is-my-order questions: shipment status, carrier, tracking code and link, posting and delivery dates, and parcels that look stuck.",
+  "tools": {
+    "melhorenvio_track_shipment": {
+      "label": "Track shipment",
+      "description": "Looks up a shipment by tracking code, Melhor Envio protocol or shipment id: status, carrier, tracking link, dates and whether it looks stuck."
+    },
+    "melhorenvio_find_customer_shipments": {
+      "label": "Find customer shipments",
+      "description": "Finds the shipments sent to a verified customer by their CPF or CNPJ, most recent first."
+    }
+  },
+  "config": {
+    "accessToken": {
+      "label": "Access token",
+      "description": "Token generated in your Melhor Envio panel (Integrações → Permissões de acesso) with permission to view shipping labels."
+    },
+    "contactEmail": {
+      "label": "Contact email",
+      "description": "Technical contact email. Melhor Envio requires one on every API request so they can reach whoever runs the integration."
+    },
+    "staleTrackingDays": {
+      "label": "Stale tracking (days)",
+      "description": "Treat a posted shipment as stuck when it has not been delivered after more than this many days."
+    }
+  }
+}
