@@ -13,6 +13,7 @@ import { Document, DocumentVisibility } from "@server/entities/document.entity";
 import { deriveServiceKey } from "@server/lib/auth/utils/service-keys";
 import { createLogger } from "@server/lib/logger";
 import { auditLogService } from "@server/services/audit-log.service";
+import { rateLimitService } from "@server/services/rate-limit.service";
 import { normalizeDomain } from "@server/services/sso.service";
 import { clearHelpCenterHostCache, isPlatformHostname } from "./host-resolver";
 import {
@@ -35,6 +36,7 @@ const POSTGRES_UNIQUE_VIOLATION = "23505";
 const PREVIEW_TOKEN_TTL_SECONDS = 60 * 60;
 /** A verified domain stops routing after this many failed daily re-checks in a row. */
 const CUSTOM_DOMAIN_MAX_FAILURES = 3;
+const SUBDOMAIN_CHANGES_PER_DAY = 5;
 
 export interface HelpCenterActor {
   userId: string;
@@ -167,6 +169,10 @@ export class HelpCenterService {
     const subdomain = normalizeSubdomain(input);
     const problem = subdomainProblem(subdomain);
     if (problem) return { available: false, reason: problem };
+    // The dashboard or API may itself live under the help center domain.
+    if (isPlatformHostname(`${subdomain}.${helpCenterBaseHostname()}`)) {
+      return { available: false, reason: "reserved" };
+    }
     const existing = await this.helpCenters.findOne({ where: { subdomain } });
     if (existing && existing.organizationId !== organizationId) {
       return { available: false, reason: "taken" };
@@ -186,6 +192,24 @@ export class HelpCenterService {
       });
     }
     return normalizeSubdomain(input);
+  }
+
+  /**
+   * Each new address can cost the proxy a certificate, and certificate
+   * authorities ration those per domain, so addresses cannot be cycled freely.
+   */
+  private async assertMayRename(organizationId: string): Promise<void> {
+    const { limited } = await rateLimitService.checkKeyRateLimit(
+      `help-center:rename:${organizationId}`,
+      SUBDOMAIN_CHANGES_PER_DAY,
+      24 * 60 * 60,
+    );
+    if (limited) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "The address was changed too many times today. Try again tomorrow.",
+      });
+    }
   }
 
   async create(
@@ -238,7 +262,11 @@ export class HelpCenterService {
     if (input.searchIndexing !== undefined) helpCenter.searchIndexing = input.searchIndexing;
     if (input.theme !== undefined) helpCenter.theme = { ...helpCenter.theme, ...input.theme };
     if (input.subdomain !== undefined) {
-      helpCenter.subdomain = await this.assertSubdomainFree(input.subdomain, organizationId);
+      const subdomain = await this.assertSubdomainFree(input.subdomain, organizationId);
+      if (subdomain !== helpCenter.subdomain) {
+        await this.assertMayRename(organizationId);
+        helpCenter.subdomain = subdomain;
+      }
     }
     try {
       await this.helpCenters.save(helpCenter);
@@ -457,9 +485,16 @@ export class HelpCenterService {
     }
     if (helpCenter.customDomainVerifiedAt) return helpCenter;
 
+    // The DNS lookups below take a while. Everything written afterwards names the domain it
+    // was checked for and only the check's own columns, so a change made meanwhile (going
+    // offline, removing the domain) is never overwritten with what was loaded before.
+    const domain = helpCenter.customDomain;
+    const checked = { id: helpCenter.id, customDomain: domain };
     helpCenter.customDomainCheckedAt = new Date();
     if (!(await this.domainProvesControl(helpCenter))) {
-      await this.helpCenters.save(helpCenter);
+      await this.helpCenters.update(checked, {
+        customDomainCheckedAt: helpCenter.customDomainCheckedAt,
+      });
       throw new TRPCError({
         code: "PRECONDITION_FAILED",
         message:
@@ -467,10 +502,12 @@ export class HelpCenterService {
       });
     }
 
-    helpCenter.customDomainVerifiedAt = new Date();
-    helpCenter.customDomainFailures = 0;
     try {
-      await this.helpCenters.save(helpCenter);
+      await this.helpCenters.update(checked, {
+        customDomainCheckedAt: helpCenter.customDomainCheckedAt,
+        customDomainVerifiedAt: new Date(),
+        customDomainFailures: 0,
+      });
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw new TRPCError({
@@ -481,10 +518,11 @@ export class HelpCenterService {
       throw error;
     }
     clearHelpCenterHostCache();
-    await this.audit(actor, organizationId, "help_center.domain.verify", {
-      domain: helpCenter.customDomain,
-    });
-    return helpCenter;
+    const verified = await this.require(organizationId);
+    if (verified.customDomain === domain && verified.customDomainVerifiedAt) {
+      await this.audit(actor, organizationId, "help_center.domain.verify", { domain });
+    }
+    return verified;
   }
 
   async removeCustomDomain(organizationId: string, actor: HelpCenterActor): Promise<HelpCenter> {
@@ -512,16 +550,24 @@ export class HelpCenterService {
     });
     for (const helpCenter of verified) {
       const stillValid = await this.domainProvesControl(helpCenter);
-      helpCenter.customDomainCheckedAt = new Date();
-      helpCenter.customDomainFailures = stillValid ? 0 : helpCenter.customDomainFailures + 1;
-      if (helpCenter.customDomainFailures >= CUSTOM_DOMAIN_MAX_FAILURES) {
-        helpCenter.customDomainVerifiedAt = null;
+      const failures = stillValid ? 0 : helpCenter.customDomainFailures + 1;
+      const lapsed = failures >= CUSTOM_DOMAIN_MAX_FAILURES;
+      if (lapsed) {
         logger.warn(
           { helpCenterId: helpCenter.id, domain: helpCenter.customDomain },
           "Custom domain no longer points at this help center; it has stopped routing",
         );
       }
-      await this.helpCenters.save(helpCenter);
+      // Only the check's own columns, and only if the domain is still the one checked
+      // (see verifyCustomDomain).
+      await this.helpCenters.update(
+        { id: helpCenter.id, customDomain: helpCenter.customDomain ?? undefined },
+        {
+          customDomainCheckedAt: new Date(),
+          customDomainFailures: failures,
+          ...(lapsed && { customDomainVerifiedAt: null }),
+        },
+      );
     }
     clearHelpCenterHostCache();
   }

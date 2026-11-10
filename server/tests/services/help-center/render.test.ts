@@ -155,8 +155,8 @@ describe("article body", () => {
     expect(rendered).not.toContain("alert(1)</script>");
   }
 
-  it("removes active content from editor HTML", () => {
-    const rendered = sanitizedArticleHtml(
+  it("removes active content from editor HTML", async () => {
+    const rendered = await sanitizedArticleHtml(
       `<h2>Title</h2><p>Safe <strong>text</strong></p>${HOSTILE}`,
       "editor",
     );
@@ -165,7 +165,7 @@ describe("article body", () => {
     expect(rendered).toContain("<strong>text</strong>");
   });
 
-  it("removes active content from markdown, written as HTML or as markdown", () => {
+  it("removes active content from markdown, written as HTML or as markdown", async () => {
     const markdown = [
       "# Title",
       "Some **bold** text and a [link](https://example.com/page).",
@@ -174,7 +174,7 @@ describe("article body", () => {
       HOSTILE,
     ].join("\n\n");
     for (const method of ["upload", "web", "plugin", "something-new"]) {
-      const rendered = sanitizedArticleHtml(markdown, method);
+      const rendered = await sanitizedArticleHtml(markdown, method);
       expectHarmless(rendered);
       expect(rendered).toContain("<h1>Title</h1>");
       expect(rendered).toContain("<strong>bold</strong>");
@@ -183,11 +183,23 @@ describe("article body", () => {
     }
   });
 
-  it("treats editor content as HTML and other content as markdown", () => {
-    expect(sanitizedArticleHtml("**bold**", "editor")).toBe("**bold**");
-    expect(sanitizedArticleHtml("**bold**", "upload").trim()).toBe("<p><strong>bold</strong></p>");
-    expect(sanitizedArticleHtml("", "upload")).toBe("");
+  it("treats editor content as HTML and other content as markdown", async () => {
+    expect(await sanitizedArticleHtml("**bold**", "editor")).toBe("**bold**");
+    expect((await sanitizedArticleHtml("**bold**", "upload")).trim()).toBe(
+      "<p><strong>bold</strong></p>",
+    );
+    expect(await sanitizedArticleHtml("", "upload")).toBe("");
   });
+  it("shows pathological markdown as text instead of blocking the server", async () => {
+    const started = Date.now();
+    const rendered = await sanitizedArticleHtml(
+      `${"*".repeat(60000)}a <script>x</script>`,
+      "upload",
+    );
+    expect(Date.now() - started).toBeLessThan(8000);
+    expect(rendered).not.toMatch(/<script/i);
+    expect(rendered.startsWith("<p>")).toBe(true);
+  }, 15000);
 });
 
 describe("theme variables", () => {

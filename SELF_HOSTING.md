@@ -334,7 +334,10 @@ failure can be found with `docker compose logs server | grep <id>`.
 - **Help centers behind your own proxy:** send every request for a subdomain of
   `HELP_CENTER_DOMAIN`, and for each connected custom domain, to the server
   (port 3001), all paths except `/internal/*`, with the `Host` header unchanged:
-  the server picks the site from it. Certificates are yours to issue. A wildcard
+  the server picks the site from it. Send the
+  request header `X-Hay-Edge: help-center` on that route as well: for a hostname
+  that is not a help center the server then answers 404 instead of the API.
+  Certificates are yours to issue. A wildcard
   certificate covers the subdomains. Custom domains need one each; if your proxy
   can issue on demand, have it ask
   `http://server:3001/internal/help-center/tls-ask?domain=<host>` first (200 =

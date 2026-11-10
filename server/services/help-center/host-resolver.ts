@@ -19,6 +19,16 @@ const CACHE_TTL_MS = 30_000;
 const CACHE_MAX_ENTRIES = 5_000;
 const cache = new Map<string, { match: HelpCenterHostMatch; expiresAt: number }>();
 
+const FAILURE_TTL_MS = 5_000;
+/** A hostname of sane length and characters; anything else is never looked up or cached. */
+const HOSTNAME_PATTERN = /^(?=.{1,253}$)[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/;
+
+function remember(hostname: string, match: HelpCenterHostMatch, ttlMs: number): void {
+  // Oldest first out: a flood of made-up hostnames must not evict every real site at once.
+  if (cache.size >= CACHE_MAX_ENTRIES) cache.delete(cache.keys().next().value as string);
+  cache.set(hostname, { match, expiresAt: Date.now() + ttlMs });
+}
+
 /** Drop cached lookups after a help center changes, so this instance sees it at once. */
 export function clearHelpCenterHostCache(): void {
   cache.clear();
@@ -39,6 +49,9 @@ async function lookup(hostname: string): Promise<HelpCenterHostMatch> {
   const base = helpCenterBaseHostname();
   const repository = AppDataSource.getRepository(HelpCenter);
 
+  // First, so no help center address can ever stand in for the dashboard or API, even
+  // when those live under the help center domain.
+  if (isPlatformHostname(hostname)) return { kind: "none" };
   if (hostname === base) return { kind: "unknown" };
   if (hostname.endsWith(`.${base}`)) {
     const label = hostname.slice(0, -(base.length + 1));
@@ -47,7 +60,6 @@ async function lookup(hostname: string): Promise<HelpCenterHostMatch> {
     return helpCenter ? { kind: "site", helpCenter } : { kind: "unknown" };
   }
 
-  if (isPlatformHostname(hostname)) return { kind: "none" };
   const helpCenter = await repository
     .createQueryBuilder("helpCenter")
     .where("helpCenter.customDomain = :hostname", { hostname })
@@ -64,7 +76,7 @@ async function lookup(hostname: string): Promise<HelpCenterHostMatch> {
 export async function resolveHelpCenterHost(rawHostname: string): Promise<HelpCenterHostMatch> {
   if (!isHelpCenterEnabled()) return { kind: "none" };
   const hostname = rawHostname.toLowerCase().replace(/\.$/, "");
-  if (!hostname) return { kind: "none" };
+  if (!HOSTNAME_PATTERN.test(hostname)) return { kind: "none" };
 
   const cached = cache.get(hostname);
   if (cached && cached.expiresAt > Date.now()) return cached.match;
@@ -73,12 +85,13 @@ export async function resolveHelpCenterHost(rawHostname: string): Promise<HelpCe
   try {
     match = await lookup(hostname);
   } catch (error) {
-    // Also the path taken while the help center migration is still pending.
+    // Also the path taken while the help center migration is still pending. Remembered
+    // briefly, so a database problem is not retried and logged on every request.
     logger.warn({ err: error }, "Help center host lookup failed");
+    remember(hostname, { kind: "none" }, FAILURE_TTL_MS);
     return { kind: "none" };
   }
 
-  if (cache.size >= CACHE_MAX_ENTRIES) cache.clear();
-  cache.set(hostname, { match, expiresAt: Date.now() + CACHE_TTL_MS });
+  remember(hostname, match, CACHE_TTL_MS);
   return match;
 }

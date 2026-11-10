@@ -300,6 +300,9 @@ async function handleSite(
   const preview = readPreview(req, helpCenter);
   // Started now so it runs alongside the page's content query.
   const loadingView = loadSiteView(helpCenter, preview, nonce);
+  // Awaited on every path below; this only keeps a failure from being reported as unhandled
+  // while another await (a rate-limit check) is still pending.
+  loadingView.catch(() => undefined);
   const notFound = (view: SiteView | null) =>
     sendPage(res, 404, view ?? emptyView(nonce), renderNotFoundPage(view ?? emptyView(nonce)));
   const path = req.path;
@@ -368,14 +371,34 @@ async function handleSite(
   return notFound(await loadingView);
 }
 
+/**
+ * Set by the reverse proxy on requests that came in through its catch-all for
+ * help center hostnames (selfhost/Caddyfile). Such a request is never served by the API.
+ */
+const HELP_CENTER_EDGE_HEADER = "x-hay-edge";
+
+/** The hostname the client asked for, without a port. */
+function requestHostname(req: Request): string {
+  return (req.headers.host ?? "").replace(/:\d+$/, "");
+}
+
 async function handle(
   req: Request,
   res: Response,
   next: NextFunction,
   middleware: { compress: RequestHandler; parseJson: RequestHandler },
 ): Promise<void> {
-  const match = await resolveHelpCenterHost(req.hostname ?? "");
-  if (match.kind === "none") return next();
+  // The Host header itself, never X-Forwarded-Host: behind a proxy that passes that header
+  // through, a client could otherwise pick which tenant, or the API, answers on any host.
+  const match = await resolveHelpCenterHost(requestHostname(req));
+  if (match.kind === "none") {
+    if (req.headers[HELP_CENTER_EDGE_HEADER] === undefined) return next();
+    // Sent by the proxy's help center entrance for a host we do not serve: the API must not
+    // answer there either.
+    setBaseHeaders(res);
+    const view = emptyView(crypto.randomBytes(16).toString("base64"));
+    return sendPage(res, 404, view, renderNotFoundPage(view));
+  }
 
   // From here on the request is ours: it is answered below and never reaches the API.
   try {

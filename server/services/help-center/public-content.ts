@@ -165,7 +165,12 @@ export async function getArticle(
 /** Trim, collapse whitespace and cap what a visitor typed in the search box. */
 export function normalizeSearchQuery(input: unknown): string {
   if (typeof input !== "string") return "";
-  return input.replace(/\s+/g, " ").trim().slice(0, SEARCH_QUERY_MAX_LENGTH).trim();
+  // Control characters, NUL included, which Postgres refuses in a text parameter.
+  const printable = Array.from(input, (char) => {
+    const code = char.charCodeAt(0);
+    return code < 32 || code === 127 ? " " : char;
+  }).join("");
+  return printable.replace(/\s+/g, " ").trim().slice(0, SEARCH_QUERY_MAX_LENGTH).trim();
 }
 
 /** An ILIKE pattern matching `query` as literal text anywhere in a value. */

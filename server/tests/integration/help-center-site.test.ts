@@ -82,7 +82,13 @@ let port = 0;
 function request(
   host: string,
   path: string,
-  options: { method?: string; ip?: string; json?: unknown; rawBody?: string } = {},
+  options: {
+    method?: string;
+    ip?: string;
+    json?: unknown;
+    rawBody?: string;
+    headers?: Record<string, string>;
+  } = {},
 ): Promise<Reply> {
   const payload = options.rawBody ?? (options.json ? JSON.stringify(options.json) : undefined);
   return new Promise((resolve, reject) => {
@@ -96,6 +102,7 @@ function request(
           host,
           "x-forwarded-for": options.ip ?? "198.51.100.1",
           ...(payload ? { "content-type": "application/json" } : {}),
+          ...options.headers,
         },
       },
       (res) => {
@@ -468,6 +475,32 @@ describe("help center site", () => {
       expect(reply.headers["content-security-policy"]).toBeUndefined();
       const post = await request("localhost", "/v1/anything", { method: "POST", json: {} });
       expect(JSON.parse(post.body)).toEqual({ reached: "api" });
+    });
+
+    it("picks the site from the Host header, never from X-Forwarded-Host", async () => {
+      const onApi = await request(API_HOST, "/v1/health", {
+        headers: { "x-forwarded-host": HOST },
+      });
+      expect(JSON.parse(onApi.body)).toEqual({ reached: "api" });
+      const onSite = await request(HOST, "/v1/health", {
+        headers: { "x-forwarded-host": API_HOST },
+      });
+      expect(onSite.status).toBe(404);
+      expect(onSite.body).not.toContain("reached");
+    });
+
+    it("does not serve the API to a request the proxy marked as help center traffic", async () => {
+      const reply = await request("stranger.example.org", "/ready", {
+        headers: { "x-hay-edge": "help-center" },
+      });
+      expect(reply.status).toBe(404);
+      expect(reply.body).toContain("Page not found");
+      expect(reply.body).not.toContain("reached");
+    });
+
+    it("answers a search containing control characters", async () => {
+      const reply = await request(HOST, "/search?q=%00shipping%01");
+      expect(reply.status).toBe(200);
     });
 
     it("answers 404 for an unknown subdomain, the bare domain and deeper names", async () => {

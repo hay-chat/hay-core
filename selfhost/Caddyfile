@@ -53,6 +53,11 @@ https:// {
 	}
 
 	handle {
-		reverse_proxy server:3001
+		# Tells the server this request came in through the help center entrance, so
+		# for a hostname that is not a help center it answers 404 instead of serving
+		# the API under a name that is not HAY_DOMAIN.
+		reverse_proxy server:3001 {
+			header_up X-Hay-Edge help-center
+		}
 	}
 }
