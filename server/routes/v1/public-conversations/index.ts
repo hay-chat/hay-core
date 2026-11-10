@@ -109,6 +109,8 @@ const sendMessageSchema = z.object({
   content: z.string().min(1).max(PUBLIC_WIDGET_LIMITS.maxMessageLength),
   proof: z.string(), // DPoP proof
   context: z.record(z.string(), z.any()).optional(),
+  // The page the shopper is on now: the conversation follows them across pages.
+  pageUrl: z.string().max(2048).optional(),
 });
 
 // Schema for sending a photo or PDF, with an optional caption (D8-9)
@@ -538,6 +540,11 @@ export const publicConversationsRouter = t.router({
         },
       );
       if (gate.decision === "deny") throw verificationFailed();
+
+      // Before the message: adding it starts the AI's turn, which reads the page.
+      if (input.pageUrl && input.pageUrl !== conversation.metadata?.url) {
+        await conversationRepository.mergeMetadata(conversation.id, { url: input.pageUrl });
+      }
 
       // Add the message using the entity method which handles cooldown
       const message = await conversation.addMessage({

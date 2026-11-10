@@ -206,6 +206,19 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     await closeClassifierService.recordClose(updated, updated.messages ?? []);
   }
 
+  /**
+   * Set keys of `metadata` in one statement, leaving the other keys as they
+   * are (a read-modify-write would drop keys another writer set in between).
+   */
+  async mergeMetadata(id: string, patch: Record<string, unknown>): Promise<void> {
+    await this.getRepository().query(
+      `UPDATE conversations
+          SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb
+        WHERE id = $2`,
+      [JSON.stringify(patch), id],
+    );
+  }
+
   // Simple update method for internal use (orchestrator, etc.)
   async updateById(id: string, data: Partial<Conversation>): Promise<Conversation | null> {
     const conversation = await this.findById(id);

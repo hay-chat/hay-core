@@ -204,6 +204,7 @@ export function useConversation(config: HayChatConfig) {
         conversationId,
         content,
         proof,
+        pageUrl: window.location.href,
         ...(context && Object.keys(context).length > 0 ? { context } : {}),
       }),
     });

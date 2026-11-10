@@ -4,6 +4,7 @@ import { Conversation } from "@server/database/entities/conversation.entity";
 import { PromptService } from "../services/prompt.service";
 import { createLogger } from "@server/lib/logger";
 import { isOrgOverBudget } from "@server/services/llm/org-usage-budget";
+import { buildPageProductPrompt } from "@server/services/page-product.service";
 import {
   BUSINESS_CONTEXT_LIMITS,
   VISITOR_CONTEXT_KEY,
@@ -1731,7 +1732,7 @@ export class ExecutionLayer {
   /**
    * Build the context block appended to the planner prompt: the business's own
    * context (server SDK, customer metadata), the unverified context the
-   * webchat page set. Conversation secrets are not listed: core fills them
+   * webchat page set, and the product on the page the shopper is on. Conversation secrets are not listed: core fills them
    * into the tool properties that ask for them (`x-hay-secret`).
    * Everything is size-bounded and presented as data, never as instructions.
    */
@@ -1765,6 +1766,11 @@ export class ExecutionLayer {
           "\n</context>",
       );
     }
+    const pageProduct = await buildPageProductPrompt(
+      conversation.organization_id,
+      conversation.metadata?.url,
+    );
+    if (pageProduct) blocks.push(pageProduct);
     return blocks.length > 0 ? `\n\n${blocks.join("\n\n")}` : "";
   }
 
