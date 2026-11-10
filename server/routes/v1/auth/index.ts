@@ -60,7 +60,7 @@ import {
 const logger = createLogger("auth");
 
 /** Dashboard UI locales (dashboard/nuxt.config.ts `i18n.locales`). */
-export const INTERFACE_LANGUAGES = ["en", "pt-BR"] as const;
+export const INTERFACE_LANGUAGES = ["en", "pt-BR", "nl"] as const;
 type InterfaceLanguage = (typeof INTERFACE_LANGUAGES)[number];
 
 /** A stored interface language, or null once the dashboard stopped offering it. */
