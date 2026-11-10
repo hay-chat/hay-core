@@ -43,6 +43,7 @@
         @toggle-expand="toggleExpand"
         @submit-pre-chat-form="submitPreChatForm"
         @submit-in-conversation-form="submitInConversationForm"
+        @product-click="trackProductClick"
       />
     </Transition>
   </div>
@@ -158,6 +159,7 @@ const {
   saveContactEmail,
   submitPreChatForm,
   submitInConversationForm,
+  trackProductClick,
 } = useChat(
   {
     ...props.config,

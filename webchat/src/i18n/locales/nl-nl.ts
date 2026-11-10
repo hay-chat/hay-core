@@ -11,6 +11,8 @@ export default {
   "chat.poweredBy": "Mogelijk gemaakt door",
   "chat.conversationClosed": "Gesprek Gesloten",
   "chat.aiLabel": "AI-assistent",
+  "product.buy": "Kopen",
+  "product.outOfStock": "Niet op voorraad",
   "input.placeholder": "Typ een bericht...",
   "input.send": "Bericht verzenden",
   "error.sendFailed": "Uw bericht kon niet worden verzonden. Probeer het zo meteen opnieuw.",

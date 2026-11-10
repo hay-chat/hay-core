@@ -1,0 +1,197 @@
+<template>
+  <div class="hay-product-recs">
+    <div v-for="p in products" :key="p.id" class="hay-product-card">
+      <a
+        :href="safeHttpUrl(p.sourceUrl) ?? '#'"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="hay-product-card__link"
+        @click="$emit('productClick', p.id, 'card_click')"
+      >
+        <div class="hay-product-card__image">
+          <img v-if="p.imageUrl" :src="p.imageUrl" :alt="p.title" loading="lazy" />
+        </div>
+        <div class="hay-product-card__body">
+          <div class="hay-product-card__title">{{ p.title }}</div>
+          <div v-if="p.topVariant?.price" class="hay-product-card__price">
+            {{ formatPrice(p.topVariant.price, p.topVariant.currency) }}
+            <s v-if="isDiscounted(p)" class="hay-product-card__compare">
+              {{ formatPrice(p.topVariant.compareAtPrice, p.topVariant.currency) }}
+            </s>
+          </div>
+          <div
+            v-for="option in shownOptions(p)"
+            :key="option.name"
+            class="hay-product-card__option"
+          >
+            {{ option.name }}: {{ option.values.join(", ") }}
+          </div>
+          <div v-if="p.available === false" class="hay-product-card__oos">
+            {{ t("product.outOfStock") }}
+          </div>
+        </div>
+      </a>
+      <a
+        v-if="safeHttpUrl(p.topVariant?.buyUrl)"
+        :href="safeHttpUrl(p.topVariant?.buyUrl)"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="hay-product-card__buy"
+        @click="$emit('productClick', p.id, 'buy_click')"
+      >
+        {{ t("product.buy") }}
+      </a>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { safeHttpUrl } from "@/utils/markdown";
+import { useI18n } from "@/i18n";
+import type { ProductClickType, RecommendedProduct } from "@/types";
+
+defineProps<{ products: RecommendedProduct[] }>();
+defineEmits<{ productClick: [productId: string, type: ProductClickType] }>();
+
+const t = useI18n();
+
+/** Options listed on a card; the rest are on the product page. */
+const MAX_OPTIONS = 2;
+
+const shownOptions = (product: RecommendedProduct) =>
+  (product.options ?? []).filter((o) => Array.isArray(o.values)).slice(0, MAX_OPTIONS);
+
+const isDiscounted = (product: RecommendedProduct): boolean => {
+  const price = parseFloat(String(product.topVariant?.price ?? ""));
+  const compareAt = parseFloat(String(product.topVariant?.compareAtPrice ?? ""));
+  return Number.isFinite(price) && Number.isFinite(compareAt) && compareAt > price;
+};
+
+const formatPrice = (amount?: string | number, currency?: string): string => {
+  if (amount === undefined || amount === null || amount === "") return "";
+  const value = typeof amount === "string" ? parseFloat(amount) : amount;
+  if (Number.isNaN(value)) return "";
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: currency || "USD",
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    return `${value.toFixed(2)} ${currency ?? ""}`.trim();
+  }
+};
+</script>
+
+<style>
+.hay-product-recs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.hay-product-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  border: 1px solid var(--color-neutral-200, #e5e7eb);
+  background: white;
+  overflow: hidden;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.hay-product-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.hay-product-card__link {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  text-decoration: none;
+  color: inherit;
+}
+
+.hay-product-card__image {
+  aspect-ratio: 1 / 1;
+  background: var(--color-neutral-100, #f3f4f6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hay-product-card__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hay-product-card__body {
+  padding: 6px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hay-product-card__title {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hay-product-card__price {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hay-primary);
+}
+
+.hay-product-card__compare {
+  margin-left: 4px;
+  font-weight: 400;
+  color: var(--color-neutral-500);
+}
+
+.hay-product-card__option {
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--color-neutral-500);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hay-product-card__oos {
+  font-size: 10px;
+  color: var(--color-neutral-500);
+}
+
+.hay-product-card__buy {
+  margin: 0 8px 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--hay-primary);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+}
+
+.hay-product-card__buy:hover {
+  filter: brightness(0.95);
+}
+
+.hay-product-card__buy:focus-visible,
+.hay-product-card__link:focus-visible {
+  outline: 2px solid var(--hay-primary);
+  outline-offset: 2px;
+}
+</style>

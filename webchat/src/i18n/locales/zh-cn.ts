@@ -11,6 +11,8 @@ export default {
   "chat.poweredBy": "技术支持",
   "chat.conversationClosed": "对话已关闭",
   "chat.aiLabel": "AI 助手",
+  "product.buy": "购买",
+  "product.outOfStock": "缺货",
   "input.placeholder": "输入消息...",
   "input.send": "发送消息",
   "error.sendFailed": "消息发送失败，请稍后再试。",

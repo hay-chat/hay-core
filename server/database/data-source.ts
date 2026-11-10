@@ -35,6 +35,7 @@ import { ConversationTakeoverEvent } from "./entities/conversation-takeover-even
 import { ConversationOutcome } from "./entities/conversation-outcome.entity";
 import { OperatorEventRecord } from "./entities/operator-event.entity";
 import { SitePage } from "./entities/site-page.entity";
+import { ShoppingEvent } from "./entities/shopping-event.entity";
 import { UserMfa } from "./entities/user-mfa.entity";
 import { UserWebauthnCredential } from "./entities/user-webauthn-credential.entity";
 import { SsoConnection } from "./entities/sso-connection.entity";
@@ -177,6 +178,7 @@ export const AppDataSource = new DataSource({
     TestCase,
     OperatorEventRecord,
     SitePage,
+    ShoppingEvent,
     UserMfa,
     UserWebauthnCredential,
     SsoConnection,

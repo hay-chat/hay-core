@@ -143,6 +143,9 @@
       :greeting-message="showGreeting && messages.length === 0 ? greetingMessage : undefined"
       :ai-label="aiLabel"
       @submit-form="(messageId, response) => $emit('submitInConversationForm', messageId, response)"
+      @product-click="
+        (messageId, productId, type) => $emit('productClick', messageId, productId, type)
+      "
     />
 
     <WaitingBanner
@@ -226,7 +229,7 @@ import WaitingBanner from "./WaitingBanner.vue";
 import ChallengeFrame from "./ChallengeFrame.vue";
 import CsatRating from "./CsatRating.vue";
 import { useI18n } from "@/i18n";
-import type { Message, SendFailure } from "@/types";
+import type { Message, ProductClickType, SendFailure } from "@/types";
 import type { FormResponse, FormSchema } from "@hay/form-schema";
 
 // Loaded on demand: most organizations never ask for a pre-chat form.
@@ -282,6 +285,7 @@ defineEmits<{
   toggleExpand: [];
   submitPreChatForm: [response: FormResponse];
   submitInConversationForm: [messageId: string, response: FormResponse];
+  productClick: [messageId: string, productId: string, type: ProductClickType];
 }>();
 
 const isShowingTitle = computed(() => {

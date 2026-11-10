@@ -180,6 +180,25 @@ export interface Message {
   attachments?: Attachment[];
 }
 
+/** A product card as the server sends it (a `recommend_products` result item). */
+export interface RecommendedProduct {
+  id: string;
+  title: string;
+  sourceUrl?: string;
+  imageUrl?: string;
+  available?: boolean;
+  options?: Array<{ name: string; values: string[] }>;
+  topVariant?: {
+    price?: string | number;
+    compareAtPrice?: string | number;
+    currency?: string;
+    buyUrl?: string;
+  };
+}
+
+/** What the shopper clicked on a product card. */
+export type ProductClickType = "card_click" | "buy_click";
+
 /** Shown under the input when the server refuses a message; `text` goes back into the input. */
 export interface SendFailure {
   reason:

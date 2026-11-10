@@ -11,6 +11,8 @@ export default {
   "chat.poweredBy": "Offerto da",
   "chat.conversationClosed": "Conversazione Chiusa",
   "chat.aiLabel": "Assistente IA",
+  "product.buy": "Acquista",
+  "product.outOfStock": "Esaurito",
   "input.placeholder": "Scrivi un messaggio...",
   "input.send": "Invia messaggio",
   "error.sendFailed": "Impossibile inviare il messaggio. Riprova tra un momento.",

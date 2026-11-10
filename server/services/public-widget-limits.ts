@@ -27,6 +27,8 @@ export const PUBLIC_WIDGET_LIMITS = {
   messagePerOrgHourly: { max: 20000, windowSeconds: 60 * 60 },
   /** Message history reads per IP. */
   readPerIp: { max: 300, windowSeconds: 60 },
+  /** Product card clicks per IP. */
+  clickPerIp: { max: 120, windowSeconds: 60 },
   /** Form submissions per IP. */
   formPerIp: { max: 30, windowSeconds: 60 },
   /** Key rotations per IP. A widget rotates rarely. */

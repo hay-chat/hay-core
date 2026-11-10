@@ -11,6 +11,8 @@ export default {
   "chat.poweredBy": "Powered by",
   "chat.conversationClosed": "会話終了",
   "chat.aiLabel": "AIアシスタント",
+  "product.buy": "購入する",
+  "product.outOfStock": "在庫切れ",
   "input.placeholder": "メッセージを入力...",
   "input.send": "メッセージを送信",
   "error.sendFailed": "メッセージを送信できませんでした。しばらくしてからもう一度お試しください。",

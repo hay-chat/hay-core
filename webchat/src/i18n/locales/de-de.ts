@@ -11,6 +11,8 @@ export default {
   "chat.poweredBy": "Bereitgestellt von",
   "chat.conversationClosed": "Unterhaltung beendet",
   "chat.aiLabel": "KI-Assistent",
+  "product.buy": "Kaufen",
+  "product.outOfStock": "Nicht vorrätig",
   "input.placeholder": "Nachricht eingeben...",
   "input.send": "Nachricht senden",
   "error.sendFailed":

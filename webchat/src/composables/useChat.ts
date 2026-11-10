@@ -15,7 +15,13 @@ import {
 import { safeStorage, useConsent } from "./useConsent";
 import { debugLog } from "@/utils/debug";
 import { resumeConversationId } from "@/utils/resume";
-import type { HayChatConfig, Message, SendFailure, WidgetContribution } from "@/types";
+import type {
+  HayChatConfig,
+  Message,
+  ProductClickType,
+  SendFailure,
+  WidgetContribution,
+} from "@/types";
 import { useChallenge } from "./useChallenge";
 import { insertMessage, parseServerTime } from "@/utils/messageOrder";
 import {
@@ -1251,6 +1257,12 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     });
   };
 
+  // A click on a recommended product card or its buy link.
+  const trackProductClick = (messageId: string, productId: string, type: ProductClickType) => {
+    if (!conversationId.value) return;
+    conversation.trackProductClick(conversationId.value, messageId, productId, type);
+  };
+
   // Rate the support once the conversation has ended (CSAT).
   const submitCsat = async (rating: number, retried = false): Promise<boolean> => {
     if (!conversationId.value || !keypair.value) return false;
@@ -1326,6 +1338,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     saveContactEmail,
     submitPreChatForm,
     submitInConversationForm,
+    trackProductClick,
   };
 }
 

@@ -47,27 +47,12 @@
           "
         >
           <div class="hay-message__content hay-message__content--rich">
-            <div class="hay-product-recs">
-              <a
-                v-for="p in (message.metadata as any).productRecommendation.products as any[]"
-                :key="p.id || p.externalId"
-                :href="safeHttpUrl(p.sourceUrl) ?? '#'"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="hay-product-card"
-              >
-                <div class="hay-product-card__image">
-                  <img v-if="p.imageUrl" :src="p.imageUrl" :alt="p.title" loading="lazy" />
-                </div>
-                <div class="hay-product-card__body">
-                  <div class="hay-product-card__title">{{ p.title }}</div>
-                  <div v-if="p.topVariant?.price" class="hay-product-card__price">
-                    {{ formatPrice(p.topVariant.price, p.topVariant.currency) }}
-                  </div>
-                  <div v-if="p.available === false" class="hay-product-card__oos">Out of stock</div>
-                </div>
-              </a>
-            </div>
+            <ProductCards
+              :products="(message.metadata as any).productRecommendation.products"
+              @product-click="
+                (productId, type) => $emit('productClick', message.id, productId, type)
+              "
+            />
           </div>
         </template>
         <!-- Agent messages: one bubble per image segment (word-reveal only when a
@@ -147,13 +132,8 @@
 
 <script setup lang="ts">
 import { defineAsyncComponent, ref, watch, nextTick, type Directive } from "vue";
-import type { Message } from "@/types";
-import {
-  parseMarkdown,
-  safeHttpUrl,
-  wrapWordsForAnimation,
-  splitMarkdownImages,
-} from "@/utils/markdown";
+import type { Message, ProductClickType } from "@/types";
+import { parseMarkdown, wrapWordsForAnimation, splitMarkdownImages } from "@/utils/markdown";
 import { useI18n } from "@/i18n";
 import { agentFirstName, agentNoticeText } from "@/utils/agentNotice";
 import { formatFileSize, isImageAttachment } from "@/utils/attachments";
@@ -161,6 +141,8 @@ import type { FormResponse, FormSchema } from "@hay/form-schema";
 
 // Forms are rare on a first open, so their code loads only when one shows.
 const FormMessage = defineAsyncComponent(() => import("./FormMessage.vue"));
+// Same for product cards: only shopping conversations show them.
+const ProductCards = defineAsyncComponent(() => import("./ProductCards.vue"));
 
 const t = useI18n();
 
@@ -174,6 +156,7 @@ const props = defineProps<{
 
 defineEmits<{
   submitForm: [messageId: string, response: FormResponse];
+  productClick: [messageId: string, productId: string, type: ProductClickType];
 }>();
 
 interface FormUi {
@@ -265,21 +248,6 @@ const formatTime = (timestamp: number) => {
 const timeLabel = (message: Message) => {
   const name = message.agentType === "HumanAgent" ? agentFirstName(message) : undefined;
   return name ? `${formatTime(message.timestamp)} · ${name}` : formatTime(message.timestamp);
-};
-
-const formatPrice = (amount?: string | number, currency?: string): string => {
-  if (amount === undefined || amount === null || amount === "") return "";
-  const value = typeof amount === "string" ? parseFloat(amount) : amount;
-  if (Number.isNaN(value)) return "";
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: currency || "USD",
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `${value.toFixed(2)} ${currency ?? ""}`.trim();
-  }
 };
 
 // Images load after the list first scrolls, which would push the newest message out of view.
@@ -627,74 +595,5 @@ a.hay-message__attachment-file:hover {
   border-radius: 8px;
   display: inline-block;
   align-self: flex-start;
-}
-
-/* Product recommendation cards */
-.hay-product-recs {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 8px;
-  margin: 4px 0;
-}
-
-.hay-product-card {
-  display: flex;
-  flex-direction: column;
-  border-radius: 10px;
-  border: 1px solid var(--color-neutral-200, #e5e7eb);
-  background: white;
-  text-decoration: none;
-  color: inherit;
-  overflow: hidden;
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.hay-product-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-
-.hay-product-card__image {
-  aspect-ratio: 1 / 1;
-  background: var(--color-neutral-100, #f3f4f6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.hay-product-card__image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.hay-product-card__body {
-  padding: 6px 8px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.hay-product-card__title {
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.25;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.hay-product-card__price {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--hay-primary);
-}
-
-.hay-product-card__oos {
-  font-size: 10px;
-  color: var(--color-neutral-500);
 }
 </style>

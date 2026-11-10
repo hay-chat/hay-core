@@ -1,4 +1,4 @@
-import type { Attachment, HayChatConfig } from "@/types";
+import type { Attachment, HayChatConfig, ProductClickType } from "@/types";
 import { resolveLocale } from "@/i18n/resolve";
 import type { FormResponse } from "@hay/form-schema";
 
@@ -300,6 +300,24 @@ export function useConversation(config: HayChatConfig) {
     return data.result.data;
   };
 
+  /**
+   * Report a click on a recommended product. Best effort: the link opens
+   * whether or not this reaches the server.
+   */
+  const trackProductClick = (
+    conversationId: string,
+    messageId: string,
+    productId: string,
+    type: ProductClickType,
+  ): void => {
+    void fetch(`${baseUrl}/v1/publicConversations.trackProductClick`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversationId, messageId, productId, type }),
+      keepalive: true,
+    }).catch(() => undefined);
+  };
+
   return {
     createConversation,
     getMessages,
@@ -307,5 +325,6 @@ export function useConversation(config: HayChatConfig) {
     sendAttachment,
     setContactEmail,
     submitCsat,
+    trackProductClick,
   };
 }

@@ -11,6 +11,8 @@ export default {
   "chat.poweredBy": "Powered by",
   "chat.conversationClosed": "대화 종료됨",
   "chat.aiLabel": "AI 어시스턴트",
+  "product.buy": "구매하기",
+  "product.outOfStock": "품절",
   "input.placeholder": "메시지를 입력하세요...",
   "input.send": "메시지 보내기",
   "error.sendFailed": "메시지를 보내지 못했습니다. 잠시 후 다시 시도해 주세요.",

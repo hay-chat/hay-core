@@ -11,6 +11,8 @@ export default {
   "chat.poweredBy": "Altyapı",
   "chat.conversationClosed": "Görüşme Kapandı",
   "chat.aiLabel": "Yapay zekâ asistanı",
+  "product.buy": "Satın al",
+  "product.outOfStock": "Stokta yok",
   "input.placeholder": "Bir mesaj yazın...",
   "input.send": "Mesaj gönder",
   "error.sendFailed": "Mesajınız gönderilemedi. Lütfen birazdan tekrar deneyin.",

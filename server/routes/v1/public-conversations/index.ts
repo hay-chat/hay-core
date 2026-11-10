@@ -23,6 +23,8 @@ import { conversationRepository } from "../../../repositories/conversation.repos
 import { CustomerRepository } from "../../../repositories/customer.repository";
 import { OrganizationRepository } from "../../../repositories/organization.repository";
 import { createLogger } from "@server/lib/logger";
+import { SHOPPING_EVENT_TYPES } from "@server/database/entities/shopping-event.entity";
+import { recordProductClick } from "@server/services/shopping-events.service";
 import { webchatSettingsService } from "../../../services/webchat/webchat-settings.service";
 import { recordWebchatConsent } from "../../../services/webchat/consent-record.service";
 import { verifiedCustomerExternalId } from "../../../services/webchat/webchat-identity.service";
@@ -135,6 +137,13 @@ const recordConsentSchema = z.object({
 });
 
 // Schema for getting messages
+const trackProductClickSchema = z.object({
+  conversationId: z.string().uuid(),
+  messageId: z.string().uuid(),
+  productId: z.string().uuid(),
+  type: z.enum(SHOPPING_EVENT_TYPES),
+});
+
 const getMessagesSchema = z.object({
   conversationId: z.string().uuid(),
   proof: z.string(), // DPoP proof
@@ -771,6 +780,17 @@ export const publicConversationsRouter = t.router({
 
     return { saved: true, nonce: verified.newNonce, error: null };
   }),
+
+  // A shopper opened a recommended product or followed its buy link. No DPoP
+  // proof: see shopping-events.service for what makes a click count.
+  trackProductClick: publicProcedure
+    .input(trackProductClickSchema)
+    .mutation(async ({ input, ctx }) => {
+      if (await isPublicWidgetRateLimited([{ rule: "clickPerIp", id: clientIp(ctx.ipAddress) }])) {
+        throw tooManyRequests();
+      }
+      return { recorded: await recordProductClick(input) };
+    }),
 
   // Rotate the keypair for a conversation (requires valid DPoP with old key)
   rotateKeys: publicProcedure
