@@ -10,6 +10,7 @@
       "title": "Billable resolutions",
       "period": "{start} to {end}",
       "periodNote": "Counted over your billing period, the same dates as your invoice.",
+      "included": "of {included} included in your plan",
       "planNote": "Your plan's allowance and any extra-resolution charges are on your billing page.",
       "paused": "The AI agent is paused because the plan's resolutions are used up. Conversations wait for your team.",
       "calendarNote": "Counted per calendar month (UTC). Your invoice may use different period dates."

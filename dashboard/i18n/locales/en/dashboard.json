@@ -12,15 +12,23 @@
   },
   "metrics": {
     "totalConversations": "Total Conversations",
-    "resolved": "resolved",
-    "resolutionRate": "Resolution Rate",
-    "ofConversations": "of conversations",
+    "resolved": "resolved by AI",
+    "resolutionRate": "AI Resolution Rate",
     "avgMessages": "Avg Messages",
     "messagesPer": "messages per",
     "conversation": "conversation",
     "avgResponseTime": "Avg Response Time",
     "medianResponseTime": "median {value}",
     "noRepliesYet": "No replies in this period"
+  },
+  "quota": {
+    "title": "Resolutions this billing period",
+    "period": "{start} to {end}",
+    "viewUsage": "Usage",
+    "ofIncluded": "of {included} included",
+    "daysLeft": "{count} day left | {count} days left",
+    "projected": "on pace for {count}",
+    "noQuota": "Your plan's included resolutions are on your billing page."
   },
   "activity": {
     "title": "Conversation Activity",

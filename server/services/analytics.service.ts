@@ -112,13 +112,6 @@ export class AnalyticsService {
       endDate,
     });
 
-    const resolvedConversations = await this.conversationRepository.countByFilters({
-      organizationId,
-      startDate,
-      endDate,
-      status: "resolved",
-    });
-
     // What the backoffice meters: billable close outcomes (D1-3: confirmed or
     // assumed AI resolutions, hand-offs included when the AI resolved them),
     // minus those reversed by the shopper returning within 72 h and those the
@@ -138,10 +131,7 @@ export class AnalyticsService {
 
     return {
       totalConversations,
-      resolvedConversations,
       billableResolutions,
-      resolutionRate:
-        totalConversations > 0 ? (resolvedConversations / totalConversations) * 100 : 0,
       avgMessagesPerConversation,
     };
   }
