@@ -30,6 +30,8 @@ export interface SourceMessage {
   providerStatus?: MessageProviderStatus | null;
   sender?: string | null;
   attachments?: MessageAttachment[] | null;
+  /** The message in English when it was written in another language (shown next to it). */
+  englishTranslation?: string | null;
   metadata?: {
     toolName?: string;
     toolInput?: Record<string, unknown>;
@@ -77,6 +79,8 @@ export type TimelineEntry =
       channel: string;
       author: Author;
       text: string;
+      /** English translation of `text`, when the message was in another language. */
+      translation: string | null;
       receipt: MessageProviderStatus | null;
       attachments: MessageAttachment[];
     }
@@ -175,6 +179,13 @@ const AUTHOR_BY_TYPE: Partial<Record<MessageType, Author>> = {
   [MessageType.HUMAN_AGENT]: "team",
 };
 
+/** Who wrote a message that belongs in the evidence; null for anything left out. */
+export function evidenceAuthor(message: SourceMessage): Author | null {
+  const author = AUTHOR_BY_TYPE[message.type];
+  if (!author) return null;
+  return author === "customer" || wasDelivered(message) ? author : null;
+}
+
 export function buildTimeline(input: {
   conversations: SourceConversation[];
   actionLogs: SourceActionLog[];
@@ -202,12 +213,13 @@ export function buildTimeline(input: {
     channels.add(conversation.channel);
     const seenTracking = new Set<string>();
     for (const message of conversation.messages) {
-      const author = AUTHOR_BY_TYPE[message.type];
-      if (author) {
-        if (author !== "customer" && !wasDelivered(message)) continue;
+      if (AUTHOR_BY_TYPE[message.type]) {
+        const author = evidenceAuthor(message);
+        if (!author) continue;
         const text = maskCardNumbers(message.content ?? "", copy.cardRemoved);
         const attachments = message.attachments ?? [];
         if (!text.trim() && attachments.length === 0) continue;
+        const english = message.englishTranslation?.trim() ? message.englishTranslation : null;
         entries.push({
           kind: "message",
           at: new Date(message.created_at),
@@ -215,6 +227,10 @@ export function buildTimeline(input: {
           channel: conversation.channel,
           author,
           text,
+          translation:
+            english && english !== message.content
+              ? maskCardNumbers(english, copy.cardRemoved)
+              : null,
           receipt: author === "customer" ? null : (message.providerStatus ?? null),
           attachments,
         });

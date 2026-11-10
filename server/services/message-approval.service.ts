@@ -18,11 +18,18 @@ import { createLogger } from "@server/lib/logger";
 import { MessageRepository } from "@server/repositories/message.repository";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { conversationEventsService } from "./conversation-events.service";
-import { MessageStatus, type Message } from "@server/database/entities/message.entity";
+import { MessageStatus, MessageType, type Message } from "@server/database/entities/message.entity";
 import type { Conversation } from "@server/database/entities/conversation.entity";
 import { DeliveryState } from "@server/types/message-feedback.types";
+import { normalizeLanguage, type LanguageCode } from "@server/types/language.types";
+import { customerLanguage } from "@server/orchestrator/conversation-utils";
+import { translationService } from "./translation.service";
 
 const logger = createLogger("message-approval");
+
+/** Earlier messages sent along so a short edit ("yes, that one") translates right. */
+const TRANSLATION_CONTEXT_MESSAGES = 6;
+const TRANSLATION_CONTEXT_MAX_CHARS = 500;
 
 export class MessageApprovalService {
   constructor(
@@ -32,14 +39,21 @@ export class MessageApprovalService {
 
   /**
    * Release a queued reply to the customer, optionally with edited content.
+   *
+   * Multilingual inbox: `editedInLanguage` is the language the reviewer wrote
+   * `editedContent` in. When it differs from the customer's language the edit
+   * is translated first and the customer gets the translation; the text as
+   * typed is kept in `translations[editedInLanguage]`. A failed translation
+   * leaves the reply queued (UNPROCESSABLE_CONTENT "TRANSLATION_FAILED").
    */
   async approve(args: {
     messageId: string;
     organizationId: string;
     userId: string;
     editedContent?: string;
+    editedInLanguage?: LanguageCode;
   }): Promise<Message> {
-    const { messageId, organizationId, userId, editedContent } = args;
+    const { messageId, organizationId, userId, editedContent, editedInLanguage } = args;
     const { message, conversation } = await this.loadQueuedMessage(messageId, organizationId);
 
     const wasEdited = editedContent !== undefined && editedContent !== message.content;
@@ -51,7 +65,10 @@ export class MessageApprovalService {
     };
     if (wasEdited) {
       updates.originalContent = message.content;
-      updates.content = editedContent;
+      Object.assign(
+        updates,
+        await this.editedContentUpdates(message, conversation, editedContent, editedInLanguage),
+      );
     }
 
     const updated = await this.release(message.id, updates);
@@ -79,7 +96,7 @@ export class MessageApprovalService {
       conversationId: conversation.id,
       messageId: message.id,
       messageType: message.type,
-      editedContent,
+      editedContent: updated.status === MessageStatus.EDITED ? updated.content : undefined,
     });
 
     return updated;
@@ -113,6 +130,65 @@ export class MessageApprovalService {
     });
 
     return updated;
+  }
+
+  /**
+   * `content` (what the customer gets), `translations` and `detectedLanguage`
+   * for an edit. Translations of the old draft no longer match, so they go.
+   */
+  private async editedContentUpdates(
+    message: Message,
+    conversation: Conversation,
+    editedContent: string,
+    editedInLanguage: LanguageCode | undefined,
+  ): Promise<Pick<Message, "content" | "translations" | "detectedLanguage">> {
+    if (!editedInLanguage) {
+      return {
+        content: editedContent,
+        translations: null,
+        detectedLanguage: message.detectedLanguage,
+      };
+    }
+    const target =
+      normalizeLanguage(message.detectedLanguage) ??
+      normalizeLanguage(customerLanguage(conversation.messages ?? [], conversation));
+    const translations = { [editedInLanguage]: editedContent };
+    if (!target || target === editedInLanguage) {
+      return { content: editedContent, translations, detectedLanguage: editedInLanguage };
+    }
+    try {
+      const result = await translationService.translateTexts({
+        organizationId: conversation.organization_id,
+        items: [{ id: message.id, text: editedContent }],
+        targetLanguage: target,
+        context: this.translationContext(conversation, message),
+      });
+      const translated = result.get(message.id);
+      if (!translated) throw new Error("Translation returned no text");
+      return { content: translated.text, translations, detectedLanguage: target };
+    } catch (error) {
+      logger.error(
+        { err: error, messageId: message.id, conversationId: conversation.id, target },
+        "Approval edit translation failed; reply stays queued",
+      );
+      throw new TRPCError({ code: "UNPROCESSABLE_CONTENT", message: "TRANSLATION_FAILED" });
+    }
+  }
+
+  /** The customer-facing messages before `message`, as "Customer: ..." lines. */
+  private translationContext(conversation: Conversation, message: Message): string {
+    const messages = conversation.messages ?? [];
+    const index = messages.findIndex((m) => m.id === message.id);
+    return (index === -1 ? messages : messages.slice(0, index))
+      .filter((m) =>
+        [MessageType.CUSTOMER, MessageType.BOT_AGENT, MessageType.HUMAN_AGENT].includes(m.type),
+      )
+      .slice(-TRANSLATION_CONTEXT_MESSAGES)
+      .map((m) => {
+        const speaker = m.type === MessageType.CUSTOMER ? "Customer" : "Support";
+        return `${speaker}: ${m.content.slice(0, TRANSLATION_CONTEXT_MAX_CHARS)}`;
+      })
+      .join("\n");
   }
 
   private async loadQueuedMessage(

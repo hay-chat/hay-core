@@ -29,6 +29,7 @@ import { documentRepository } from "../../repositories/document.repository";
 import { signDocumentImageUrls } from "../../services/media-url.service";
 import { createLogger } from "@server/lib/logger";
 import type { LanguageCode } from "../../types/language.types";
+import type { ConversationTranslations } from "../../types/translation-cache.types";
 
 const logger = createLogger("conversation-entity");
 
@@ -91,6 +92,12 @@ export class Conversation {
   // and why it handed off. Populated when status flips to pending-human.
   @Column({ type: "text", nullable: true })
   summary!: string | null;
+
+  // Title and summary in team members' translation languages (multilingual
+  // inbox). Read and written only with raw SQL (conversation-translations
+  // service), so entity loads don't depend on the column.
+  @Column({ type: "jsonb", nullable: true, select: false, insert: false, update: false })
+  translations?: ConversationTranslations | null;
 
   // Channel identifier — a loose string so new channel plugins can register
   // without a schema migration. Validation happens at plugin registration and

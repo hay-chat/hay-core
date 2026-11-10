@@ -179,7 +179,7 @@
             </Button>
             <div class="min-w-0">
               <h1 class="text-xl font-semibold truncate">
-                {{ conversation?.title || $t("conversations.detail.loading") }}
+                {{ conversationTitle || $t("conversations.detail.loading") }}
               </h1>
               <p class="text-sm text-neutral-muted hidden sm:block">
                 {{
@@ -554,7 +554,7 @@
                   {{ $t("conversations.pendingHuman.needsHuman") }}
                 </p>
                 <p class="text-sm text-amber-700 mt-1">
-                  {{ conversation?.summary || $t("conversations.pendingHuman.summaryPending") }}
+                  {{ conversationSummary || $t("conversations.pendingHuman.summaryPending") }}
                 </p>
               </div>
             </div>
@@ -1142,6 +1142,7 @@ import type { AssignedUser } from "@/composables/useConversationTakeover";
 import type { RouterOutputs } from "@/types/trpc";
 import type { ComposerAttachmentItem } from "@/components/conversations/ComposerAttachments.vue";
 import { useMessageTranslations } from "@/composables/useMessageTranslations";
+import { useConversationTextTranslations } from "@/composables/useTextTranslations";
 import { isLanguageCode, languageName, type LanguageCode } from "@/utils/languages";
 
 // i18n
@@ -1462,7 +1463,29 @@ const { translationFor, isTranslating } = useMessageTranslations(
 );
 const translationLanguage = computed(() => userStore.user?.translationLanguage ?? null);
 
-/** The customer's language: their latest detected message, else the conversation's. */
+// The title, and the hand-off summary while it is shown, in the reader's language too.
+const { textFor: conversationTextFor } = useConversationTextTranslations(
+  () => (isPlaygroundMode.value || !conversation.value ? [] : [conversation.value]),
+  ["title"],
+);
+useConversationTextTranslations(
+  () =>
+    !isPlaygroundMode.value && isPendingHuman.value && conversation.value
+      ? [conversation.value]
+      : [],
+  ["summary"],
+);
+const conversationTitle = computed(() =>
+  conversation.value ? conversationTextFor(conversation.value, "title") : null,
+);
+const conversationSummary = computed(() =>
+  conversation.value ? conversationTextFor(conversation.value, "summary") : null,
+);
+
+/**
+ * The customer's language: their latest detected message, else the conversation's,
+ * else the organization's default (what the AI replies in).
+ */
 const customerLanguage = computed<string | null>(() => {
   if (isPlaygroundMode.value) return null;
   const list = conversation.value?.messages ?? [];
@@ -1472,8 +1495,7 @@ const customerLanguage = computed<string | null>(() => {
       return message.detectedLanguage;
     }
   }
-  // TODO: fall back to the organization's default language once a store exposes it.
-  return conversation.value?.language ?? null;
+  return conversation.value?.language ?? conversation.value?.organization?.defaultLanguage ?? null;
 });
 
 /** A language the team member picked for their replies in this conversation. */
@@ -2084,6 +2106,11 @@ const exportConversation = async (format: "pdf" | "csv") => {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
+    // The export carries the reader's translation; the original text is always there.
+    if (result.translationIncomplete) {
+      const { useToast } = await import("@/composables/useToast");
+      useToast().warning(t("conversations.detail.exportTranslationIncomplete"));
+    }
   } catch (error) {
     console.error("Failed to export conversation:", error);
     const { useToast } = await import("@/composables/useToast");

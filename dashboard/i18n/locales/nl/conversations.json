@@ -120,6 +120,7 @@
       "exportCsv": "Exporteren als CSV",
       "evidencePack": "Bewijspakket voor een betwisting",
       "exportFailed": "Kan gesprek niet exporteren. Probeer het opnieuw.",
+      "exportTranslationIncomplete": "Export klaar, maar sommige berichten konden niet worden vertaald. Hun originele tekst staat erin.",
       "takeOver": "Overnemen",
       "sendTestMessage": "Typ je testbericht...",
       "sendMessage": "Typ je bericht...",
@@ -314,7 +315,13 @@
       "approvalTranslatedFrom": "Jouw vertaling (uit het {language})",
       "approvalTranslated": "Jouw vertaling",
       "approvalEditsOriginal": "Bewerkingen gelden voor het originele antwoord hieronder; dat is wat de klant ontvangt.",
-      "approvalOriginalLabel": "Origineel antwoord (verstuurd naar de klant)"
+      "approvalOriginalLabel": "Origineel antwoord (verstuurd naar de klant)",
+      "approvalCustomerVersion": "Huidig antwoord, in de taal van de klant",
+      "approvalEditLabel": "Antwoord in het {language} (wordt voor de klant vertaald als je het goedkeurt)",
+      "approvalFailedTitle": "Antwoord niet verstuurd",
+      "approvalFailedMessage": "We konden je bewerking niet vertalen, dus het antwoord wacht nog op goedkeuring. Keur het originele antwoord goed of bewerk het zonder vertaling.",
+      "approvalApproveOriginal": "Origineel goedkeuren",
+      "approvalEditUntranslated": "Bewerken zonder vertaling"
     },
     "draftApproval": {
       "queued": "Wacht op goedkeuring",

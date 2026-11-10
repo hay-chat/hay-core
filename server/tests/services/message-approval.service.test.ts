@@ -94,6 +94,18 @@ jest.mock("@server/repositories/conversation.repository", () => ({
   ConversationRepository: jest.fn(() => mockConversationRepo),
 }));
 
+const mockTranslateTexts =
+  jest.fn<
+    (input: {
+      items: Array<{ id: string; text: string }>;
+      targetLanguage: string;
+      context?: string;
+    }) => Promise<Map<string, { sourceLanguage: string | null; text: string }>>
+  >();
+jest.mock("@server/services/translation.service", () => ({
+  translationService: { translateTexts: mockTranslateTexts },
+}));
+
 import { messageApprovalService } from "@server/services/message-approval.service";
 import { channelDeliveryService } from "@server/services/channel-delivery.service";
 
@@ -295,6 +307,113 @@ describe("messageApprovalService", () => {
         ORG_ID,
         expect.objectContaining({ type: "message_approved" }),
       );
+    });
+  });
+
+  describe("approve with an edit in the reviewer's language", () => {
+    const portugueseDraft = (): MessageRow => ({
+      ...queuedMessage(),
+      content: "Seu pedido será enviado amanhã.",
+      detectedLanguage: "pt",
+      translations: { en: "Your order ships tomorrow." },
+    });
+
+    beforeEach(() => {
+      storedMessage = portugueseDraft();
+      mockConversationRepo.findById.mockResolvedValue({
+        ...conversation,
+        language: "pt",
+        messages: [
+          { id: "m0", type: "Customer", content: "Quando chega meu pedido?" },
+          storedMessage,
+        ],
+      });
+    });
+
+    it("translates the edit into the customer's language before releasing it", async () => {
+      mockTranslateTexts.mockImplementation(async ({ items }) => {
+        return new Map([[items[0].id, { sourceLanguage: "en", text: "Seu pedido sai na terça." }]]);
+      });
+
+      await messageApprovalService.approve({
+        messageId: MESSAGE_ID,
+        organizationId: ORG_ID,
+        userId: USER_ID,
+        editedContent: "Your order ships on Tuesday.",
+        editedInLanguage: "en",
+      });
+
+      expect(mockTranslateTexts).toHaveBeenCalledWith(
+        expect.objectContaining({
+          items: [{ id: MESSAGE_ID, text: "Your order ships on Tuesday." }],
+          targetLanguage: "pt",
+          context: "Customer: Quando chega meu pedido?",
+        }),
+      );
+      expect(mockMessageRepo.transitionDeliveryState).toHaveBeenCalledWith(
+        MESSAGE_ID,
+        "queued",
+        expect.objectContaining({
+          status: "edited",
+          deliveryState: "sent",
+          content: "Seu pedido sai na terça.",
+          originalContent: "Seu pedido será enviado amanhã.",
+          // The stale translation of the draft is replaced by what the reviewer wrote.
+          translations: { en: "Your order ships on Tuesday." },
+          detectedLanguage: "pt",
+        }),
+      );
+      expect(publishedEvent("message_received")?.payload).toMatchObject({
+        content: "Seu pedido sai na terça.",
+      });
+    });
+
+    it("keeps the reply queued when the translation fails", async () => {
+      mockTranslateTexts.mockRejectedValue(new Error("LLM down"));
+
+      await expect(
+        messageApprovalService.approve({
+          messageId: MESSAGE_ID,
+          organizationId: ORG_ID,
+          userId: USER_ID,
+          editedContent: "Your order ships on Tuesday.",
+          editedInLanguage: "en",
+        }),
+      ).rejects.toMatchObject({ code: "UNPROCESSABLE_CONTENT", message: "TRANSLATION_FAILED" });
+
+      expect(mockMessageRepo.transitionDeliveryState).not.toHaveBeenCalled();
+      expect(storedMessage?.deliveryState).toBe("queued");
+      expect(mockPublish).not.toHaveBeenCalled();
+    });
+
+    it("sends an edit already in the customer's language as typed", async () => {
+      await messageApprovalService.approve({
+        messageId: MESSAGE_ID,
+        organizationId: ORG_ID,
+        userId: USER_ID,
+        editedContent: "Seu pedido sai na terça.",
+        editedInLanguage: "pt",
+      });
+
+      expect(mockTranslateTexts).not.toHaveBeenCalled();
+      const [, , updates] = mockMessageRepo.transitionDeliveryState.mock.calls[0];
+      expect(updates).toMatchObject({
+        content: "Seu pedido sai na terça.",
+        translations: { pt: "Seu pedido sai na terça." },
+      });
+    });
+
+    it("approves as is without translating", async () => {
+      await messageApprovalService.approve({
+        messageId: MESSAGE_ID,
+        organizationId: ORG_ID,
+        userId: USER_ID,
+      });
+
+      expect(mockTranslateTexts).not.toHaveBeenCalled();
+      const [, , updates] = mockMessageRepo.transitionDeliveryState.mock.calls[0];
+      expect(updates.status).toBe("approved");
+      expect(updates).not.toHaveProperty("content");
     });
   });
 

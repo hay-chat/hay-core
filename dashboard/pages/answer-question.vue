@@ -39,13 +39,23 @@
 
         <!-- Untrusted text: plain interpolation only -->
         <blockquote class="whitespace-pre-line border-l-2 border-border pl-3 text-sm">
-          {{ question.question }}
+          {{ question.translatedQuestion ?? question.question }}
         </blockquote>
         <p
           v-if="question.customerMessage && question.customerMessage !== question.question"
           class="whitespace-pre-line text-xs text-neutral-muted"
         >
-          {{ $t("home.questions.customerSaid", { message: question.customerMessage }) }}
+          {{
+            $t("home.questions.customerSaid", {
+              message: question.translatedCustomerMessage ?? question.customerMessage,
+            })
+          }}
+        </p>
+        <p
+          v-if="question.translatedQuestion || question.translatedCustomerMessage"
+          class="text-xs text-neutral-muted"
+        >
+          {{ $t("home.questions.translated") }}
         </p>
 
         <Input
@@ -98,6 +108,9 @@ interface TokenQuestion {
   organizationName: string | null;
   question: string;
   customerMessage: string | null;
+  /** In the teammate's translation language, when they have one and it differs. */
+  translatedQuestion: string | null;
+  translatedCustomerMessage: string | null;
   askedAt: string;
   answerable: boolean;
   status: string;

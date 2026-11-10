@@ -1,11 +1,17 @@
 import { ref } from "vue";
 import { HayApi } from "@/utils/api";
+import type { LanguageCode } from "@/utils/languages";
 
 export function useMessageApproval() {
   const loading = ref(false);
   const error = ref<Error | null>(null);
 
-  const approveMessage = async (messageId: string, editedContent?: string) => {
+  /** `editedInLanguage`: the reviewer's language, so the server translates the edit for the customer. */
+  const approveMessage = async (
+    messageId: string,
+    editedContent?: string,
+    editedInLanguage?: LanguageCode,
+  ) => {
     loading.value = true;
     error.value = null;
 
@@ -13,6 +19,7 @@ export function useMessageApproval() {
       const message = await HayApi.conversations.approveMessage.mutate({
         messageId,
         editedContent,
+        editedInLanguage,
       });
       return message;
     } catch (err) {

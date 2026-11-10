@@ -7,9 +7,11 @@
  * LLMService. Errors throw; callers decide what to show.
  */
 
+import { createHash } from "crypto";
 import { AppDataSource } from "@server/database/data-source";
 import { LLMService } from "@server/services/core/llm.service";
 import { languageName, normalizeLanguage, type LanguageCode } from "@server/types/language.types";
+import type { CachedTextTranslations } from "@server/types/translation-cache.types";
 
 export interface TranslationItem {
   id: string;
@@ -29,6 +31,30 @@ export interface TranslateTextsInput {
   targetLanguage: LanguageCode;
   /** Earlier messages, so short replies ("yes, that one") translate correctly. */
   context?: string;
+}
+
+export interface CachedTextItem {
+  id: string;
+  /** The stored text as it is now. */
+  text: string;
+  /** Its translation cache, if any (dropped when made for another text). */
+  cached?: CachedTextTranslations | null;
+  /** Its language when the caller knows it, so it is never sent for translation. */
+  sourceLanguage?: LanguageCode | null;
+}
+
+export interface CachedTextResult {
+  /** The text in the target language (the original when it already was). */
+  text: string;
+  /** The cache to store for this text. */
+  cache: CachedTextTranslations;
+  /** The cache differs from the stored one. */
+  changed: boolean;
+}
+
+/** Identifies the text a translation cache belongs to. */
+export function sourceTextHash(text: string): string {
+  return createHash("sha256").update(text).digest("hex").slice(0, 32);
 }
 
 /** Items per LLM call. */
@@ -201,6 +227,54 @@ export class TranslationService {
         WHERE id = $1`,
       [params.messageId, params.language, params.text, params.detectedLanguage],
     );
+  }
+
+  /**
+   * Translate stored texts (titles, summaries, team questions) into
+   * `targetLanguage` through their translation caches, in as few LLM calls
+   * as `translateTexts` needs for what is missing. A cache made for another
+   * version of the text is dropped. Nothing is sent for texts that are
+   * cached, empty, or known to be in the target language already.
+   *
+   * Returns each item's text for the reader and its cache; `changed` says the
+   * cache must be saved. Errors throw (nothing is half-applied).
+   */
+  async translateCachedTexts(input: {
+    organizationId: string;
+    items: CachedTextItem[];
+    targetLanguage: LanguageCode;
+  }): Promise<Map<string, CachedTextResult>> {
+    const { organizationId, items, targetLanguage } = input;
+    const results = new Map<string, CachedTextResult>();
+    const missing: CachedTextItem[] = [];
+
+    for (const item of items) {
+      const hash = sourceTextHash(item.text);
+      const fresh = item.cached?.sourceHash === hash;
+      const cache: CachedTextTranslations = fresh
+        ? { ...item.cached!, text: { ...item.cached!.text } }
+        : { sourceHash: hash, sourceLanguage: item.sourceLanguage ?? null, text: {} };
+      const known =
+        cache.sourceLanguage === targetLanguage ? item.text : cache.text[targetLanguage];
+      results.set(item.id, { text: known ?? item.text, cache, changed: !fresh });
+      if (known === undefined && item.text.trim()) missing.push(item);
+    }
+    if (!missing.length) return results;
+
+    const translated = await this.translateTexts({
+      organizationId,
+      items: missing.map((item) => ({ id: item.id, text: item.text })),
+      targetLanguage,
+    });
+    for (const item of missing) {
+      const result = results.get(item.id)!;
+      const answer = translated.get(item.id)!;
+      result.cache.sourceLanguage = answer.sourceLanguage ?? result.cache.sourceLanguage;
+      if (answer.sourceLanguage !== targetLanguage) result.cache.text[targetLanguage] = answer.text;
+      result.text = answer.text;
+      result.changed = true;
+    }
+    return results;
   }
 
   /** Same message, text and target in one organization: one translation. */

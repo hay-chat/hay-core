@@ -25,6 +25,7 @@
       "statusOpen": "De klant is verteld dat er hier binnen een paar minuten antwoord komt.",
       "statusTimedOut": "Wacht in je wachtrij. De klant is verteld dat het team zal antwoorden.",
       "customerSaid": "Klant schreef: {message}",
+      "translated": "Vertaald naar jouw taal",
       "answerLabel": "Jouw antwoord",
       "answerPlaceholder": "bijv. Ja, de vaas van 40 cm wordt in een cadeauverpakking verzonden.",
       "sendAsWritten": "Versturen zoals geschreven",

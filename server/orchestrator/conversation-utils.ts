@@ -9,7 +9,8 @@ import { createLogger } from "@server/lib/logger";
 import { getAiReplyBlocker, recheckAiReply } from "./reply-guard";
 import { closureCopy } from "./closure-copy";
 import type { Conversation } from "@server/database/entities/conversation.entity";
-import { languageName } from "@server/types/language.types";
+import { DEFAULT_LANGUAGE, languageName, normalizeLanguage } from "@server/types/language.types";
+import { resetSummaryTranslations } from "@server/services/conversation-translations.service";
 
 const logger = createLogger("conversation-utils");
 
@@ -147,10 +148,18 @@ export async function generateHandoffSummary(
       .map(handoffTranscriptLine)
       .join("\n");
 
+    // Written for the team, so in the organization's language rather than
+    // the customer's: readers with another translation language get it
+    // translated (conversations.translateTexts).
+    const summaryLanguage =
+      normalizeLanguage(conversation.organization?.defaultLanguage) ?? DEFAULT_LANGUAGE;
     const prompt = await promptService.getPrompt(
       "conversation/handoff-summary",
-      { conversationContext },
-      { conversationId, organizationId },
+      {
+        conversationContext,
+        languageName: languageName(summaryLanguage, summaryLanguage.startsWith("pt") ? "pt" : "en"),
+      },
+      { conversationId, organizationId, language: summaryLanguage },
     );
 
     const response = await llmService.invoke({
@@ -165,6 +174,12 @@ export async function generateHandoffSummary(
     await conversationRepository.update(conversationId, organizationId, {
       summary,
     });
+    await resetSummaryTranslations({
+      conversationId,
+      organizationId,
+      summary,
+      language: summaryLanguage,
+    }).catch((error) => log.warn({ err: error }, "Could not reset summary translations"));
 
     log.debug({ summary }, "Generated handoff summary");
   } catch (error) {

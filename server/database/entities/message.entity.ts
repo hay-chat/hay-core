@@ -112,6 +112,9 @@ export interface MessageAttachment {
 
 @Entity("messages")
 @Index("idx_messages_conversation_created", ["conversation_id", "created_at"])
+// Trigram (pg_trgm) GIN indexes for the conversation search; TypeORM can't express them.
+@Index("idx_messages_content_trgm", { synchronize: false })
+@Index("idx_messages_translations_trgm", { synchronize: false })
 export class Message {
   @PrimaryGeneratedColumn("uuid")
   id!: string;

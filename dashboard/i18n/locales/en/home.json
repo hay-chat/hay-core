@@ -25,6 +25,7 @@
       "statusOpen": "The customer was told they'll hear back here in a few minutes.",
       "statusTimedOut": "Waiting in your queue. The customer was told the team will reply.",
       "customerSaid": "Customer wrote: {message}",
+      "translated": "Translated into your language",
       "answerLabel": "Your answer",
       "answerPlaceholder": "e.g. Yes, the 40 cm vase ships in a gift box.",
       "sendAsWritten": "Send as written",

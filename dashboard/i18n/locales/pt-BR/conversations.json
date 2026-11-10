@@ -120,6 +120,7 @@
       "exportCsv": "Exportar como CSV",
       "evidencePack": "Pacote de evidências para disputa",
       "exportFailed": "Falha ao exportar conversa. Tente novamente.",
+      "exportTranslationIncomplete": "Exportação concluída, mas algumas mensagens não puderam ser traduzidas. O texto original delas está incluído.",
       "takeOver": "Assumir",
       "sendTestMessage": "Digite sua mensagem de teste...",
       "sendMessage": "Digite sua mensagem...",
@@ -314,7 +315,13 @@
       "approvalTranslatedFrom": "Sua tradução (do {language})",
       "approvalTranslated": "Sua tradução",
       "approvalEditsOriginal": "As edições valem para a resposta original abaixo, que é o que o cliente recebe.",
-      "approvalOriginalLabel": "Resposta original (enviada ao cliente)"
+      "approvalOriginalLabel": "Resposta original (enviada ao cliente)",
+      "approvalCustomerVersion": "Resposta atual, no idioma do cliente",
+      "approvalEditLabel": "Resposta em {language} (traduzida para o cliente quando você aprovar)",
+      "approvalFailedTitle": "Resposta não enviada",
+      "approvalFailedMessage": "Não conseguimos traduzir sua edição, então a resposta continua aguardando aprovação. Aprove a resposta original ou edite-a sem tradução.",
+      "approvalApproveOriginal": "Aprovar original",
+      "approvalEditUntranslated": "Editar sem tradução"
     },
     "draftApproval": {
       "queued": "Aguardando aprovação",
