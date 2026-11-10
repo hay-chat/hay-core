@@ -18,7 +18,8 @@ export default defineNitroPlugin((nitroApp) => {
   });
 
   nitroApp.hooks.hook("render:html", (html, { event }) => {
-    const { apiBaseUrl, posthogKey, posthogHost, useSSL } = useRuntimeConfig(event).public;
+    const { apiBaseUrl, posthogKey, posthogHost, helpCenterDomain, useSSL } =
+      useRuntimeConfig(event).public;
     const inlineScripts = [...html.head, ...html.bodyPrepend, ...html.body, ...html.bodyAppend]
       .flatMap(inlineScriptBodies)
       .map(scriptHashSource);
@@ -29,6 +30,7 @@ export default defineNitroPlugin((nitroApp) => {
         {
           apiBaseUrl: String(apiBaseUrl ?? ""),
           posthogHost: posthogKey ? String(posthogHost ?? "") : undefined,
+          helpCenterDomain: String(helpCenterDomain ?? ""),
           useSSL: useSSL === true,
         },
         inlineScripts,

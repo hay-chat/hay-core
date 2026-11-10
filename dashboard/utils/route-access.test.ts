@@ -12,6 +12,8 @@ describe("hasRouteAccess", () => {
     ["/insights", "viewer", true],
     ["/playbooks/new", "member", false],
     ["/documents/import", "viewer", false],
+    ["/help-center", "member", false],
+    ["/help-center", "admin", true],
   ])("%s for %s: %s", (path, role, allowed) => {
     expect(hasRouteAccess(path, role)).toBe(allowed);
   });

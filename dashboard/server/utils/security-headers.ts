@@ -5,6 +5,8 @@ export interface SecurityHeaderConfig {
   apiBaseUrl: string;
   /** PostHog ingestion host; only added when telemetry is configured. */
   posthogHost?: string;
+  /** Domain help centers are published under (HELP_CENTER_DOMAIN); empty when there is none. */
+  helpCenterDomain?: string;
   useSSL: boolean;
 }
 
@@ -39,6 +41,18 @@ function socketOriginOf(origin: string): string {
 function posthogAssetsOriginOf(origin: string): string | undefined {
   const match = /^https:\/\/([a-z]+)\.i\.posthog\.com$/.exec(origin);
   return match ? `https://${match[1]}-assets.i.posthog.com` : undefined;
+}
+
+/**
+ * Source matching every help center's built-in address (`<subdomain>.<domain>`), which
+ * the Appearance preview frames. Custom domains are not needed: the preview always
+ * uses the built-in address.
+ */
+function helpCenterFrameSourceOf(domain: string | undefined, useSSL: boolean): string | undefined {
+  // The server accepts the setting with or without a scheme.
+  const host = domain?.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+  if (!host || !/^[a-z0-9.-]+(:\d+)?$/i.test(host)) return undefined;
+  return `${useSSL ? "https" : "http"}://*.${host}`;
 }
 
 /** `'sha256-…'` source for an inline script body. */
@@ -86,6 +100,7 @@ export function contentSecurityPolicy(
       posthog,
       posthogAssets,
     ),
+    "frame-src": sources("'self'", helpCenterFrameSourceOf(config.helpCenterDomain, config.useSSL)),
     "worker-src": "'self'",
     "manifest-src": "'self'",
     "object-src": "'none'",

@@ -53,6 +53,32 @@ describe("dashboard Content-Security-Policy", () => {
     expect(csp).not.toHaveProperty("upgrade-insecure-requests");
   });
 
+  it("frames only itself unless a help center domain is set", () => {
+    const base = { apiBaseUrl: "https://api.hay.example", useSSL: true };
+    expect(directives(contentSecurityPolicy(base))["frame-src"]).toBe("'self'");
+    // The Appearance preview frames `<subdomain>.<domain>`; the server accepts a scheme too.
+    for (const helpCenterDomain of ["help.hay.example", "https://help.hay.example/"]) {
+      expect(directives(contentSecurityPolicy({ ...base, helpCenterDomain }))["frame-src"]).toBe(
+        "'self' https://*.help.hay.example",
+      );
+    }
+    expect(
+      directives(
+        contentSecurityPolicy({ ...base, useSSL: false, helpCenterDomain: "help.localhost:3001" }),
+      )["frame-src"],
+    ).toBe("'self' http://*.help.localhost:3001");
+  });
+
+  it("ignores a help center domain that could inject other sources", () => {
+    const csp = contentSecurityPolicy({
+      apiBaseUrl: "",
+      useSSL: true,
+      helpCenterDomain: "evil.example; script-src *",
+    });
+    expect(directives(csp)["frame-src"]).toBe("'self'");
+    expect(csp).not.toContain("evil.example");
+  });
+
   it("allows inline scripts only by hash", () => {
     const html =
       '<script type="module" src="/_nuxt/a.js"></script><script>window.__NUXT__={}</script>';
