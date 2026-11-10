@@ -296,6 +296,10 @@ export default defineNuxtConfig({
         "@hay/form-schema": fileURLToPath(
           new URL("../packages/form-schema/src/index.ts", import.meta.url),
         ),
+        // Language list shared with the server (a pure module, no server imports)
+        "@hay/languages": fileURLToPath(
+          new URL("../server/types/language.types.ts", import.meta.url),
+        ),
       },
     },
     server: {

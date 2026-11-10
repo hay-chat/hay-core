@@ -166,7 +166,7 @@ describe("Improve prompts", () => {
             { id: "doc-1", title: "Shipping", editable: "yes", content: "Ships in 3 days." },
           ],
         },
-        { language: lang === "pt" ? "pt" as const : "en" as const },
+        { language: lang === "pt" ? ("pt" as const) : ("en" as const) },
       );
       expect(prompt).toContain("Document id: doc-1");
       expect(prompt).toContain("Ships in 3 days.");

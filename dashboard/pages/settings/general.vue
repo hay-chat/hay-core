@@ -154,15 +154,11 @@
       </CardHeader>
       <CardContent class="space-y-6">
         <div class="grid gap-4 md:grid-cols-2">
-          <Input
-            v-model="settings.defaultLanguage"
-            type="select"
+          <LanguageSelect
+            :model-value="settings.defaultLanguage"
             :label="$t('platform.defaultLanguage')"
-            :options="[
-              { label: $t('platform.languages.en'), value: 'en' },
-              { label: $t('platform.languages.pt'), value: 'pt' },
-            ]"
             :helper-text="$t('platform.defaultLanguageHelper')"
+            @update:model-value="setDefaultLanguage"
           />
 
           <Input
@@ -531,7 +527,6 @@ type UpdateSettingsInput = RouterInputs["organizations"]["updateSettings"];
 const { t } = useI18n();
 const toast = useToast();
 const userStore = useUserStore();
-const { setLocaleFromBackend } = useLocale();
 
 const logoUpload = useFileUpload({
   accept: "image/*",
@@ -664,6 +659,11 @@ const settings = ref<PlatformSettings>({
 const hasChanges = computed(() => {
   return JSON.stringify(settings.value) !== JSON.stringify(originalSettings.value);
 });
+
+// LanguageSelect only offers known codes; the server validates them again.
+const setDefaultLanguage = (code: string | null) => {
+  if (code) settings.value.defaultLanguage = code as LanguageCode;
+};
 
 const timezoneOptions = computed(() => {
   const options: { label: string; value: string }[] = [];
@@ -833,9 +833,6 @@ const saveSettings = async (escalationOffConfirmed = false) => {
           activeOrg.name = response.data.name;
         }
       }
-
-      // Sync dashboard locale immediately when language changes
-      await setLocaleFromBackend(settings.value.defaultLanguage);
 
       // Sync date/time formatting immediately when settings change
       const { setOrgDateTimeSettings } = useOrgDateTime();
