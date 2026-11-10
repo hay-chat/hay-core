@@ -78,6 +78,18 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "help-center-domain-recheck",
+    description: "Confirm verified help center custom domains still point at this server",
+    schedule: "45 4 * * *", // Daily at 4:45 AM
+    handler: async () => {
+      const { helpCenterService } = await import("./help-center/help-center.service");
+      await helpCenterService.recheckCustomDomains();
+    },
+    singleton: true,
+    enabled: true,
+  },
+
+  {
     name: "site-index-sync",
     description:
       "Re-read each organization's sitemap into the site page index (find_page_url, link check)",

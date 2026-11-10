@@ -44,6 +44,9 @@ import { ScimToken } from "./entities/scim-token.entity";
 import { ScimUser } from "./entities/scim-user.entity";
 import { SsoDomain } from "./entities/sso-domain.entity";
 import { SsoIdentity } from "./entities/sso-identity.entity";
+import { HelpCenter } from "./entities/help-center.entity";
+import { HelpCenterCollection } from "./entities/help-center-collection.entity";
+import { HelpCenterArticle } from "./entities/help-center-article.entity";
 import { InsightIssue } from "./entities/insight-issue.entity";
 import { PushSubscription } from "./entities/push-subscription.entity";
 import { NotificationDelivery } from "./entities/notification-delivery.entity";
@@ -186,6 +189,9 @@ export const AppDataSource = new DataSource({
     ScimUser,
     ScimGroup,
     ScimGroupMember,
+    HelpCenter,
+    HelpCenterCollection,
+    HelpCenterArticle,
   ],
   migrations: __filename.includes("dist")
     ? [__dirname + "/migrations/*.js"] // Production: compiled JS files in same relative location
