@@ -14,6 +14,9 @@ const api = vi.hoisted(() => ({
 vi.mock("@/composables/useDomain", () => ({
   useDomain: () => ({ getApiUrl: (path: string) => `http://api${path}` }),
 }));
+vi.mock("@/composables/useToolLabel", () => ({
+  useToolLabel: () => ({ getToolLabel: (_plugin: string, tool: string) => `Label of ${tool}` }),
+}));
 vi.mock("@/utils/api", () => ({
   Hay: {
     setup: {
@@ -69,7 +72,17 @@ const shop = { id: "shopify", name: "Shopify" };
 const draft = {
   id: "pb1",
   title: "Order status",
-  steps: ["Ask for the order number", "Look the order up", "Tell the customer"],
+  steps: [
+    [{ type: "text" as const, text: "Ask for the order number" }],
+    [
+      { type: "text" as const, text: "Look the order up with " },
+      { type: "action" as const, pluginId: "shopify", tool: "get_order", label: "get_order" },
+    ],
+    [
+      { type: "text" as const, text: "If it fails, " },
+      { type: "handoff" as const, label: "Handoff to human" },
+    ],
+  ],
 };
 
 describe("inline playbook review", () => {
@@ -93,7 +106,20 @@ describe("inline playbook review", () => {
   it("shows the steps with Turn on and Not now, and turning on emits once", async () => {
     const wrapper = mountRow("playbook_off", { playbook: draft });
     expect(wrapper.get("[data-testid=setup-playbook-review]").exists()).toBe(true);
-    expect(wrapper.findAll("ol li").map((li) => li.text())).toEqual(draft.steps);
+    const stepTexts = wrapper
+      .findAll("[data-testid=setup-step]")
+      .map((step) => step.text().replace(/\s+/g, " "));
+    expect(stepTexts).toEqual([
+      "Ask for the order number",
+      "Look the order up with Label of get_order",
+      "If it fails, Handoff to human",
+    ]);
+    // Actions read as the playbook editor shows them: the readable label and the plugin's thumbnail.
+    const action = wrapper.get("[data-testid=setup-step-action]");
+    expect(action.classes()).toEqual(expect.arrayContaining(["mention", "mention-action"]));
+    expect(action.attributes("title")).toBe("get_order");
+    expect(action.get("img").attributes("src")).toContain("/plugins/thumbnails/shopify");
+    expect(wrapper.find(".mention.mention-handoff").exists()).toBe(true);
     expect(wrapper.text()).toContain("setup.playbook.reviewHint");
 
     const labels = wrapper.findAll("button").map((b) => b.text());

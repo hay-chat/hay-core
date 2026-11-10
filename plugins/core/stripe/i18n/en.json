@@ -1,7 +1,112 @@
 {
   "name": "Stripe",
   "description": "Connect your Stripe account to manage payments, customers, subscriptions, and more",
-  "tools": {},
+  "tools": {
+    "get_stripe_account_info": {
+      "label": "Get account info",
+      "description": "Get the connected Stripe account's details"
+    },
+    "retrieve_balance": {
+      "label": "Check balance",
+      "description": "Get the Stripe account's current balance"
+    },
+    "create_customer": {
+      "label": "Create customer",
+      "description": "Create a customer in Stripe"
+    },
+    "list_customers": {
+      "label": "Find customers",
+      "description": "List customers, optionally by email"
+    },
+    "create_product": {
+      "label": "Create product",
+      "description": "Create a product in Stripe"
+    },
+    "list_products": {
+      "label": "List products",
+      "description": "List the account's products"
+    },
+    "create_price": {
+      "label": "Create price",
+      "description": "Create a price for a product"
+    },
+    "list_prices": {
+      "label": "List prices",
+      "description": "List the prices of products"
+    },
+    "list_payment_intents": {
+      "label": "Find payments",
+      "description": "List payments, optionally for one customer"
+    },
+    "create_payment_link": {
+      "label": "Create payment link",
+      "description": "Create a link customers can pay with"
+    },
+    "create_refund": {
+      "label": "Refund payment",
+      "description": "Refund all or part of a payment"
+    },
+    "create_invoice": {
+      "label": "Create invoice",
+      "description": "Create a draft invoice for a customer"
+    },
+    "create_invoice_item": {
+      "label": "Add invoice item",
+      "description": "Add a line item to a draft invoice"
+    },
+    "finalize_invoice": {
+      "label": "Finalize invoice",
+      "description": "Finalize a draft invoice so it can be paid"
+    },
+    "list_invoices": {
+      "label": "Find invoices",
+      "description": "List invoices, optionally for one customer"
+    },
+    "list_subscriptions": {
+      "label": "Find subscriptions",
+      "description": "List subscriptions, optionally for one customer"
+    },
+    "update_subscription": {
+      "label": "Change subscription",
+      "description": "Change a customer's subscription"
+    },
+    "cancel_subscription": {
+      "label": "Cancel subscription",
+      "description": "Cancel a customer's subscription"
+    },
+    "create_coupon": {
+      "label": "Create coupon",
+      "description": "Create a discount coupon"
+    },
+    "list_coupons": {
+      "label": "List coupons",
+      "description": "List the account's coupons"
+    },
+    "list_disputes": {
+      "label": "Find disputes",
+      "description": "List payment disputes"
+    },
+    "update_dispute": {
+      "label": "Respond to dispute",
+      "description": "Submit evidence for a payment dispute"
+    },
+    "search_stripe_resources": {
+      "label": "Search Stripe",
+      "description": "Search customers, payments, invoices and more"
+    },
+    "fetch_stripe_resources": {
+      "label": "Get Stripe record",
+      "description": "Get one Stripe record by its ID"
+    },
+    "search_stripe_documentation": {
+      "label": "Search Stripe docs",
+      "description": "Search Stripe's documentation"
+    },
+    "stripe_api_read": {
+      "label": "Look up in Stripe",
+      "description": "Read data from the Stripe API"
+    }
+  },
   "config": {
     "apiKey": {
       "label": "API Key",

@@ -88,57 +88,92 @@
           }}
         </p>
 
-        <div class="mb-1 flex items-center gap-3">
-          <b class="whitespace-nowrap font-medium text-neutral-900" aria-live="polite">
-            {{ $t("setup.board.ready", { ready: readyShown, total: board.rows.length }) }}
-          </b>
-          <Progress
-            :value="readyPercent"
-            class="h-1.5 max-w-[220px] flex-1"
-            :aria-label="$t('setup.board.progressLabel')"
-          />
+        <div class="mb-4 grid gap-2.5">
+          <div class="flex flex-wrap items-baseline justify-between gap-x-4 text-sm tabular-nums">
+            <b class="font-medium text-neutral-900" aria-live="polite">
+              {{ $t("setup.board.ready", { ready: readyShown, total: board.rows.length }) }}
+            </b>
+            <span class="text-neutral-muted">{{ needYouLabel }}</span>
+          </div>
+          <SetupProgressBar v-if="board.rows.length" :statuses="shownStatuses" />
+          <div
+            v-if="board.rows.length"
+            class="flex flex-wrap gap-1.5"
+            role="group"
+            :aria-label="$t('setup.board.filtersLabel')"
+          >
+            <button
+              v-for="option in filterOptions"
+              :key="option.value"
+              type="button"
+              :aria-pressed="filter === option.value"
+              :class="[
+                'inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8',
+                filter === option.value
+                  ? 'border-neutral-900 bg-neutral-900 text-white'
+                  : 'border-neutral-300 text-neutral-700 hover:bg-accent',
+              ]"
+              @click="filter = option.value"
+            >
+              {{ option.label }}
+              <span class="tabular-nums opacity-70">{{ option.count }}</span>
+            </button>
+          </div>
         </div>
 
-        <ul
-          v-if="board.rows.length"
-          class="min-[1360px]:grid min-[1360px]:grid-cols-[minmax(0,1.15fr)_auto_minmax(0,1.3fr)_auto_2rem]"
-          data-testid="setup-rows"
-        >
-          <SetupRow
-            v-for="(row, index) in board.rows"
-            :key="row.id"
-            :row="row"
-            :display-status="displayStatus(row, index)"
-            :has-site="Boolean(board.website)"
-            :expanded="openId === row.id"
-            :saving="savingId === row.id"
-            :error="errorId === row.id"
-            :connect-to="rowConnectTo(row)"
-            :playbook-to="rowPlaybookTo(row)"
-            :site-partial="Boolean(board.site.partial)"
-            :write-to="writeTo"
-            :can-open-documents="canOpen('/documents')"
-            :turning-on="turningOnId === row.id"
-            :turn-on-error="turnOnErrorId === row.id"
-            :connect-failure="rowConnectFailure(row)"
-            :try-disabled="Boolean(chat?.busy)"
-            @try="tryRow(row.text)"
-            @toggle="toggleRow(row.id)"
-            @remove="removeRow(row.id)"
-            @retry="actions.retryRow(row.id)"
-            @choose-platform="emit('choosePlatform')"
-            @save="saveRow(row.id, $event)"
-            @turn-on="turnOn(row.id)"
-            @regenerate="actions.generatePlaybook(row.id)"
-          />
-        </ul>
+        <div v-if="board.rows.length" class="grid gap-6" data-testid="setup-rows">
+          <section v-for="group in shownGroups" :key="group.key" class="grid gap-2.5">
+            <h2
+              class="flex items-baseline gap-2 px-1 font-primary text-sm font-medium text-neutral-700"
+            >
+              {{ $t(`setup.board.groups.${group.key}`) }}
+              <span class="tabular-nums text-neutral-muted">{{ group.rows.length }}</span>
+            </h2>
+            <ul class="grid gap-2.5">
+              <SetupRow
+                v-for="{ row, index } in group.rows"
+                :key="row.id"
+                :row="row"
+                :display-status="displayStatus(row, index)"
+                :has-site="Boolean(board.website)"
+                :expanded="openId === row.id"
+                :saving="savingId === row.id"
+                :error="errorId === row.id"
+                :connect-to="rowConnectTo(row)"
+                :playbook-to="rowPlaybookTo(row)"
+                :site-partial="Boolean(board.site.partial)"
+                :write-to="writeTo"
+                :can-open-documents="canOpen('/documents')"
+                :turning-on="turningOnId === row.id"
+                :turn-on-error="turnOnErrorId === row.id"
+                :connect-failure="rowConnectFailure(row)"
+                :try-disabled="Boolean(chat?.busy)"
+                @try="tryRow(row.text)"
+                @toggle="toggleRow(row.id)"
+                @remove="removeRow(row.id)"
+                @retry="actions.retryRow(row.id)"
+                @choose-platform="emit('choosePlatform')"
+                @save="(changes, options) => saveRow(row.id, changes, options.keepOpen)"
+                @turn-on="turnOn(row.id)"
+                @regenerate="actions.generatePlaybook(row.id)"
+              />
+            </ul>
+          </section>
+          <p v-if="!shownGroups.length" class="px-1 text-sm text-neutral-muted" role="status">
+            {{ $t("setup.board.filterEmpty") }}
+          </p>
+        </div>
         <EmptyState
           v-else
           :title="$t('setup.board.emptyTitle')"
           :description="$t('setup.board.emptyDescription')"
         />
 
-        <form ref="addForm" class="mt-3 flex items-end gap-2" @submit.prevent="addQuestion">
+        <form
+          ref="addForm"
+          class="mt-4 flex items-end gap-2 rounded-xl border border-dashed border-neutral-300 bg-background p-3"
+          @submit.prevent="addQuestion"
+        >
           <div class="min-w-0 flex-1">
             <Input
               v-model="newQuestion"
@@ -190,6 +225,8 @@ import SetupTestChat from "./SetupTestChat.vue";
 import SetupInstallPanel from "./SetupInstallPanel.vue";
 import SetupChannels from "./SetupChannels.vue";
 import SetupReplay from "./SetupReplay.vue";
+import SetupProgressBar from "./SetupProgressBar.vue";
+import { STATUS_GROUP, type SetupGroup } from "./status";
 import { textLinkClass } from "./styles";
 
 export interface SetupBoardActions {
@@ -305,11 +342,44 @@ const displayStatus = (row: SetupRowData, index: number): SetupRowStatus => {
   return settledOnce.value || index < revealed.value ? row.status : "checking";
 };
 
-const readyShown = computed(
-  () => props.board.rows.filter((row, index) => displayStatus(row, index) === "ready").length,
+const shownStatuses = computed(() =>
+  props.board.rows.map((row, index) => displayStatus(row, index)),
 );
-const readyPercent = computed(() =>
-  props.board.rows.length ? (readyShown.value / props.board.rows.length) * 100 : 0,
+const readyShown = computed(() => shownStatuses.value.filter((s) => s === "ready").length);
+const needYouShown = computed(
+  () => shownStatuses.value.filter((s) => STATUS_GROUP[s] === "needs_you").length,
+);
+const needYouLabel = computed(() => {
+  const count = needYouShown.value;
+  if (count === 0)
+    return readyShown.value === props.board.rows.length ? t("setup.board.allSet") : "";
+  return count === 1 ? t("setup.board.needYouOne") : t("setup.board.needYouOther", { count });
+});
+
+// --- Groups and filter. Rows are grouped by their real status, not the one shown during the
+// first reveal, so cards don't jump between groups while their badges settle.
+type Filter = "all" | "needs_you" | "ready";
+const filter = ref<Filter>("all");
+const GROUP_ORDER: SetupGroup[] = ["needs_you", "checking", "ready"];
+const indexedRows = computed(() => props.board.rows.map((row, index) => ({ row, index })));
+const groupCount = (group: SetupGroup) =>
+  props.board.rows.filter((row) => STATUS_GROUP[row.status] === group).length;
+const filterOptions = computed(() => [
+  { value: "all" as const, label: t("setup.board.filterAll"), count: props.board.rows.length },
+  {
+    value: "needs_you" as const,
+    label: t("setup.board.filterNeedsYou"),
+    count: groupCount("needs_you"),
+  },
+  { value: "ready" as const, label: t("setup.board.filterReady"), count: groupCount("ready") },
+]);
+const shownGroups = computed(() =>
+  GROUP_ORDER.filter((key) => filter.value === "all" || filter.value === key)
+    .map((key) => ({
+      key,
+      rows: indexedRows.value.filter(({ row }) => STATUS_GROUP[row.status] === key),
+    }))
+    .filter((group) => group.rows.length > 0),
 );
 
 // --- Header tags: business type, a few tools and the website.
@@ -393,13 +463,14 @@ const turnOn = async (id: string) => {
   else turnOnErrorId.value = id;
 };
 
-const saveRow = async (id: string, changes: SetupRowChanges) => {
+/** `keepOpen`: one section of an open card was saved, so the card stays open. */
+const saveRow = async (id: string, changes: SetupRowChanges, keepOpen = false) => {
   savingId.value = id;
   errorId.value = null;
   const saved = await props.actions.saveRow(id, changes);
   savingId.value = null;
-  if (saved) openId.value = null;
-  else errorId.value = id;
+  if (!saved) errorId.value = id;
+  else if (!keepOpen && openId.value === id) openId.value = null;
 };
 
 const addForm = ref<HTMLFormElement | null>(null);

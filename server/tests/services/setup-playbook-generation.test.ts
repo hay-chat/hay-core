@@ -161,11 +161,47 @@ describe("planToDocument and stepsFromInstructions", () => {
     });
   });
 
-  it("reads the steps back for the review list", () => {
+  it("reads the steps back for the review list, with the tool as an action chip", () => {
     expect(stepsFromInstructions(doc)).toEqual([
-      "Ask for the order number.",
-      "Look the order up. shop_get_order",
-      "Tell the customer the status.",
+      [{ type: "text", text: "Ask for the order number." }],
+      [
+        { type: "text", text: "Look the order up. " },
+        { type: "action", pluginId: "shop", tool: "shop_get_order", label: "shop_get_order" },
+      ],
+      [{ type: "text", text: "Tell the customer the status." }],
+    ]);
+  });
+
+  it("reads editor-written mentions as chips, and falls back to paragraphs", () => {
+    const paragraph = (...content: unknown[]) => ({ type: "paragraph", content });
+    const mention = (attrs: Record<string, string | null>) => ({ type: "mention", attrs });
+    const written = {
+      type: "doc",
+      content: [
+        paragraph(
+          { type: "text", text: "  If it fails,   " },
+          mention({ id: null, type: "handoff", label: "Handoff to human", pluginId: null }),
+        ),
+        paragraph(
+          { type: "text", text: "Send " },
+          mention({ id: "doc-1", type: "document", label: "Returns", pluginId: null }),
+          { type: "hardBreak" },
+          { type: "text", text: "then " },
+          mention({ id: "x", type: "action", label: "orphan_tool", pluginId: null }),
+        ),
+        paragraph({ type: "text", text: "   " }),
+      ],
+    };
+    expect(stepsFromInstructions(written)).toEqual([
+      [
+        { type: "text", text: "If it fails, " },
+        { type: "handoff", label: "Handoff to human" },
+      ],
+      [
+        { type: "text", text: "Send " },
+        { type: "document", label: "Returns" },
+        { type: "text", text: " then orphan_tool" },
+      ],
     ]);
   });
 });

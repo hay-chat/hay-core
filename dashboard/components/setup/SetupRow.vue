@@ -1,234 +1,203 @@
 <template>
-  <!-- Below 1360px a row stacks; from there the list is the grid and each row a subgrid of it, so
-       pills and reasons line up between rows. -->
-  <li
-    ref="rowEl"
-    class="border-b border-border min-[1360px]:col-span-full min-[1360px]:grid min-[1360px]:grid-cols-subgrid"
-    :data-status="displayStatus"
-    :data-row-id="row.id"
-  >
-    <div
-      class="grid grid-cols-[minmax(0,1fr)_2.75rem] items-center gap-x-2 gap-y-1 py-3 min-[1360px]:col-span-full min-[1360px]:grid-cols-subgrid min-[1360px]:gap-x-3"
+  <li ref="rowEl" :data-status="displayStatus" :data-row-id="row.id">
+    <article
+      :class="[
+        'rounded-xl border bg-background transition-shadow duration-200 motion-reduce:transition-none',
+        expanded ? 'border-neutral-300 shadow-lg' : 'border-border shadow-sm',
+      ]"
     >
-      <span class="col-start-1 font-medium text-neutral-900">{{ row.text }}</span>
-      <button
-        type="button"
-        data-row-action="edit"
-        class="col-start-2 row-start-1 grid h-11 w-11 place-items-center justify-self-end rounded-md text-neutral-muted hover:bg-accent hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-[1360px]:col-start-5 min-[1360px]:h-8 min-[1360px]:w-8"
-        :aria-expanded="expanded"
-        :aria-controls="expanded ? panelId : undefined"
-        :aria-label="$t('setup.action.edit', { question: row.text })"
-        @click="emit('toggle')"
+      <!-- Status, question and reason, one action, the chevron: the same columns on every card -->
+      <div
+        class="grid cursor-pointer grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-2 py-3.5 pl-4 pr-2.5 sm:grid-cols-[2rem_minmax(0,1fr)_auto_auto]"
+        @click="onHeadClick"
       >
-        <ChevronDown
-          :class="[
-            'h-4 w-4 transition-transform duration-150 motion-reduce:transition-none',
-            expanded && 'rotate-180',
-          ]"
+        <span
+          :class="['grid h-8 w-8 place-items-center rounded-lg', tile.classes]"
           aria-hidden="true"
-        />
-      </button>
-
-      <span
-        class="col-span-2 min-[1360px]:col-span-1 min-[1360px]:col-start-2 min-[1360px]:row-start-1"
-      >
-        <Badge :key="displayStatus" :variant="badgeVariant" :class="['setup-settle', badgeClass]">
-          {{ $t(`setup.status.${displayStatus}`) }}
-        </Badge>
-      </span>
-
-      <span
-        class="col-span-2 text-sm text-neutral-muted min-[1360px]:col-span-1 min-[1360px]:col-start-3 min-[1360px]:row-start-1"
-      >
-        {{ why }}
-      </span>
-
-      <span
-        class="col-span-2 min-[1360px]:col-span-1 min-[1360px]:col-start-4 min-[1360px]:row-start-1 min-[1360px]:text-right"
-      >
-        <template v-if="displayStatus === 'ready'">
-          <Button
-            variant="link"
-            size="sm"
-            data-row-action="primary"
-            class="min-h-11 md:min-h-0"
-            :disabled="tryDisabled"
-            :aria-label="$t('setup.action.tryItFor', { question: row.text })"
-            @click="emit('try')"
-          >
-            {{ $t("setup.action.tryIt") }}
-          </Button>
-        </template>
-        <template v-else-if="displayStatus === 'missing'">
-          <Button
-            variant="link"
-            size="sm"
-            data-row-action="primary"
-            class="min-h-11 md:min-h-0"
-            :aria-expanded="expanded"
-            :aria-label="$t('setup.action.addAnswerFor', { question: row.text })"
-            @click="emit('toggle')"
-          >
-            {{ $t("setup.action.addAnswer") }}
-          </Button>
-        </template>
-        <template v-else-if="displayStatus === 'needs_connection'">
-          <NuxtLink
-            v-if="connectTo"
-            :to="connectTo"
-            data-row-action="primary"
-            :class="textLinkClass"
-            :aria-label="$t('setup.action.connectFor', { question: row.text })"
-          >
-            {{ $t("setup.action.connect") }}
-          </NuxtLink>
-          <Button
-            v-else-if="!row.plugin"
-            variant="link"
-            data-row-action="primary"
-            size="sm"
-            class="min-h-11 md:min-h-0"
-            @click="emit('choosePlatform')"
-          >
-            {{ $t("setup.action.choosePlatform") }}
-          </Button>
-        </template>
-        <template v-else-if="displayStatus === 'playbook_off'">
-          <Button
-            variant="link"
-            size="sm"
-            data-row-action="primary"
-            class="min-h-11 md:min-h-0"
-            :aria-expanded="expanded"
-            @click="emit('toggle')"
-          >
-            {{ $t("setup.action.review") }}
-          </Button>
-        </template>
-        <template v-else-if="displayStatus === 'playbook_missing'">
-          <NuxtLink
-            v-if="writeTo && row.generation !== 'pending'"
-            :to="writeTo"
-            :class="textLinkClass"
-          >
-            {{ $t("setup.action.writeOwn") }}
-          </NuxtLink>
-          <Button variant="link" size="sm" class="min-h-11 md:min-h-0" @click="emit('regenerate')">
-            {{ $t("setup.action.retry") }}
-          </Button>
-        </template>
-        <template v-else-if="displayStatus === 'check_failed'">
-          <Button variant="link" size="sm" class="min-h-11 md:min-h-0" @click="emit('retry')">
-            {{ $t("setup.action.retry") }}
-          </Button>
-        </template>
-      </span>
-    </div>
-
-    <!-- The platform's connect attempt failed: say so next to the row it would have unlocked -->
-    <p
-      v-if="connectFailure && displayStatus === 'needs_connection'"
-      class="pb-3 text-sm text-destructive min-[1360px]:col-span-full"
-      role="alert"
-      data-testid="setup-connect-error"
-    >
-      {{ $t("setup.connectError.message", { plugin: row.plugin?.name ?? "" }) }}
-      <span v-if="connectFailure.detail" class="text-neutral-muted">
-        {{
-          $t("setup.connectError.detail", {
-            plugin: row.plugin?.name ?? "",
-            detail: connectFailure.detail,
-          })
-        }}
-      </span>
-    </p>
-
-    <!-- The edit panel: the question, its answer and the document it is based on -->
-    <form
-      v-if="expanded"
-      :id="panelId"
-      class="setup-expand grid gap-4 pb-4 min-[1360px]:col-span-full"
-      data-testid="setup-panel"
-      @submit.prevent="save"
-      @keydown.esc="closeIfClean"
-    >
-      <div class="grid gap-1.5">
-        <label :for="questionId" class="text-sm font-medium text-neutral-900">
-          {{ $t("setup.panel.questionLabel") }}
-        </label>
-        <Input
-          :id="questionId"
-          :model-value="questionValue"
-          :label="$t('setup.panel.questionLabel')"
-          maxlength="500"
-          class="max-md:min-h-11"
-          @update:model-value="questionDraft = String($event)"
-        />
-      </div>
-
-      <!-- Ready on a page the assistant found: read-only until the person takes over -->
-      <div v-if="panelKind === 'found'" class="grid gap-2" data-testid="setup-found">
-        <p v-if="row.answer" class="whitespace-pre-line text-sm text-neutral-900">
-          {{ row.answer }}
-        </p>
-        <p class="text-sm text-neutral-muted">{{ why }}</p>
-        <div class="flex flex-wrap items-center gap-x-3">
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            class="min-h-11 md:min-h-0"
-            @click="changeDocument"
-          >
-            {{ $t("setup.panel.changeDocument") }}
-          </Button>
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            class="min-h-11 md:min-h-0"
-            @click="writeMyOwn"
-          >
-            {{ $t("setup.panel.writeMyOwn") }}
-          </Button>
-        </div>
-      </div>
-
-      <!-- The answer the customer writes, saved as a document -->
-      <div v-else-if="panelKind === 'answer'" class="grid gap-4">
-        <div
-          v-if="storedPending"
-          class="h-20 animate-pulse rounded-md bg-neutral-100 motion-reduce:animate-none"
-          role="status"
-          :aria-label="$t('setup.panel.loadingAnswer')"
-        />
-        <div v-else-if="stored.state === 'error'" class="grid gap-1" role="alert">
-          <p class="text-sm text-destructive">{{ $t("setup.panel.answerLoadError") }}</p>
-          <div>
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              class="min-h-11 md:min-h-0"
-              @click="loadStored"
+        >
+          <component
+            :is="tile.icon"
+            :class="[
+              'h-4 w-4',
+              (displayStatus === 'checking' || displayStatus === 'reading_site') &&
+                'animate-spin motion-reduce:animate-none',
+            ]"
+          />
+        </span>
+        <div class="min-w-0">
+          <p class="font-medium text-neutral-900">{{ row.text }}</p>
+          <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-neutral-muted">
+            <Badge
+              :key="displayStatus"
+              :variant="badgeVariant"
+              :class="['setup-settle', badgeClass]"
             >
+              {{ $t(`setup.status.${displayStatus}`) }}
+            </Badge>
+            <span class="min-w-0">{{ why }}</span>
+          </p>
+        </div>
+        <div
+          class="flex items-center gap-1 empty:hidden max-sm:col-span-2 max-sm:col-start-2 max-sm:row-start-2 sm:justify-self-end"
+        >
+          <template v-if="displayStatus === 'ready'">
+            <Button
+              variant="ghost"
+              size="sm"
+              data-row-action="primary"
+              class="max-md:min-h-11"
+              :disabled="tryDisabled"
+              :aria-label="$t('setup.action.tryItFor', { question: row.text })"
+              @click="emit('try')"
+            >
+              <Play class="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+              {{ $t("setup.action.tryIt") }}
+            </Button>
+          </template>
+          <template v-else-if="displayStatus === 'missing' && !expanded">
+            <button
+              type="button"
+              data-row-action="primary"
+              :class="softLinkClass"
+              :aria-expanded="expanded"
+              :aria-label="$t('setup.action.addAnswerFor', { question: row.text })"
+              @click="emit('toggle')"
+            >
+              {{ $t("setup.action.addAnswer") }}
+            </button>
+          </template>
+          <template v-else-if="displayStatus === 'needs_connection'">
+            <NuxtLink
+              v-if="connectTo"
+              :to="connectTo"
+              data-row-action="primary"
+              :class="softLinkClass"
+              :aria-label="$t('setup.action.connectFor', { question: row.text })"
+            >
+              <Plug class="h-3.5 w-3.5" aria-hidden="true" />
+              {{ connectLabel }}
+            </NuxtLink>
+            <button
+              v-else-if="!row.plugin"
+              type="button"
+              data-row-action="primary"
+              :class="softLinkClass"
+              @click="emit('choosePlatform')"
+            >
+              {{ $t("setup.action.choosePlatform") }}
+            </button>
+          </template>
+          <template v-else-if="displayStatus === 'playbook_off' && !expanded">
+            <button
+              type="button"
+              data-row-action="primary"
+              :class="softLinkClass"
+              :aria-expanded="expanded"
+              @click="emit('toggle')"
+            >
+              {{ $t("setup.action.review") }}
+            </button>
+          </template>
+          <template v-else-if="displayStatus === 'playbook_missing'">
+            <NuxtLink
+              v-if="writeTo && row.generation !== 'pending'"
+              :to="writeTo"
+              :class="textLinkClass"
+            >
+              {{ $t("setup.action.writeOwn") }}
+            </NuxtLink>
+            <Button variant="ghost" size="sm" class="max-md:min-h-11" @click="emit('regenerate')">
               {{ $t("setup.action.retry") }}
             </Button>
-          </div>
+          </template>
+          <template v-else-if="displayStatus === 'check_failed'">
+            <Button variant="ghost" size="sm" class="max-md:min-h-11" @click="emit('retry')">
+              {{ $t("setup.action.retry") }}
+            </Button>
+          </template>
         </div>
-        <div v-else-if="readOnlyAnswer" class="grid gap-2" data-testid="setup-readonly-answer">
-          <p class="whitespace-pre-line text-sm text-neutral-900">{{ stored.text }}</p>
-          <p class="text-sm text-neutral-muted">{{ $t("setup.panel.formatted") }}</p>
-          <div v-if="linkedDocument" class="text-sm text-neutral-muted">
-            {{ basedOn }}
-          </div>
-          <div>
-            <NuxtLink v-if="documentTo" :to="documentTo" :class="textLinkClass">
-              {{ $t("setup.panel.editInKnowledge") }}
-            </NuxtLink>
-          </div>
+        <div class="max-sm:col-start-3 max-sm:row-start-1">
+          <SetupIconButton
+            data-row-action="edit"
+            :label="$t('setup.action.edit', { question: row.text })"
+            :tooltip="$t(expanded ? 'setup.action.collapse' : 'setup.action.expand')"
+            :aria-expanded="expanded"
+            :aria-controls="expanded ? panelId : undefined"
+            @click="emit('toggle')"
+          >
+            <ChevronDown
+              :class="[
+                'h-4 w-4 transition-transform duration-150 motion-reduce:transition-none',
+                expanded && 'rotate-180',
+              ]"
+              aria-hidden="true"
+            />
+          </SetupIconButton>
         </div>
-        <template v-else>
+      </div>
+
+      <!-- The platform's connect attempt failed: say so next to the row it would have unlocked -->
+      <p
+        v-if="connectFailure && displayStatus === 'needs_connection'"
+        class="px-4 pb-3 text-sm text-destructive sm:pl-[3.875rem]"
+        role="alert"
+        data-testid="setup-connect-error"
+      >
+        {{ $t("setup.connectError.message", { plugin: row.plugin?.name ?? "" }) }}
+        <span v-if="connectFailure.detail" class="text-neutral-muted">
+          {{
+            $t("setup.connectError.detail", {
+              plugin: row.plugin?.name ?? "",
+              detail: connectFailure.detail,
+            })
+          }}
+        </span>
+      </p>
+
+      <!-- The panel. Each section edits in place; the rest of the card stays where it is. -->
+      <form
+        v-if="expanded"
+        :id="panelId"
+        class="setup-expand grid gap-5 border-t border-border px-4 pb-4 pt-5 sm:pl-[3.875rem]"
+        data-testid="setup-panel"
+        @submit.prevent="saveCompose"
+        @keydown.esc="onEscape"
+      >
+        <div class="grid gap-1.5">
+          <div class="flex min-h-8 items-center justify-between gap-2">
+            <label :for="questionId" class="text-sm font-medium text-neutral-900">
+              {{ $t("setup.panel.questionLabel") }}
+            </label>
+            <span v-if="panelKind !== 'compose' && textChanged" class="flex items-center gap-1">
+              <Button type="button" variant="ghost" size="xs" @click="questionDraft = null">
+                {{ $t("setup.answer.cancel") }}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                class="text-primary"
+                data-testid="setup-save-question"
+                :loading="savingSection === 'question'"
+                :disabled="saving"
+                @click="saveQuestion"
+              >
+                <Check class="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                {{ $t("setup.answer.save") }}
+              </Button>
+            </span>
+          </div>
+          <Input
+            :id="questionId"
+            :model-value="questionValue"
+            maxlength="500"
+            class="max-md:min-h-11"
+            @update:model-value="questionDraft = String($event)"
+          />
+        </div>
+
+        <!-- Writing an answer for a question that has none -->
+        <template v-if="panelKind === 'compose'">
           <div class="grid gap-1.5">
             <label :for="answerId" class="text-sm font-medium text-neutral-900">
               {{ $t("setup.answer.label") }}
@@ -240,163 +209,300 @@
               :placeholder="$t('setup.answer.placeholder')"
               @update:model-value="typeAnswer"
             />
+            <SetupDraftStatus
+              :drafting="drafting"
+              :failed="draftFailed"
+              :no-answer="noAnswer"
+              :pending-draft="pendingDraft !== null"
+              :documents="editDocs"
+              @replace="replaceWithDraft"
+            />
+          </div>
+          <SetupDocumentList
+            :documents="editDocs"
+            mode="edit"
+            :title="documentsTitle(editDocs, 'drafting')"
+            :exclude-ids="ownExclude"
+            @add="addComposeDocument"
+            @remove="removeDocument"
+          />
+        </template>
+
+        <!-- An answer that is already there: the customer's own, or one found in their documents -->
+        <template v-else-if="panelKind === 'own' || panelKind === 'found'">
+          <div class="grid gap-1.5" data-testid="setup-answer">
+            <div
+              v-if="storedPending"
+              class="h-20 animate-pulse rounded-md bg-neutral-100 motion-reduce:animate-none"
+              role="status"
+              :aria-label="$t('setup.panel.loadingAnswer')"
+            />
+            <div v-else-if="stored.state === 'error'" class="grid gap-1" role="alert">
+              <p class="text-sm text-destructive">{{ $t("setup.panel.answerLoadError") }}</p>
+              <div>
+                <Button type="button" variant="link" size="sm" @click="loadStored">
+                  {{ $t("setup.action.retry") }}
+                </Button>
+              </div>
+            </div>
+            <template v-else>
+              <div class="flex min-h-8 items-center justify-between gap-2">
+                <label :for="answerId" class="text-sm font-medium text-neutral-900">
+                  {{ $t("setup.panel.answerLabel") }}
+                </label>
+                <span v-if="editing === 'answer'" class="flex items-center gap-1">
+                  <Button type="button" variant="ghost" size="xs" @click="cancelSection">
+                    {{ $t("setup.answer.cancel") }}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    class="text-primary"
+                    data-testid="setup-save-answer"
+                    :loading="savingSection === 'answer'"
+                    :disabled="!canSaveAnswer"
+                    @click="saveAnswer"
+                  >
+                    <Check class="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                    {{ $t("setup.answer.save") }}
+                  </Button>
+                </span>
+                <NuxtLink
+                  v-else-if="readOnlyAnswer && documentTo"
+                  :to="documentTo"
+                  :class="textLinkClass"
+                >
+                  {{ $t("setup.panel.editInKnowledge") }}
+                </NuxtLink>
+                <Button
+                  v-else-if="!readOnlyAnswer"
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  class="text-primary"
+                  data-testid="setup-edit-answer"
+                  :disabled="editing !== null"
+                  @click="startEdit('answer')"
+                >
+                  <PenLine class="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                  {{ $t("setup.panel.editAnswer") }}
+                </Button>
+              </div>
+              <Textarea
+                v-if="editing === 'answer'"
+                :id="answerId"
+                :model-value="answerValue"
+                :rows="3"
+                @update:model-value="typeAnswer"
+              />
+              <p
+                v-else
+                class="whitespace-pre-line rounded-md border border-border bg-background-secondary px-3 py-2.5 text-sm text-neutral-900"
+              >
+                {{ baseAnswer }}
+              </p>
+              <p v-if="readOnlyAnswer" class="text-sm text-neutral-muted">
+                {{ $t("setup.panel.formatted") }}
+              </p>
+            </template>
           </div>
 
-          <div class="grid gap-2" data-testid="setup-document">
-            <template v-if="showSearch">
-              <p class="text-sm font-medium text-neutral-900">
-                {{ $t("setup.panel.useDocument") }}
-              </p>
-              <SetupDocumentSearch
-                ref="searchEl"
-                :exclude-id="row.answerDocumentId"
-                @select="pickDocument"
-              />
-            </template>
-            <div v-else-if="linkedDocument" class="flex flex-wrap items-center gap-x-3">
-              <span class="text-sm text-neutral-muted">{{ basedOn }}</span>
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                class="min-h-11 md:min-h-0"
-                @click="changeDocument"
-              >
-                {{ $t("setup.panel.changeDocument") }}
-              </Button>
-            </div>
-
-            <p v-if="drafting" class="text-sm text-neutral-muted" role="status">
-              {{ $t("setup.panel.drafting", { document: pageTitle(drafting.title) }) }}
+          <div class="grid gap-1.5">
+            <SetupDocumentList
+              ref="documentsEl"
+              :documents="editing === 'documents' ? editDocs : currentDocs"
+              :mode="editing === 'documents' ? 'edit' : 'read'"
+              :title="documentsTitle(editing === 'documents' ? editDocs : currentDocs, 'based')"
+              :can-open="canOpenDocuments"
+              :exclude-ids="ownExclude"
+              @add="addDocument"
+              @remove="removeDocument"
+            >
+              <template #actions>
+                <span v-if="editing === 'documents'" class="flex items-center gap-1">
+                  <Button type="button" variant="ghost" size="xs" @click="cancelSection">
+                    {{ $t("setup.answer.cancel") }}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    class="text-primary"
+                    data-testid="setup-save-documents"
+                    :loading="drafting || savingSection === 'documents'"
+                    :disabled="!canSaveDocuments"
+                    @click="saveDocuments"
+                  >
+                    <Check class="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                    {{ $t("setup.documents.done") }}
+                  </Button>
+                </span>
+                <Button
+                  v-else
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  class="text-primary"
+                  data-testid="setup-edit-documents"
+                  :disabled="editing !== null || storedPending"
+                  @click="startEdit('documents')"
+                >
+                  <PenLine class="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                  {{
+                    $t(currentDocs.length ? "setup.documents.edit" : "setup.documents.addDocuments")
+                  }}
+                </Button>
+              </template>
+            </SetupDocumentList>
+            <SetupDraftStatus
+              v-if="editing === 'documents'"
+              :drafting="drafting"
+              :failed="draftFailed"
+              :no-answer="noAnswer"
+              :pending-draft="false"
+              :documents="editDocs"
+            />
+            <p
+              v-if="editing === 'documents' && panelKind === 'found'"
+              class="text-sm text-neutral-muted"
+            >
+              {{ $t("setup.documents.redraftHint") }}
             </p>
-            <p v-else-if="draftFailed" class="text-sm text-destructive" role="alert">
-              {{ $t("setup.panel.draftError", { document: pageTitle(draftFailed.title) }) }}
-            </p>
-            <p v-else-if="noAnswerFrom" class="text-sm text-neutral-900" role="status">
-              {{ $t("setup.panel.noAnswer", { document: pageTitle(noAnswerFrom.title) }) }}
-            </p>
-            <div v-else-if="pendingDraft" class="flex flex-wrap items-center gap-x-3" role="status">
-              <span class="text-sm text-neutral-muted">{{ $t("setup.panel.draftReady") }}</span>
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                class="min-h-11 md:min-h-0"
-                @click="replaceWithDraft"
-              >
-                {{ $t("setup.panel.replaceDraft") }}
-              </Button>
-            </div>
           </div>
         </template>
-      </div>
 
-      <!-- Playbook off: what it does, before the customer turns it on -->
-      <div
-        v-else-if="panelKind === 'playbook' && row.playbook"
-        class="grid gap-2"
-        data-testid="setup-playbook-review"
-      >
-        <span class="text-sm font-medium text-neutral-900">
-          {{ $t("setup.playbook.whatItDoes", { playbook: row.playbook.title }) }}
-        </span>
-        <ol
-          v-if="row.playbook.steps.length"
-          class="list-decimal space-y-1 pl-5 text-sm text-neutral-900"
-          :aria-label="$t('setup.playbook.stepsLabel')"
+        <!-- Playbook off: what it does, before the customer turns it on -->
+        <div
+          v-else-if="panelKind === 'playbook' && row.playbook"
+          class="grid gap-3"
+          data-testid="setup-playbook-review"
         >
-          <li v-for="(step, index) in row.playbook.steps" :key="index">{{ step }}</li>
-        </ol>
-        <p class="text-sm text-neutral-muted">{{ $t("setup.playbook.reviewHint") }}</p>
-        <p v-if="turnOnError" class="text-sm text-destructive" role="alert">
-          {{ $t("setup.playbook.turnOnError") }}
+          <div class="overflow-hidden rounded-lg border border-border bg-background-secondary">
+            <div
+              class="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-background px-3.5 py-2.5"
+            >
+              <span class="flex min-w-0 items-center gap-2 text-sm font-medium text-neutral-900">
+                <Workflow class="h-4 w-4 shrink-0 text-neutral-muted" aria-hidden="true" />
+                {{ $t("setup.playbook.whatItDoes", { playbook: row.playbook.title }) }}
+              </span>
+              <span v-if="row.plugin" class="text-xs text-neutral-muted">
+                {{ $t("setup.playbook.writtenFrom", { plugin: row.plugin.name }) }}
+              </span>
+            </div>
+            <ol
+              v-if="row.playbook.steps.length"
+              class="grid px-3.5 py-1.5 text-sm text-neutral-900"
+              :aria-label="$t('setup.playbook.stepsLabel')"
+            >
+              <li
+                v-for="(step, index) in row.playbook.steps"
+                :key="index"
+                class="grid grid-cols-[1.375rem_minmax(0,1fr)] gap-2.5 border-b border-dashed border-border py-2 leading-6 last:border-b-0"
+              >
+                <span
+                  class="mt-0.5 grid h-5 w-5 place-items-center rounded-full border border-neutral-300 bg-background text-xs font-medium tabular-nums text-neutral-700"
+                  aria-hidden="true"
+                >
+                  {{ index + 1 }}
+                </span>
+                <SetupPlaybookStep :step="step" />
+              </li>
+            </ol>
+          </div>
+          <p class="text-sm text-neutral-muted">{{ $t("setup.playbook.reviewHint") }}</p>
+          <p v-if="turnOnError" class="text-sm text-destructive" role="alert">
+            {{ $t("setup.playbook.turnOnError") }}
+          </p>
+        </div>
+
+        <p v-if="error" class="text-sm text-destructive" role="alert">
+          {{ $t("setup.answer.error") }}
         </p>
-      </div>
 
-      <p v-if="error" class="text-sm text-destructive" role="alert">
-        {{ $t("setup.answer.error") }}
-      </p>
-
-      <div class="flex flex-wrap items-center gap-2">
-        <template v-if="panelKind === 'playbook'">
+        <!-- One action bar per card: the main action, a way out, and Remove at the far end -->
+        <div class="flex flex-wrap items-center gap-2">
+          <template v-if="panelKind === 'compose'">
+            <Button
+              type="submit"
+              class="max-md:min-h-11"
+              :loading="savingSection === 'compose'"
+              :disabled="!canSaveCompose"
+            >
+              {{ $t("setup.answer.saveAnswer") }}
+            </Button>
+            <Button type="button" variant="outline" class="max-md:min-h-11" @click="cancel">
+              {{ $t("setup.answer.cancel") }}
+            </Button>
+          </template>
+          <template v-else-if="panelKind === 'playbook'">
+            <Button
+              type="button"
+              class="max-md:min-h-11"
+              :loading="turningOn"
+              @click="emit('turnOn')"
+            >
+              {{ $t("setup.playbook.turnOn") }}
+            </Button>
+            <Button type="button" variant="outline" class="max-md:min-h-11" @click="cancel">
+              {{ $t("setup.playbook.close") }}
+            </Button>
+            <NuxtLink v-if="playbookTo" :to="playbookTo" :class="textLinkClass">
+              {{ $t("setup.playbook.open") }}
+            </NuxtLink>
+          </template>
+          <template v-else-if="displayStatus === 'needs_connection'">
+            <NuxtLink v-if="connectTo" :to="connectTo" :class="buttonLinkClass">
+              {{ connectLabel }}
+            </NuxtLink>
+            <Button
+              v-else-if="!row.plugin"
+              type="button"
+              class="max-md:min-h-11"
+              @click="emit('choosePlatform')"
+            >
+              {{ $t("setup.action.choosePlatform") }}
+            </Button>
+          </template>
+          <template v-else-if="displayStatus === 'ready'">
+            <Button
+              type="button"
+              class="max-md:min-h-11"
+              :disabled="tryDisabled"
+              @click="emit('try')"
+            >
+              <Play class="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+              {{ $t("setup.action.tryInChat") }}
+            </Button>
+          </template>
           <Button
             type="button"
-            class="max-md:min-h-11"
-            :loading="turningOn"
-            @click="emit('turnOn')"
+            variant="ghost"
+            class="ml-auto text-destructive hover:text-destructive max-md:min-h-11"
+            @click="emit('remove')"
           >
-            {{ $t("setup.playbook.turnOn") }}
+            <Trash2 class="mr-1.5 h-4 w-4" aria-hidden="true" />
+            {{ $t("setup.panel.removeQuestion") }}
           </Button>
-          <Button
-            v-if="textChanged"
-            type="submit"
-            variant="outline"
-            class="max-md:min-h-11"
-            :loading="saving"
-            :disabled="!canSave"
-          >
-            {{ $t("setup.answer.save") }}
-          </Button>
-          <Button type="button" variant="outline" class="max-md:min-h-11" @click="cancel">
-            {{ $t("setup.playbook.close") }}
-          </Button>
-          <NuxtLink v-if="playbookTo" :to="playbookTo" :class="textLinkClass">
-            {{ $t("setup.playbook.open") }}
-          </NuxtLink>
-        </template>
-        <template v-else>
-          <Button type="submit" class="max-md:min-h-11" :loading="saving" :disabled="!canSave">
-            {{ $t("setup.answer.save") }}
-          </Button>
-          <Button type="button" variant="outline" class="max-md:min-h-11" @click="cancel">
-            {{ $t("setup.answer.cancel") }}
-          </Button>
-        </template>
-        <Button
-          type="button"
-          variant="ghost"
-          class="text-destructive hover:text-destructive max-md:min-h-11 sm:ml-auto"
-          @click="emit('remove')"
-        >
-          {{ $t("setup.panel.removeQuestion") }}
-        </Button>
-      </div>
-    </form>
+        </div>
+      </form>
+    </article>
   </li>
 </template>
 
 <script setup lang="ts">
 import { pageTitle } from "@/utils/format";
 import { computed, nextTick, ref, watch } from "vue";
-import { ChevronDown } from "lucide-vue-next";
+import { Check, ChevronDown, PenLine, Play, Plug, Trash2, Workflow } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import type { SetupDocumentRef, SetupRow, SetupRowChanges, SetupRowStatus } from "@/stores/setup";
 import { needsLabel } from "@/composables/useSetupCopy";
-import SetupDocumentSearch from "./SetupDocumentSearch.vue";
-import { textLinkClass } from "./styles";
-
-type BadgeVariant = "secondary" | "success" | "warning" | "outline";
-
-const BADGE_VARIANTS: Record<SetupRowStatus, BadgeVariant> = {
-  checking: "secondary",
-  reading_site: "secondary",
-  ready: "success",
-  missing: "warning",
-  needs_connection: "secondary",
-  playbook_off: "secondary",
-  playbook_missing: "secondary",
-  check_failed: "outline",
-};
-
-// Setup keeps one saturated colour, the blue: steps that need the customer are a quiet blue tint
-// and in-progress states a quiet grey. `!` beats the Badge variant's own colours.
-const BADGE_CLASSES: Partial<Record<SetupRowStatus, string>> = {
-  checking: "!bg-background-tertiary !text-neutral-muted",
-  reading_site: "!bg-background-tertiary !text-neutral-muted",
-  needs_connection: "!bg-primary-50 !text-primary",
-  playbook_off: "!bg-primary-50 !text-primary",
-  playbook_missing: "!bg-primary-50 !text-primary",
-};
+import SetupDocumentList from "./SetupDocumentList.vue";
+import SetupDraftStatus from "./SetupDraftStatus.vue";
+import SetupIconButton from "./SetupIconButton.vue";
+import SetupPlaybookStep from "./SetupPlaybookStep.vue";
+import { BADGE_CLASSES, BADGE_VARIANTS, STATUS_TILES } from "./status";
+import { buttonLinkClass, softLinkClass, textLinkClass } from "./styles";
 
 const props = withDefaults(
   defineProps<{
@@ -426,6 +532,7 @@ const props = withDefaults(
     tryDisabled?: boolean;
   }>(),
   {
+    sitePartial: false,
     writeTo: null,
     canOpenDocuments: false,
     turningOn: false,
@@ -441,7 +548,8 @@ const emit = defineEmits<{
   remove: [];
   retry: [];
   choosePlatform: [];
-  save: [changes: SetupRowChanges];
+  /** `keepOpen`: a section of an open card was saved, so the card stays open. */
+  save: [changes: SetupRowChanges, options: { keepOpen: boolean }];
   turnOn: [];
   regenerate: [];
 }>();
@@ -453,10 +561,26 @@ const questionId = computed(() => `setup-question-${props.row.id}`);
 const answerId = computed(() => `setup-answer-${props.row.id}`);
 const badgeVariant = computed(() => BADGE_VARIANTS[props.displayStatus]);
 const badgeClass = computed(() => BADGE_CLASSES[props.displayStatus]);
-
-const linkedTitle = computed(() =>
-  props.row.linkedDocument ? pageTitle(props.row.linkedDocument.title) : "",
+const tile = computed(() => STATUS_TILES[props.displayStatus]);
+const connectLabel = computed(() =>
+  props.row.plugin
+    ? t("setup.action.connectPlugin", { plugin: props.row.plugin.name })
+    : t("setup.action.connect"),
 );
+
+/** Pages of the customer's documents the check found the answer on (not their own answer). */
+const sourceDocs = computed<SetupDocumentRef[]>(() =>
+  props.row.sources.filter((s) => !s.own).map((s) => ({ id: s.documentId, title: s.title })),
+);
+const linkedDocs = computed<SetupDocumentRef[]>(() => props.row.linkedDocuments ?? []);
+
+/** "{first}", or "{first} and N more documents". */
+const firstAndMore = (prefix: string, docs: SetupDocumentRef[], key: string): string => {
+  const first = pageTitle(docs[0].title);
+  if (docs.length === 1) return t(prefix, { [key]: first });
+  const count = docs.length - 1;
+  return t(`${prefix}More${count === 1 ? "One" : "Other"}`, { [key]: first, count });
+};
 
 const why = computed(() => {
   const { row } = props;
@@ -466,13 +590,14 @@ const why = computed(() => {
     case "reading_site":
       return t("setup.why.readingSite");
     case "ready": {
-      const source = row.sources[0];
-      if (source?.own) {
-        return row.linkedDocument
-          ? t("setup.why.readyLinked", { document: linkedTitle.value })
+      if (row.sources[0]?.own || row.answerDocumentId) {
+        return linkedDocs.value.length
+          ? firstAndMore("setup.why.readyLinked", linkedDocs.value, "document")
           : t("setup.why.readyOwn");
       }
-      if (source) return t("setup.why.readyFound", { source: pageTitle(source.title) });
+      if (sourceDocs.value.length) {
+        return firstAndMore("setup.why.readyFound", sourceDocs.value, "source");
+      }
       if (row.plugin && row.playbook) {
         return t("setup.why.readyTool", { plugin: row.plugin.name, playbook: row.playbook.title });
       }
@@ -504,34 +629,14 @@ const why = computed(() => {
   }
 });
 
-// --- The panel's draft. The row stays mounted while closed, so the draft lives here and only
-// Cancel or a successful Save clears it. A board poll replaces `row` and leaves it alone.
-// `null` / `undefined` mean "untouched": the panel then shows what the row holds.
-const questionDraft = ref<string | null>(null);
-const answerDraft = ref<string | null>(null);
-/** The answer text came from a drafted answer and has not been typed over since. */
-const answerIsDraft = ref(false);
-const chosenDocument = ref<SetupDocumentRef | undefined>(undefined);
-/** A found-on-a-page answer was taken over by the person. */
-const takenOver = ref(false);
-/** Showing the search even though a document is already linked. */
-const searching = ref(false);
-
-const drafting = ref<SetupDocumentRef | null>(null);
-const pendingDraft = ref<string | null>(null);
-const noAnswerFrom = ref<SetupDocumentRef | null>(null);
-const draftFailed = ref<SetupDocumentRef | null>(null);
-
+// --- The saved own answer, read when the panel opens for a row that has one.
 type StoredAnswer = {
   state: "idle" | "loading" | "ready" | "error";
   text: string;
   editable: boolean;
 };
 const stored = ref<StoredAnswer>({ state: "idle", text: "", editable: true });
-
-let draftToken = 0;
 let loadToken = 0;
-let storedLoad: Promise<void> | null = null;
 
 const hasStored = computed(() => Boolean(props.row.answerDocumentId));
 const storedPending = computed(
@@ -541,90 +646,141 @@ const readOnlyAnswer = computed(
   () => hasStored.value && stored.value.state === "ready" && !stored.value.editable,
 );
 
-type PanelKind = "answer" | "found" | "playbook" | "question";
-const panelKind = computed<PanelKind>(() => {
-  const { status, answerDocumentId, sources, playbook } = props.row;
-  if (status === "missing" || status === "check_failed") return "answer";
-  if (status === "ready") {
-    if (answerDocumentId) return "answer";
-    if (sources.length > 0) return takenOver.value ? "answer" : "found";
+const loadStored = async () => {
+  const token = ++loadToken;
+  stored.value = { state: "loading", text: "", editable: true };
+  try {
+    const result = await Hay.setup.getAnswer.query({ questionId: props.row.id });
+    if (token !== loadToken) return;
+    stored.value = { state: "ready", text: result?.text ?? "", editable: result?.editable ?? true };
+  } catch {
+    if (token === loadToken) stored.value = { state: "error", text: "", editable: true };
   }
-  if (status === "playbook_off" && playbook) return "playbook";
+};
+const loadStoredOnce = () => {
+  if (hasStored.value && stored.value.state === "idle") void loadStored();
+};
+
+/**
+ * - compose: no answer yet; write one, optionally drafted from documents.
+ * - own: the customer's saved answer and the documents it is based on.
+ * - found: an answer the check found in the customer's documents.
+ * - playbook: a platform request whose playbook is off, to review.
+ * - question: nothing to edit but the wording.
+ */
+type PanelKind = "compose" | "own" | "found" | "playbook" | "question";
+const panelKind = computed<PanelKind>(() => {
+  const { row } = props;
+  if (row.status === "playbook_off" && row.playbook) return "playbook";
+  if (row.needs) return "question";
+  if (hasStored.value) return "own";
+  if (row.status === "ready" && sourceDocs.value.length) return "found";
+  if (row.status === "missing" || row.status === "check_failed") return "compose";
   return "question";
 });
 
+// --- Drafts. The row stays mounted while closed, so drafts live here; only Cancel or a
+// successful Save clears them. `null` means "untouched": the panel shows what the row holds.
+const questionDraft = ref<string | null>(null);
+const answerDraft = ref<string | null>(null);
+/** The answer text came from a drafted answer and has not been typed over since. */
+const answerIsDraft = ref(false);
+const docsDraft = ref<SetupDocumentRef[] | null>(null);
+/** The section of an existing answer being edited, if any. */
+const editing = ref<"answer" | "documents" | null>(null);
+/** Which save is in flight, for its button's spinner. */
+const savingSection = ref<"question" | "answer" | "documents" | "compose" | null>(null);
+
+const drafting = ref(false);
+const draftFailed = ref(false);
+const noAnswer = ref(false);
+const pendingDraft = ref<string | null>(null);
+let draftToken = 0;
+
 const questionValue = computed(() => questionDraft.value ?? props.row.text);
-const storedText = computed(() => (stored.value.state === "ready" ? stored.value.text : ""));
-const answerValue = computed(() => answerDraft.value ?? storedText.value);
-
-const linkedDocument = computed(() => chosenDocument.value ?? props.row.linkedDocument);
-const basedOn = computed(() =>
-  linkedDocument.value
-    ? t("setup.panel.basedOn", { document: pageTitle(linkedDocument.value.title) })
-    : "",
-);
-const showSearch = computed(() => !linkedDocument.value || searching.value);
-const documentTo = computed(() =>
-  props.canOpenDocuments && props.row.answerDocumentId
-    ? `/documents/${props.row.answerDocumentId}`
-    : null,
-);
-
-// What changed against the row. Only these are sent.
 const textChanged = computed(
-  () => questionDraft.value !== null && questionDraft.value.trim() !== props.row.text,
-);
-const answerEditable = computed(
   () =>
-    panelKind.value === "answer" &&
-    !storedPending.value &&
-    stored.value.state !== "error" &&
-    !readOnlyAnswer.value,
-);
-const answerChanged = computed(
-  () =>
-    answerEditable.value &&
-    answerDraft.value !== null &&
-    answerDraft.value.trim() !== storedText.value.trim(),
-);
-const linkChanged = computed(
-  () =>
-    answerEditable.value &&
-    chosenDocument.value !== undefined &&
-    chosenDocument.value.id !== props.row.linkedDocument?.id,
-);
-const dirty = computed(() => textChanged.value || answerChanged.value || linkChanged.value);
-
-const answerEmptied = computed(
-  () => answerChanged.value && !answerValue.value.trim() && Boolean(storedText.value.trim()),
-);
-const canSave = computed(
-  () => dirty.value && !props.saving && !answerEmptied.value && Boolean(questionValue.value.trim()),
+    questionDraft.value !== null &&
+    Boolean(questionDraft.value.trim()) &&
+    questionDraft.value.trim() !== props.row.text,
 );
 
-const save = () => {
-  if (!canSave.value) return;
-  const changes: SetupRowChanges = {};
-  if (textChanged.value) changes.text = questionValue.value.trim();
-  if (answerChanged.value) changes.answer = answerValue.value.trim();
-  if (linkChanged.value && chosenDocument.value) changes.linkedDocumentId = chosenDocument.value.id;
-  emit("save", changes);
+const baseAnswer = computed(() =>
+  panelKind.value === "own"
+    ? stored.value.state === "ready"
+      ? stored.value.text
+      : ""
+    : panelKind.value === "found"
+      ? (props.row.answer ?? "")
+      : "",
+);
+const answerValue = computed(() => answerDraft.value ?? baseAnswer.value);
+
+const currentDocs = computed(() =>
+  panelKind.value === "found" ? sourceDocs.value : linkedDocs.value,
+);
+const editDocs = computed(
+  () => docsDraft.value ?? (panelKind.value === "compose" ? [] : currentDocs.value),
+);
+const ownExclude = computed(() => (props.row.answerDocumentId ? [props.row.answerDocumentId] : []));
+
+const documentsTitle = (docs: SetupDocumentRef[], kind: "based" | "drafting"): string => {
+  if (!docs.length) {
+    return t(kind === "drafting" ? "setup.documents.startFrom" : "setup.documents.none");
+  }
+  const one = docs.length === 1 ? "One" : "Other";
+  return t(
+    kind === "drafting" ? `setup.documents.draftingFrom${one}` : `setup.documents.basedOn${one}`,
+    {
+      count: docs.length,
+    },
+  );
+};
+
+const sameDocs = (a: SetupDocumentRef[], b: SetupDocumentRef[]) =>
+  a.length === b.length && a.every((doc, index) => doc.id === b[index].id);
+
+const canSaveAnswer = computed(
+  () =>
+    !props.saving &&
+    Boolean(answerValue.value.trim()) &&
+    answerValue.value.trim() !== baseAnswer.value.trim(),
+);
+const canSaveDocuments = computed(() => {
+  if (props.saving || drafting.value) return false;
+  // A found answer is redrafted from the documents, so it needs at least one.
+  if (panelKind.value === "found") return editDocs.value.length > 0;
+  return !sameDocs(editDocs.value, currentDocs.value);
+});
+const canSaveCompose = computed(
+  () => !props.saving && Boolean(answerValue.value.trim()) && Boolean(questionValue.value.trim()),
+);
+
+const dirty = computed(
+  () =>
+    textChanged.value ||
+    editing.value !== null ||
+    (panelKind.value === "compose" &&
+      (Boolean(answerValue.value.trim()) || editDocs.value.length > 0)),
+);
+
+const resetDraftStatus = () => {
+  draftToken++;
+  drafting.value = false;
+  draftFailed.value = false;
+  noAnswer.value = false;
+  pendingDraft.value = null;
 };
 
 const reset = () => {
-  draftToken++;
   loadToken++;
-  storedLoad = null;
   questionDraft.value = null;
   answerDraft.value = null;
   answerIsDraft.value = false;
-  chosenDocument.value = undefined;
-  takenOver.value = false;
-  searching.value = false;
-  drafting.value = null;
-  pendingDraft.value = null;
-  noAnswerFrom.value = null;
-  draftFailed.value = null;
+  docsDraft.value = null;
+  editing.value = null;
+  savingSection.value = null;
+  resetDraftStatus();
   stored.value = { state: "idle", text: "", editable: true };
 };
 
@@ -633,9 +789,34 @@ const cancel = () => {
   emit("toggle");
 };
 
-// Escape closes the panel only when nothing would be lost.
-const closeIfClean = () => {
-  if (!dirty.value) emit("toggle");
+const cancelSection = () => {
+  editing.value = null;
+  answerDraft.value = null;
+  answerIsDraft.value = false;
+  docsDraft.value = null;
+  resetDraftStatus();
+};
+
+// Escape steps out of a section being edited; on the card, it closes only when nothing is lost.
+const onEscape = () => {
+  if (editing.value) cancelSection();
+  else if (!dirty.value) emit("toggle");
+};
+
+const documentsEl = ref<InstanceType<typeof SetupDocumentList> | null>(null);
+
+const startEdit = async (section: "answer" | "documents") => {
+  cancelSection();
+  editing.value = section;
+  if (section === "documents") docsDraft.value = [...currentDocs.value];
+  await nextTick();
+  if (section === "answer") {
+    const field = document.getElementById(answerId.value) as HTMLTextAreaElement | null;
+    field?.focus();
+    field?.setSelectionRange?.(field.value.length, field.value.length);
+  } else {
+    documentsEl.value?.focus();
+  }
 };
 
 const typeAnswer = (value: string) => {
@@ -643,33 +824,38 @@ const typeAnswer = (value: string) => {
   answerIsDraft.value = false;
 };
 
-// --- The saved answer, read when the panel opens for a row that has one.
-const loadStored = () => {
-  const token = ++loadToken;
-  stored.value = { state: "loading", text: "", editable: true };
-  const run = (async () => {
-    try {
-      const result = await Hay.setup.getAnswer.query({ questionId: props.row.id });
-      if (token !== loadToken) return;
-      stored.value = {
-        state: "ready",
-        text: result?.text ?? "",
-        editable: result?.editable ?? true,
-      };
-    } catch {
-      if (token === loadToken) stored.value = { state: "error", text: "", editable: true };
+const addDocument = (doc: SetupDocumentRef) => {
+  docsDraft.value = [...editDocs.value, doc];
+  noAnswer.value = false;
+  draftFailed.value = false;
+};
+const removeDocument = (id: string) => {
+  docsDraft.value = editDocs.value.filter((doc) => doc.id !== id);
+};
+
+/** Drafts from the documents together. Resolves the answer, null when they don't say, or undefined on failure. */
+const draftFrom = async (docs: SetupDocumentRef[]): Promise<string | null | undefined> => {
+  const token = ++draftToken;
+  drafting.value = true;
+  draftFailed.value = false;
+  noAnswer.value = false;
+  try {
+    const { answer } = await Hay.setup.draftAnswer.mutate({
+      questionId: props.row.id,
+      documentIds: docs.map((d) => d.id),
+    });
+    if (token !== draftToken) return undefined;
+    drafting.value = false;
+    noAnswer.value = answer === null;
+    return answer;
+  } catch {
+    if (token === draftToken) {
+      drafting.value = false;
+      draftFailed.value = true;
     }
-  })();
-  storedLoad = run;
-  return run;
+    return undefined;
+  }
 };
-
-const loadStoredOnce = () => {
-  if (hasStored.value && stored.value.state === "idle") void loadStored();
-};
-
-// --- Drafting an answer from a document.
-const searchEl = ref<InstanceType<typeof SetupDocumentSearch> | null>(null);
 
 const applyDraft = (answer: string) => {
   const current = answerValue.value.trim();
@@ -683,32 +869,12 @@ const applyDraft = (answer: string) => {
   }
 };
 
-const pickDocument = async (picked: SetupDocumentRef) => {
-  const token = ++draftToken;
-  chosenDocument.value = picked;
-  takenOver.value = true;
-  searching.value = false;
+/** Writing a new answer: each document picked joins the list and the draft is redone from all. */
+const addComposeDocument = async (doc: SetupDocumentRef) => {
+  addDocument(doc);
   pendingDraft.value = null;
-  noAnswerFrom.value = null;
-  draftFailed.value = null;
-  drafting.value = picked;
-  // The saved answer must be known before deciding whether a draft may fill the field.
-  if (storedLoad) await storedLoad;
-  if (token !== draftToken) return;
-  try {
-    const { answer } = await Hay.setup.draftAnswer.mutate({
-      questionId: props.row.id,
-      documentId: picked.id,
-    });
-    if (token !== draftToken) return;
-    drafting.value = null;
-    if (answer === null) noAnswerFrom.value = picked;
-    else applyDraft(answer);
-  } catch {
-    if (token !== draftToken) return;
-    drafting.value = null;
-    draftFailed.value = picked;
-  }
+  const answer = await draftFrom(editDocs.value);
+  if (answer) applyDraft(answer);
 };
 
 const replaceWithDraft = async () => {
@@ -720,24 +886,59 @@ const replaceWithDraft = async () => {
   document.getElementById(answerId.value)?.focus();
 };
 
-const changeDocument = async () => {
-  takenOver.value = true;
-  searching.value = true;
-  await nextTick();
-  searchEl.value?.focus();
+// --- Saving. Inline sections keep the card open; the footer's Save closes it.
+const emitSave = (
+  section: NonNullable<typeof savingSection.value>,
+  changes: SetupRowChanges,
+  keepOpen: boolean,
+) => {
+  savingSection.value = section;
+  emit("save", changes, { keepOpen });
 };
 
-const writeMyOwn = async () => {
-  takenOver.value = true;
-  await nextTick();
-  document.getElementById(answerId.value)?.focus();
+const saveQuestion = () => {
+  if (!textChanged.value || props.saving) return;
+  emitSave("question", { text: questionValue.value.trim() }, true);
 };
 
-// --- Saving. A save that ends without an error is done: the draft is spent.
+const withText = (changes: SetupRowChanges): SetupRowChanges =>
+  textChanged.value ? { ...changes, text: questionValue.value.trim() } : changes;
+
+const saveAnswer = () => {
+  if (!canSaveAnswer.value) return;
+  const changes: SetupRowChanges = { answer: answerValue.value.trim() };
+  // A found answer the customer rewrites becomes their own, based on the pages it was found on.
+  if (panelKind.value === "found") changes.linkedDocumentIds = sourceDocs.value.map((d) => d.id);
+  emitSave("answer", withText(changes), true);
+};
+
+const saveDocuments = async () => {
+  if (!canSaveDocuments.value) return;
+  const docs = editDocs.value;
+  const linkedDocumentIds = docs.map((d) => d.id);
+  if (panelKind.value === "own") {
+    emitSave("documents", withText({ linkedDocumentIds }), true);
+    return;
+  }
+  // A found answer is redrafted from the chosen documents and saved as the customer's own.
+  const answer = await draftFrom(docs);
+  if (answer) emitSave("documents", withText({ answer, linkedDocumentIds }), true);
+};
+
+const saveCompose = () => {
+  if (panelKind.value !== "compose" || !canSaveCompose.value) return;
+  const changes: SetupRowChanges = { answer: answerValue.value.trim() };
+  if (editDocs.value.length) changes.linkedDocumentIds = editDocs.value.map((d) => d.id);
+  emitSave("compose", withText(changes), false);
+};
+
+// A save that ends without an error is done: the draft is spent.
 watch(
   () => props.saving,
   (now, was) => {
-    if (was && !now && !props.error) reset();
+    if (!was || now) return;
+    if (props.error) savingSection.value = null;
+    else reset();
   },
 );
 
@@ -748,15 +949,28 @@ watch(
   },
 );
 
+// The card's head opens and closes it; its own buttons and links keep their meaning.
+const onHeadClick = (event: MouseEvent) => {
+  if ((event.target as HTMLElement).closest("a, button")) return;
+  emit("toggle");
+};
+
 const rowEl = ref<HTMLElement | null>(null);
+const documentTo = computed(() =>
+  props.canOpenDocuments && props.row.answerDocumentId
+    ? `/documents/${props.row.answerDocumentId}`
+    : null,
+);
 
 // Move focus into the panel when it opens, like a dialog would. When it closes, the focused
-// control (Cancel, Save, Turn on) is gone: hand focus back to the row's chevron.
+// control is gone: hand focus back to the card's chevron.
 watch(
   () => props.expanded,
   async (open, wasOpen) => {
     if (!open) {
       if (!wasOpen) return;
+      // A section edit ends with the card; an answer being written stays for when it reopens.
+      if (editing.value) cancelSection();
       await nextTick();
       const active = document.activeElement;
       if (!active || active === document.body) {
@@ -766,9 +980,8 @@ watch(
     }
     loadStoredOnce();
     await nextTick();
-    const wantsAnswer = props.row.status === "missing" || props.row.status === "check_failed";
     const target =
-      (wantsAnswer ? document.getElementById(answerId.value) : null) ??
+      (panelKind.value === "compose" ? document.getElementById(answerId.value) : null) ??
       document.getElementById(questionId.value);
     target?.focus();
   },

@@ -199,6 +199,27 @@ export const uiStubs: Record<string, Component> = {
   EmptyState,
 };
 
+/**
+ * reka-ui tooltips position themselves with floating-ui, which loops on animation frames in
+ * jsdom. Tests get the tooltip text inline and hidden instead, so they can still read it.
+ */
+const tooltipStubs: Record<string, Component> = {
+  TooltipPortal: defineComponent({
+    name: "TooltipPortal",
+    setup:
+      (_, { slots }) =>
+      () =>
+        slots.default?.(),
+  }),
+  TooltipContent: defineComponent({
+    name: "TooltipContent",
+    setup:
+      (_, { slots }) =>
+      () =>
+        h("span", { role: "tooltip", hidden: true }, slots.default?.()),
+  }),
+};
+
 export function mountWithStubs(
   component: Component,
   options: {
@@ -213,7 +234,7 @@ export function mountWithStubs(
     attachTo: options.attachTo,
     global: {
       components: uiStubs,
-      stubs: options.stubs,
+      stubs: { ...tooltipStubs, ...options.stubs },
       mocks: { $t: translate },
     },
   });

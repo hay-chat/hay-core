@@ -15,6 +15,9 @@ const api = vi.hoisted(() => ({
 vi.mock("@/composables/useDomain", () => ({
   useDomain: () => ({ getApiUrl: (path: string) => `http://api${path}` }),
 }));
+vi.mock("@/composables/useToolLabel", () => ({
+  useToolLabel: () => ({ getToolLabel: (_plugin: string, tool: string) => `Label of ${tool}` }),
+}));
 vi.mock("@/utils/api", () => ({
   Hay: {
     setup: {
@@ -91,8 +94,8 @@ describe("setup page", () => {
     expect(api.checkQuestions).toHaveBeenCalledTimes(1);
     expect(api.checkQuestions).toHaveBeenCalledWith({});
     expect(wrapper.findAll("[data-row-id]").map((r) => r.attributes("data-status"))).toEqual([
-      "ready",
       "missing",
+      "ready",
     ]);
   });
 

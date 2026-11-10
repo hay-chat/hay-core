@@ -52,10 +52,22 @@
       }
     },
     "types": {
-      "store": { "name": "Online store", "hint": "You sell products online" },
-      "saas": { "name": "Software or SaaS", "hint": "Customers subscribe to your product" },
-      "service": { "name": "Service provider", "hint": "Customers book or hire you" },
-      "other": { "name": "Something else", "hint": "We'll start with the basics" }
+      "store": {
+        "name": "Online store",
+        "hint": "You sell products online"
+      },
+      "saas": {
+        "name": "Software or SaaS",
+        "hint": "Customers subscribe to your product"
+      },
+      "service": {
+        "name": "Service provider",
+        "hint": "Customers book or hire you"
+      },
+      "other": {
+        "name": "Something else",
+        "hint": "We'll start with the basics"
+      }
     },
     "groups": {
       "commerce": "Where you sell",
@@ -112,7 +124,20 @@
       "undoError": "We couldn't undo that. Add the question again.",
       "removeError": "We couldn't remove that question. Try again.",
       "partialNoticeOne": "We've read {count} page of your site so far, so a request listed as missing may be on a page we haven't reached yet.",
-      "partialNoticeOther": "We've read {count} pages of your site so far, so a request listed as missing may be on a page we haven't reached yet."
+      "partialNoticeOther": "We've read {count} pages of your site so far, so a request listed as missing may be on a page we haven't reached yet.",
+      "filtersLabel": "Show",
+      "filterAll": "All",
+      "filterNeedsYou": "Needs you",
+      "filterReady": "Ready",
+      "needYouOne": "1 needs you",
+      "needYouOther": "{count} need you",
+      "allSet": "All set",
+      "groups": {
+        "needs_you": "Needs you",
+        "checking": "Being checked",
+        "ready": "Ready"
+      },
+      "filterEmpty": "Nothing here right now."
     },
     "status": {
       "checking": "Checking…",
@@ -127,7 +152,7 @@
     "why": {
       "checking": "Testing on your assistant",
       "readingSite": "Still reading your website",
-      "readyFound": "Found on {source}",
+      "readyFound": "Based on {source}",
       "readyOwn": "Your answer",
       "readyLinked": "Your answer, based on {document}",
       "readyTool": "{plugin} connected, {playbook} on",
@@ -143,7 +168,11 @@
       "playbookFailed": "We couldn't write a playbook. Try again or write your own.",
       "failed": "Something went wrong while checking. Try again.",
       "missingHandedOff": "We found something, but not enough to answer with confidence. This would go to your team.",
-      "missingPartial": "Not found in the pages read so far"
+      "missingPartial": "Not found in the pages read so far",
+      "readyFoundMoreOne": "Based on {source} and 1 more document",
+      "readyFoundMoreOther": "Based on {source} and {count} more documents",
+      "readyLinkedMoreOne": "Your answer, based on {document} and 1 more document",
+      "readyLinkedMoreOther": "Your answer, based on {document} and {count} more documents"
     },
     "needs": {
       "orders": "look up orders",
@@ -165,37 +194,42 @@
       "choosePlatform": "Choose platform",
       "writeOwn": "Write your own",
       "review": "Review",
-      "retry": "Retry"
+      "retry": "Retry",
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "connectPlugin": "Connect {plugin}",
+      "tryInChat": "Try it in chat"
     },
     "answer": {
       "label": "How should your assistant answer?",
       "placeholder": "Write the answer customers should get",
       "save": "Save",
       "cancel": "Cancel",
-      "error": "We couldn't save your changes. Try again."
+      "error": "We couldn't save your changes. Try again.",
+      "saveAnswer": "Save answer"
     },
     "panel": {
       "questionLabel": "Question",
-      "useDocument": "Use a document",
       "searchLabel": "Search your documents",
       "searchHint": "Type at least 2 characters.",
       "searching": "Searching…",
       "searchError": "We couldn't search your documents. Try again.",
       "noResults": "No documents match “{query}”.",
       "resultsLabel": "Matching documents",
-      "basedOn": "Based on {document}",
-      "changeDocument": "Change document",
-      "writeMyOwn": "Write my own",
-      "drafting": "Drafting from {document}…",
-      "draftReady": "We drafted an answer from this document. Your text stays until you replace it.",
+      "draftReady": "We drafted an answer from your documents. Your text stays until you replace it.",
       "replaceDraft": "Replace with draft",
-      "noAnswer": "{document} doesn't answer this. Write the answer or pick another.",
-      "draftError": "We couldn't draft an answer from {document}. Write it yourself or pick it again.",
+      "draftError": "We couldn't draft an answer from these documents. Write it yourself or try again.",
       "loadingAnswer": "Loading your answer",
       "answerLoadError": "We couldn't load your answer.",
       "formatted": "This answer has formatting that would be lost here.",
       "editInKnowledge": "Edit it in Knowledge",
-      "removeQuestion": "Remove question"
+      "removeQuestion": "Remove question",
+      "answerLabel": "What your assistant says",
+      "editAnswer": "Edit answer",
+      "draftingOne": "Drafting an answer from {document}…",
+      "draftingOther": "Drafting an answer from {count} documents…",
+      "noAnswerOne": "{document} doesn't answer this. Write the answer or add another document.",
+      "noAnswerOther": "These {count} documents don't answer this. Write the answer or add another document."
     },
     "playbook": {
       "whatItDoes": "What {playbook} does",
@@ -205,7 +239,8 @@
       "turnOnError": "We couldn't turn this playbook on. Try again.",
       "generateError": "We couldn't write the playbook. Try again.",
       "reviewHint": "Nothing changes for customers until you turn it on.",
-      "stepsLabel": "Steps"
+      "stepsLabel": "Steps",
+      "writtenFrom": "Written from your {plugin} tools"
     },
     "connectError": {
       "message": "We couldn't connect {plugin}. Nothing was changed. Try again.",
@@ -321,6 +356,22 @@
       "capped": "This replay stopped early at its AI usage limit. The counts cover what finished.",
       "cancelled": "This replay was stopped. The counts cover what finished.",
       "openReport": "Open the full report"
+    },
+    "documents": {
+      "basedOnOne": "Based on 1 document",
+      "basedOnOther": "Based on {count} documents",
+      "draftingFromOne": "Drafting from 1 document",
+      "draftingFromOther": "Drafting from {count} documents",
+      "none": "Not based on a document",
+      "startFrom": "Start from a document",
+      "edit": "Edit documents",
+      "addDocuments": "Add documents",
+      "done": "Done",
+      "remove": "Remove {document}",
+      "removeTip": "Remove document",
+      "open": "Open {document}",
+      "openTip": "Open document",
+      "redraftHint": "When you click Done, we draft the answer again from these documents and save it as yours."
     }
   }
 }
