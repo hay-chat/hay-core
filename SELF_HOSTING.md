@@ -114,12 +114,76 @@ Each organization can choose its chat provider in **Settings → AI Models**
 default for every organization, set `LLM_BASE_URL`, `LLM_VENDOR` and
 `LLM_API_KEY` in `.env`. Embeddings stay on `OPENAI_API_KEY`.
 
+## Help center
+
+Each organization can publish a public help center: a website with its articles,
+served by the Hay server itself. A help center gets a built-in address,
+`<subdomain>.<HELP_CENTER_DOMAIN>`, and can also be connected to a domain the
+organization owns, such as `help.acme.com`.
+
+The feature is off until you set `HELP_CENTER_DOMAIN`. To turn it on:
+
+1. Pick a domain or subdomain reserved for help centers, for example
+   `help.example.com`. It must not be `HAY_DOMAIN`. A different registered domain
+   from the dashboard's is the safer choice, because help centers show content
+   written by your organizations and browsers treat subdomains of one domain as
+   the same site.
+2. Create a wildcard DNS record `*.help.example.com` (A, and AAAA if you use
+   IPv6) pointing at the server. The bare `help.example.com` needs no record;
+   nothing is served there.
+3. Set `HELP_CENTER_DOMAIN=help.example.com` in `selfhost/.env` (host name only,
+   no `https://`) and run `docker compose up -d`.
+
+Sites are then reachable at addresses like `https://acme.help.example.com`.
+
+**Certificates.** Caddy gets a separate certificate for each help center
+hostname, the first time someone requests it. That first request takes a few
+seconds. Before asking Let's Encrypt, Caddy asks the server whether the hostname
+is a help center it serves (`/internal/help-center/tls-ask`, reachable only
+inside the Docker network). The server says yes for an existing subdomain or a
+verified custom domain and no for anything else, so a stranger who points a
+domain at your server gets no certificate and can't use up your rate limits.
+
+**Custom domains.** In the dashboard, an organization enters its domain and is
+shown a CNAME record to create at its own DNS provider, pointing at
+`hc-<random>.<HELP_CENTER_DOMAIN>`. Your wildcard record makes that name resolve
+to your server. Once Hay has verified the record, the first visit to the custom
+domain gets its certificate. For that to work the server must be reachable on
+ports 80 and 443 under the customer's domain, so the domain has to resolve
+straight to this machine and not to a CDN or proxy that ends TLS in front of it.
+
+**Rate limits.** Let's Encrypt issues a limited number of new certificates per
+registered domain per week (50 at the time of writing). Every help center
+subdomain counts towards the limit of `HELP_CENTER_DOMAIN`'s registered domain,
+together with `HAY_DOMAIN` if they share one. Custom domains count against the
+customer's domain, not yours. A handful of help centers is fine. If your
+instance will create many, serve the subdomains with one wildcard certificate
+instead: build Caddy with the module for your DNS provider
+([how](https://caddyserver.com/docs/build#xcaddy)), and add a site for the
+wildcard to `selfhost/Caddyfile`, above the `https://` block. With Cloudflare
+DNS, for example:
+
+```
+*.{$HELP_CENTER_DOMAIN} {
+	tls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+	}
+	@internal path /internal /internal/*
+	respond @internal 404
+	reverse_proxy server:3001
+}
+```
+
+Pass `HELP_CENTER_DOMAIN` and the token to the `caddy` service in `compose.yml`.
+Keep the `https://` block: custom domains still get their certificates on demand.
+
 ## Other optional features
 
 All are configured in `selfhost/.env`; the example lists each one.
 
 | Feature                          | Variables                                                |
 | -------------------------------- | -------------------------------------------------------- |
+| Public help centers              | `HELP_CENTER_DOMAIN`. See [Help center](#help-center)    |
 | Push notifications for agents    | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` |
 | Bot check on the chat widget     | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`             |
 | S3-compatible file storage       | `S3_*` (default: local `uploads` volume)                 |
@@ -265,7 +329,19 @@ failure can be found with `docker compose logs server | grep <id>`.
   the server, everything else to the dashboard: `/v1`, `/ws`, `/plugins`,
   `/uploads`, `/github`, `/oauth/callback`, `/.well-known/oauth-client`,
   `/health`. Forward WebSocket upgrades on `/ws` and `/v1/ws`. `selfhost/Caddyfile`
-  is the reference. Hay assumes HTTPS in production.
+  is the reference. Hay assumes HTTPS in production. Never route `/internal/*`
+  to the server from outside: those endpoints are for the proxy itself.
+- **Help centers behind your own proxy:** send every request for a subdomain of
+  `HELP_CENTER_DOMAIN`, and for each connected custom domain, to the server
+  (port 3001), all paths except `/internal/*`, with the `Host` header unchanged:
+  the server picks the site from it. Certificates are yours to issue. A wildcard
+  certificate covers the subdomains. Custom domains need one each; if your proxy
+  can issue on demand, have it ask
+  `http://server:3001/internal/help-center/tls-ask?domain=<host>` first (200 =
+  issue, 404 = refuse). A CDN in front of the wildcard record generally breaks
+  custom domains, because customers' CNAMEs then point at the CDN, which doesn't
+  know their domain. Keep that record DNS-only unless your CDN has a feature for
+  customer hostnames.
 - **Managed PostgreSQL / Redis / RabbitMQ:** remove the service from
   `compose.yml` and set `DB_HOST`, `DB_PORT`, `DB_SSL=true`, `REDIS_HOST`,
   `REDIS_PASSWORD`, `REDIS_TLS` or `RABBITMQ_URL` in the `environment` block of
@@ -288,6 +364,11 @@ failure can be found with `docker compose logs server | grep <id>`.
 - **The site shows a certificate error:** Caddy couldn't get a certificate.
   Check that DNS points at the server and ports 80/443 are reachable, then
   `docker compose logs caddy`.
+- **A help center shows a certificate error:** Caddy was refused or couldn't get
+  a certificate for that hostname. Check `HELP_CENTER_DOMAIN` is set, the
+  wildcard DNS record (or the customer's CNAME) resolves to the server, and for
+  a custom domain that the dashboard shows it as verified. `docker compose logs
+  caddy` shows the refusal or the Let's Encrypt error, including rate limits.
 - **The server exits on start:** `docker compose logs server`. The usual cause
   is a missing or too-short `JWT_SECRET` / `JWT_REFRESH_SECRET`, or a missing
   `OPENAI_API_KEY`.

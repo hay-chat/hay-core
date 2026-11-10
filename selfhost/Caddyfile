@@ -1,6 +1,24 @@
-# One domain for everything. API paths go to the server, the rest to the dashboard.
+{
+	# Help center sites get a certificate each, on the first request for their
+	# hostname. Before asking Let's Encrypt, Caddy asks the server whether that
+	# hostname is a help center it serves (200) or not (404). Without this check
+	# a stranger could point any domain at this machine and use up your Let's
+	# Encrypt rate limits. With HELP_CENTER_DOMAIN unset the answer is always
+	# 404, so no certificates are issued.
+	on_demand_tls {
+		ask http://server:3001/internal/help-center/tls-ask
+	}
+}
+
+# The main domain: API paths go to the server, the rest to the dashboard.
 {$HAY_DOMAIN} {
 	encode gzip
+
+	# Server endpoints meant for this machine only. Never proxied.
+	@internal path /internal /internal/*
+	handle @internal {
+		respond 404
+	}
 
 	@api path /v1 /v1/* /ws /ws/* /plugins/* /uploads/* /github/* /oauth/callback* /.well-known/oauth-client* /health
 	handle @api {
@@ -9,5 +27,32 @@
 
 	handle {
 		reverse_proxy dashboard:3000
+	}
+}
+
+# Every other hostname: help centers, at <subdomain>.<HELP_CENTER_DOMAIN> and at
+# customers' own domains. The server picks the site from the Host header. The
+# block above is more specific, so it still wins for HAY_DOMAIN.
+#
+# Let's Encrypt issues a limited number of new certificates per registered
+# domain per week (50 at the time of writing), and every help center subdomain
+# counts towards it. An instance that creates many help centers should serve
+# *.<HELP_CENTER_DOMAIN> with one wildcard certificate instead. That needs the
+# DNS-01 challenge, which means a Caddy build with your DNS provider's module.
+# See SELF_HOSTING.md.
+https:// {
+	tls {
+		on_demand
+	}
+
+	encode gzip
+
+	@internal path /internal /internal/*
+	handle @internal {
+		respond 404
+	}
+
+	handle {
+		reverse_proxy server:3001
 	}
 }
