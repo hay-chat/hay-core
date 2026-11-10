@@ -1,0 +1,318 @@
+{
+  "page": {
+    "title": "Playbooks",
+    "description": "Geautomatiseerde gespreksflows en antwoorden voor je assistent",
+    "headTitle": "Playbooks - Hay.chat"
+  },
+  "actions": {
+    "generatePlaybook": "Playbook genereren",
+    "createPlaybook": "Playbook aanmaken",
+    "createFirstPlaybook": "Maak je eerste playbook",
+    "createPlaybookOpenEditor": "Playbook aanmaken en editor openen",
+    "deletePlaybook": "Playbook verwijderen",
+    "saveChanges": "Wijzigingen opslaan",
+    "viewAllPlaybooks": "Alle playbooks bekijken",
+    "continueEditing": "Verder bewerken",
+    "backToList": "Terug naar lijst",
+    "previous": "Vorige",
+    "continue": "Doorgaan",
+    "confirmLeave": "Pagina verlaten",
+    "leave": "Verlaten",
+    "moreActions": "Meer acties",
+    "edit": "Bewerken",
+    "duplicate": "Dupliceren",
+    "copyTitle": "{name} (kopie)",
+    "archive": "Archiveren",
+    "restoreAsDraft": "Herstellen als concept"
+  },
+  "stats": {
+    "totalPlaybooks": "Totaal aantal playbooks",
+    "active": "Actief",
+    "totalTriggers": "Totaal aantal triggers",
+    "newThisMonth": "+{count} deze maand",
+    "percentOfTotal": "{percent}% van totaal",
+    "last30Days": "Afgelopen 30 dagen"
+  },
+  "filters": {
+    "searchPlaceholder": "Playbooks zoeken...",
+    "allCategories": "Alle categorieën",
+    "customerSupport": "Klantenservice",
+    "sales": "Verkoop",
+    "technical": "Technisch",
+    "custom": "Aangepast",
+    "allStatus": "Alle statussen",
+    "statusActive": "Actief",
+    "statusArchived": "Gearchiveerd",
+    "statusDraft": "Concept"
+  },
+  "table": {
+    "playbooks": "Playbooks",
+    "name": "Naam",
+    "status": "Status",
+    "created": "Aangemaakt",
+    "actions": "Acties"
+  },
+  "empty": {
+    "noPlaybooksFound": "Geen playbooks gevonden",
+    "noPlaybooksCreated": "Nog geen playbooks aangemaakt",
+    "adjustSearch": "Probeer je zoektermen aan te passen.",
+    "createFirst": "Maak je eerste playbook om gesprekken te automatiseren."
+  },
+  "form": {
+    "titleLabel": "Titel",
+    "titlePlaceholder": "bijv. Automatisering klantenservice",
+    "triggerLabel": "Trigger",
+    "triggerPlaceholder": "Dit playbook wordt geactiveerd wanneer de klant zegt:\n - Ik heb hulp nodig met mijn account...",
+    "triggerHint": "Bepaal wanneer dit playbook moet worden geactiveerd",
+    "descriptionLabel": "Beschrijving",
+    "descriptionPlaceholder": "Beschrijf wat dit playbook doet...",
+    "instructionsLabel": "Instructies",
+    "instructionsHint": "Maak genummerde stapsgewijze instructies die de assistent volgt bij het uitvoeren van dit playbook",
+    "editorHintMention": "voor acties/documenten",
+    "editorHintBlocks": "voor blokken",
+    "editorHintUndo": "om ongedaan te maken",
+    "statusLabel": "Status",
+    "createdDate": "Aangemaakt: {date}",
+    "lastUpdated": "Laatst bijgewerkt: {date}"
+  },
+  "edit": {
+    "title": "{name} bewerken",
+    "description": "Werk de configuratie van je playbook bij",
+    "headTitle": "Playbook bewerken - Hay.chat"
+  },
+  "create": {
+    "title": "Nieuw aanmaken",
+    "description": "Definieer geautomatiseerde gespreksflows voor je assistent",
+    "headTitle": "Playbook aanmaken - Hay.chat",
+    "headDescription": "Maak een nieuw geautomatiseerd gespreksplaybook",
+    "editHeadDescription": "Bewerk je geautomatiseerde gespreksplaybook"
+  },
+  "validation": {
+    "titleRequired": "Een titel voor het playbook is verplicht",
+    "titleMaxLength": "De titel van het playbook moet korter zijn dan 255 tekens",
+    "triggerRequired": "Een trigger is verplicht",
+    "triggerMaxLength": "De trigger moet korter zijn dan 255 tekens"
+  },
+  "toast": {
+    "deleteSuccess": "Playbook verwijderd",
+    "deleteFailed": "Kan playbook niet verwijderen",
+    "updateSuccess": "Playbook bijgewerkt",
+    "createSuccess": "Playbook aangemaakt",
+    "saveFailed": "Kan playbook niet {action}. Probeer het opnieuw.",
+    "loadFailed": "Kan playbooks niet laden",
+    "playbookNotFound": "Playbook niet gevonden",
+    "generateFailed": "Kan instructies niet genereren. Probeer het opnieuw.",
+    "createFailed": "Kan playbook niet aanmaken. Probeer het opnieuw.",
+    "duplicateSuccess": "Playbook gedupliceerd",
+    "duplicateFailed": "Kan playbook niet dupliceren",
+    "archiveSuccess": "Playbook gearchiveerd",
+    "restoreSuccess": "Playbook hersteld als concept",
+    "statusFailed": "Kan de status van het playbook niet bijwerken"
+  },
+  "delete": {
+    "title": "Playbook verwijderen",
+    "confirmMessage": "Weet je zeker dat je \"{name}\" wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
+  },
+  "versioning": {
+    "unsavedChanges": "Niet-opgeslagen wijzigingen",
+    "saving": "Opslaan...",
+    "saved": "Alle wijzigingen opgeslagen",
+    "saveError": "Kan niet opslaan",
+    "retry": "Opnieuw proberen",
+    "publish": "Publiceren",
+    "publishTitle": "Playbook publiceren",
+    "publishDescription": "Hiermee wordt het gedrag van de live assistent bijgewerkt. Het huidige concept wordt de actieve versie.",
+    "publishConfirm": "Nu publiceren",
+    "publishNoteLabel": "Wat is er veranderd? (optioneel)",
+    "publishNotePlaceholder": "bijv. Stappen van het retourbeleid bijgewerkt...",
+    "publishSuccess": "Playbook gepubliceerd",
+    "publishFailed": "Kan playbook niet publiceren",
+    "history": {
+      "button": "Versiegeschiedenis",
+      "title": "Versiegeschiedenis",
+      "description": "Bekijk alle versies van dit playbook",
+      "empty": "Nog geen versies",
+      "loadFailed": "Kan versiegeschiedenis niet laden",
+      "status": {
+        "active": "Actief",
+        "draft": "Concept",
+        "archived": "Gearchiveerd"
+      },
+      "rollback": "Herstellen",
+      "rollbackTitle": "Versie herstellen",
+      "rollbackDescription": "Hiermee wordt een nieuwe actieve versie gemaakt op basis van v{version}. De huidige actieve versie wordt gearchiveerd.",
+      "rollbackConfirm": "Versie herstellen",
+      "rollbackReasonLabel": "Reden (optioneel)",
+      "rollbackReasonPlaceholder": "bijv. Teruggezet vanwege onjuiste instructies...",
+      "restoring": "Versie herstellen...",
+      "rollbackSuccess": "Versie hersteld",
+      "rollbackFailed": "Kan versie niet herstellen",
+      "discard": "Negeren",
+      "discardTitle": "Concept negeren",
+      "discardDescription": "Hiermee wordt het huidige concept permanent verwijderd en zet de editor de actieve versie terug. Dit kan niet ongedaan worden gemaakt.",
+      "discardConfirm": "Concept negeren",
+      "discardSuccess": "Concept genegeerd",
+      "discardFailed": "Kan concept niet negeren"
+    },
+    "testDraft": "Dit concept testen",
+    "replayDraft": "Eerdere gesprekken opnieuw afspelen",
+    "diff": {
+      "compareWithActive": "Vergelijken met actieve versie",
+      "hide": "Wijzigingen verbergen",
+      "against": "Wijzigingen vergeleken met de actieve versie (v{version})",
+      "neverPublished": "Nooit gepubliceerd: alles hieronder is nieuw",
+      "noChanges": "Dezelfde instructies als de actieve versie",
+      "loadFailed": "Kan de wijzigingen niet laden"
+    }
+  },
+  "loading": {
+    "loadingPlaybook": "Playbook laden...",
+    "playbookNotFound": "Playbook niet gevonden"
+  },
+  "wizard": {
+    "title": "Playbook aanmaken",
+    "description": "Volg de stappen om een nieuw playbook te maken",
+    "headTitle": "Playbook aanmaken - Hay.chat",
+    "steps": {
+      "purpose": "Doel",
+      "actions": "Acties",
+      "documents": "Documenten",
+      "boundaries": "Grenzen",
+      "generate": "Genereren"
+    },
+    "cancelDialog": {
+      "title": "Wizard verlaten?",
+      "description": "Je voortgang gaat verloren. Weet je zeker dat je wilt stoppen?"
+    },
+    "successDialog": {
+      "title": "Playbook aangemaakt",
+      "description": "Je playbook is aangemaakt. Wat wil je nu doen?"
+    },
+    "purpose": {
+      "label": "Waar is dit playbook voor?",
+      "placeholder": "bijv. Terugbetalingsverzoeken afhandelen voor bestellingen van de afgelopen 30 dagen",
+      "helperText": "Beschrijf wat dit playbook moet helpen oplossen of automatiseren. 1–3 zinnen aanbevolen.",
+      "tipsTitle": "Tips voor een goede beschrijving",
+      "tipsFocus": "Richt je op het specifieke probleem of de taak die dit playbook moet afhandelen",
+      "tipsMention": "Noem wie hier meestal hulp bij nodig heeft (bijv. klanten, intern team)",
+      "tipsOutcomes": "Vermeld de belangrijkste uitkomsten die je verwacht (bijv. een terugbetaling doen, escaleren naar een manager)"
+    },
+    "actions": {
+      "label": "Welke acties kan dit playbook uitvoeren?",
+      "helperText": "Selecteer de tools die dit playbook mag gebruiken. Als er niets is geselecteerd, geeft het playbook alleen antwoorden.",
+      "errorLoadTools": "Kan beschikbare tools niet laden. Probeer het later opnieuw.",
+      "noTools": "Er zijn nog geen integraties gekoppeld. Dit playbook geeft alleen antwoorden, tenzij je integraties koppelt in Instellingen."
+    },
+    "documents": {
+      "label": "Welke documenten moet dit playbook gebruiken?",
+      "helperText": "Selecteer documenten om het playbook te baseren op je kennisbank. Je kunt deze stap overslaan als er geen documenten nodig zijn.",
+      "errorLoad": "Kan documenten niet laden. Probeer het later opnieuw.",
+      "noDocuments": "Geen documenten gevonden. Je kunt doorgaan zonder documenten; het playbook baseert zich dan alleen op de instructies die je geeft.",
+      "suggestedTitle": "Voorgesteld voor jou",
+      "suggestedHint": "Op basis van de beschrijving van je playbook",
+      "allDocumentsTitle": "Alle documenten",
+      "filterPlaceholder": "Documenten filteren...",
+      "documentsSelected": "{count} document geselecteerd | {count} documenten geselecteerd"
+    },
+    "boundaries": {
+      "label": "Grenzen en escalatieregels instellen",
+      "helperText": "Bepaal wanneer het playbook moet escaleren naar een mens en welke onderwerpen het moet vermijden.",
+      "whyMatters": "Waarom dit belangrijk is",
+      "warningText": "Duidelijke escalatieregels voorkomen dat je playbook gevoelige situaties afhandelt die het niet zou moeten afhandelen. Grenzen houden antwoorden gericht en veilig.",
+      "escalationLabel": "Altijd escaleren wanneer...",
+      "escalationPlaceholder": "bijv. De klant dreigt met juridische stappen, vraagt een terugbetaling van meer dan $500...",
+      "boundariesLabel": "Nooit vragen beantwoorden over...",
+      "boundariesPlaceholder": "bijv. Intern bedrijfsbeleid, prijzen van concurrenten...",
+      "acknowledgment": "Ik heb de escalatieregels en grenzen gecontroleerd",
+      "escalationExamples": {
+        "legal": "Juridische dreigementen",
+        "refund": "Terugbetalingsverzoeken boven $500",
+        "safety": "Veiligheidszorgen",
+        "manager": "Klant vraagt naar een manager"
+      },
+      "boundaryExamples": {
+        "policies": "Intern beleid",
+        "competitor": "Vergelijkingen met concurrenten",
+        "medical": "Medisch/juridisch advies",
+        "employee": "Informatie over medewerkers"
+      }
+    },
+    "generate": {
+      "summaryTitle": "Samenvatting",
+      "purposeLabel": "Doel",
+      "actionsLabel": "Acties",
+      "actionsNone": "Geen (alleen antwoorden)",
+      "actionsSelected": "{count} geselecteerd",
+      "documentsLabel": "Documenten",
+      "documentsNone": "Geen",
+      "documentsSelected": "{count} geselecteerd",
+      "boundariesLabel": "Grenzen",
+      "boundariesConfigured": "Ingesteld",
+      "boundariesNone": "Niet ingesteld",
+      "readyText": "Klaar om de instructies voor je playbook te genereren op basis van de informatie die je hebt gegeven.",
+      "generateButton": "Instructies genereren",
+      "generatingText": "Instructies genereren...",
+      "generatingHint": "Dit kan een paar seconden duren.",
+      "titleLabel": "Titel",
+      "triggerLabel": "Trigger",
+      "descriptionLabel": "Beschrijving",
+      "instructionsLabel": "Instructies",
+      "startingPointText": "Dit is een startpunt. Je kunt alles verfijnen in de editor.",
+      "regenerateButton": "Opnieuw genereren"
+    }
+  },
+  "editor": {
+    "titlePlaceholder": "Naamloos playbook",
+    "documentLabel": "Inhoud van het playbook",
+    "detailsSection": "Details",
+    "actionsSection": "Beschikbare acties",
+    "actionsHint": "Typ {'@'} in de inhoud om een actie of document in te voegen.",
+    "actionsLoading": "Acties laden...",
+    "actionsEmpty": "Nog geen acties beschikbaar. Koppel een plugin om acties toe te voegen.",
+    "actionsCount": "{count} acties",
+    "actionsAdd": "Toevoegen aan playbook",
+    "actionsNoDescription": "Geen beschrijving beschikbaar.",
+    "metadataSection": "Over",
+    "dangerSection": "Gevarenzone"
+  },
+  "suggest": {
+    "title": "Playbook verbeteren met AI",
+    "descriptionConversation": "Analyseer dit gesprek en stel verbeteringen voor het playbook voor. Je kunt optioneel feedback toevoegen om het voorstel te sturen.",
+    "descriptionFeedback": "Beschrijf wat je wilt veranderen en de AI stelt een herziene versie van de instructies voor.",
+    "feedbackLabel": "Feedback",
+    "feedbackPlaceholderOptional": "Optioneel: iets specifieks dat je verbeterd wilt zien…",
+    "feedbackPlaceholderRequired": "Beschrijf wat je wilt veranderen…",
+    "selectionLabel": "Geselecteerde tekst (wijzigingen blijven hiertoe beperkt)",
+    "loadingConversation": "Gesprek analyseren en verbeteringen opstellen…",
+    "loadingFeedback": "Instructies herschrijven…",
+    "analysisLabel": "Analyse",
+    "changesLabel": "Voorgestelde wijzigingen",
+    "changeType": {
+      "added": "Toegevoegd",
+      "modified": "Gewijzigd",
+      "removed": "Verwijderd"
+    },
+    "noChangesTitle": "Geen wijzigingen aanbevolen",
+    "noChangesText": "De huidige instructies dekken dit scenario al goed.",
+    "staleWarning": "Het concept is gewijzigd sinds dit voorstel is gegenereerd. Toepassen overschrijft het huidige concept; klik nogmaals op Toepassen om te bevestigen.",
+    "generate": "Voorstel genereren",
+    "regenerate": "Opnieuw genereren",
+    "discard": "Negeren",
+    "applyToDraft": "Toepassen op concept",
+    "appliedToast": "Voorstel toegepast op concept",
+    "generateError": "Kan geen voorstel genereren. Probeer het opnieuw.",
+    "applyError": "Kan het voorstel niet toepassen.",
+    "improveButton": "Verbeteren met AI",
+    "improveFromConversation": "Playbook verbeteren",
+    "openPlaybook": "Playbook openen",
+    "diff": {
+      "showHidden": "{count} verborgen regels tonen"
+    }
+  },
+  "templates": {
+    "button": "Vanuit sjabloon",
+    "loadFailed": "Kan sjablonen niet laden",
+    "created": "Conceptplaybook aangemaakt vanuit het sjabloon. Controleer het en activeer het daarna.",
+    "createFailed": "Kan het playbook niet aanmaken vanuit het sjabloon"
+  }
+}

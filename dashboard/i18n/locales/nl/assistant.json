@@ -1,0 +1,81 @@
+{
+  "assistant": {
+    "page": {
+      "title": "Assistent",
+      "description": "Wie je klanten antwoordt: één AI-assistent voor de hele organisatie, op elk kanaal.",
+      "loading": "Assistent laden...",
+      "leavePage": "Pagina verlaten",
+      "metaTitle": "Assistent - Hay.chat",
+      "metaDescription": "Configureer je AI-assistent"
+    },
+    "actions": {
+      "cancel": "Wijzigingen negeren",
+      "save": "Wijzigingen opslaan"
+    },
+    "toast": {
+      "updatedSuccess": "Assistent opgeslagen",
+      "updateFailed": "Kan de assistent niet opslaan. Probeer het opnieuw.",
+      "loadFailed": "Kan de assistent niet laden"
+    },
+    "form": {
+      "cardTitle": "Identiteit",
+      "cardDescription": "Hoe de assistent zichzelf voorstelt en hoe hij praat. Playbooks beschrijven wat te doen in specifieke situaties; ze zijn allemaal van toepassing.",
+      "name": {
+        "label": "Naam",
+        "placeholder": "bijv. {organization} Assistent",
+        "helperText": "Wordt aan klanten getoond in de chatwidget. Laat leeg om de titel van de widget te tonen.",
+        "tooLong": "De naam moet korter zijn dan 255 tekens"
+      },
+      "description": {
+        "label": "Beschrijving",
+        "helperText": "Een interne notitie; klanten en de assistent zien deze nooit.",
+        "placeholder": "Waar deze assistent voor dient..."
+      },
+      "instructions": {
+        "label": "Instructies",
+        "hint": "Het algemene gedrag en de vaste regels van de assistent. Zet situatiespecifieke stappen in Playbooks."
+      },
+      "initialGreeting": {
+        "label": "Openingsbericht",
+        "helperText": "Het eerste bericht dat klanten zien wanneer ze een gesprek beginnen. Als je dit leeg laat, wordt een standaardbegroeting gebruikt. Het wordt automatisch vertaald naar de taal van het gesprek.",
+        "placeholder": "Hallo! Waarmee kan ik je vandaag helpen?"
+      },
+      "tone": {
+        "label": "Toon",
+        "professional": "Professioneel",
+        "casual": "Informeel",
+        "enthusiastic": "Enthousiast",
+        "placeholder": "Beschrijf de communicatietoon (bijv. professioneel, vriendelijk, informeel)...",
+        "presets": {
+          "professional": "Je toon is professioneel, rustig en beknopt. Je communiceert duidelijk, gebruikt volledige zinnen en vermijdt straattaal of emoji's. Je klinkt zelfverzekerd maar toegankelijk, als een goed getrainde supportspecialist die de tijd van de klant respecteert. Je toont empathie waar dat past, maar houdt de focus altijd op het efficiënt oplossen van het probleem.\n\nVoorbeeld: \"Ik begrijp dat dat frustrerend kan zijn. Laten we samen naar de status van je bestelling kijken. Kun je je bestelnummer bevestigen?\"",
+          "casual": "Je klinkt als een echt persoon die via een berichtje chat: ontspannen, warm en toegankelijk. Gebruik eenvoudige formuleringen en af en toe een emoji als het bij de sfeer past. Houd antwoorden behulpzaam maar luchtig, als een collega die een vriend helpt.\n\nVoorbeeld: \"Hoi! Helemaal begrijpelijk, dat gebeurt soms 😅 Ik check even snel je bestelling, dan lossen we het op.\"",
+          "enthusiastic": "Je maakt elke klantinteractie leuk en positief. Je gebruikt met mate uitroeptekens, laat zien dat je graag helpt en viert kleine successen. Je zorgt dat de klant zich gehoord en gewaardeerd voelt, terwijl je antwoorden kort en krachtig houdt.\n\nVoorbeeld: \"Goede vraag! Laten we dit meteen regelen 🎉 Ik heb alleen je e-mailadres nodig om je bestelling te vinden!\""
+        }
+      },
+      "avoid": {
+        "label": "Wat te vermijden",
+        "placeholder": "Noem dingen die de assistent moet vermijden (bijv. technisch jargon, bepaalde onderwerpen)..."
+      },
+      "languageNote": "De assistent antwoordt in de taal van de klant en valt terug op de standaardtaal van de organisatie uit de algemene instellingen."
+    },
+    "escalation": {
+      "title": "Escalatie naar een mens",
+      "description": "Wat de assistent doet wanneer een klant een mens nodig heeft.",
+      "availableLabel": "Als er een menselijke agent beschikbaar is",
+      "availableHint": "Instructies voor de assistent wanneer er een menselijke agent beschikbaar is. Laat leeg om het gesprek gewoon naar de wachtrij te verplaatsen.",
+      "unavailableLabel": "Als er geen menselijke agenten beschikbaar zijn",
+      "unavailableHint": "Instructies voor de assistent wanneer er geen menselijke agent beschikbaar is (bijv. vraag om het e-mailadres).",
+      "unavailableModeHint": "Wat de assistent doet wanneer een klant een mens nodig heeft en niemand het gesprek kan aannemen (buiten kantooruren of niemand online).",
+      "modeInstructions": "Mijn instructies volgen",
+      "modeTicket": "Een ticket aanmaken",
+      "modeTicketIn": "Een ticket aanmaken in {name}",
+      "noHelpdesk": "Koppel een helpdesk zoals Zendesk om automatisch tickets aan te maken.",
+      "connectHelpdesk": "Integraties bekijken",
+      "ticketExplainer": "De assistent zorgt dat hij het e-mailadres van de klant heeft, maakt een ticket aan met een samenvatting en het volledige gesprek, en laat de klant weten dat het team contact opneemt. Het gesprek wordt daarna gesloten in plaats van in de wachtrij te blijven.",
+      "helpdesk": "Helpdesk",
+      "prefillTitle": "Elk ticket vooraf invullen met",
+      "notSet": "Niet ingesteld",
+      "formError": "Kan de ticketvelden niet laden uit je helpdesk: {message}"
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "customers": {
+    "title": "Klanten",
+    "description": "Mensen die via je kanalen contact met je hebben opgenomen",
+    "refresh": "Vernieuwen",
+    "search": {
+      "label": "Zoeken",
+      "placeholder": "Zoek op naam, e-mail of ID",
+      "apply": "Zoeken"
+    },
+    "summary": "{total} klanten",
+    "columns": {
+      "customer": "Klant",
+      "channels": "Kanalen",
+      "email": "E-mail",
+      "phone": "Telefoon",
+      "created": "Aangemaakt"
+    },
+    "empty": {
+      "title": "Nog geen klanten",
+      "description": "Klanten verschijnen hier zodra ze je een bericht sturen via een gekoppeld kanaal."
+    },
+    "pagination": "Pagina {page} van {totalPages}",
+    "fields": {
+      "email": "E-mail",
+      "phone": "Telefoon",
+      "externalId": "Externe ID",
+      "created": "Aangemaakt",
+      "notes": "Notities"
+    },
+    "profile": {
+      "description": "Klantprofiel en gespreksgeschiedenis",
+      "back": "Terug naar klanten",
+      "evidencePack": "Bewijspakket",
+      "notFound": "Klant niet gevonden"
+    },
+    "conversations": {
+      "title": "Gesprekken",
+      "none": "Nog geen gesprekken",
+      "messageCount": "{count} berichten"
+    },
+    "merge": {
+      "title": "Mogelijk dezelfde persoon",
+      "description": "Deze klanten delen een e-mailadres of telefoonnummer, vaak dezelfde shopper op twee kanalen. Samenvoegen verplaatst elk gesprek naar één klant, en antwoorden blijven naar het kanaal gaan waarop elk gesprek is begonnen.",
+      "sameEmail": "Zelfde e-mail: {value}",
+      "samePhone": "Zelfde telefoon: {value}",
+      "merge": "Samenvoegen",
+      "dismiss": "Niet dezelfde persoon",
+      "confirmTitle": "Deze klanten samenvoegen?",
+      "confirmDescription": "{source} wordt samengevoegd met {target}. De gesprekken gaan naar {target} en {source} wordt verwijderd. Dit kan niet ongedaan worden gemaakt.",
+      "confirm": "Klanten samenvoegen",
+      "merged": "Klanten samengevoegd",
+      "failed": "Er is iets misgegaan. Probeer het opnieuw."
+    }
+  }
+}

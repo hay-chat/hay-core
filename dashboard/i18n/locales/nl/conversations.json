@@ -1,0 +1,344 @@
+{
+  "conversations": {
+    "untitled": "Naamloos gesprek",
+    "delivery": {
+      "failed": "Bezorging mislukt",
+      "windowExpired": "Buiten het venster van 24 uur: de klant moet eerst een bericht sturen",
+      "codes": {
+        "retriedOut": "Het kanaal accepteerde dit antwoord niet. Hay.chat heeft het 3 keer opnieuw geprobeerd en daarna opgegeven.",
+        "uncertain": "Het kanaal heeft dit antwoord niet bevestigd. Mogelijk heeft de klant het niet ontvangen."
+      },
+      "alert": {
+        "title": "Een antwoord kon niet worden bezorgd",
+        "body": "Hay.chat heeft het 3 keer opnieuw geprobeerd en daarna opgegeven. Open het gesprek om het op te volgen."
+      }
+    },
+    "attachment": {
+      "loadFailed": "Kan deze bijlage niet laden",
+      "attach": "Een bestand bijvoegen",
+      "remove": "{name} verwijderen",
+      "uploading": "{name} uploaden…",
+      "uploadFailed": "Kan {name} niet uploaden. Probeer het opnieuw of kies een ander bestand.",
+      "tooLarge": "{name} is groter dan {size} MB.",
+      "tooMany": "Je kunt maximaal {count} bestanden tegelijk versturen.",
+      "analysisPending": "AI leest dit bestand…",
+      "analysisRead": "AI las: {description}",
+      "analysisFailed": "De AI kon dit bestand niet lezen",
+      "reveal": "Klik om te tonen",
+      "withheldId": "Identiteitsbewijs: verborgen voor de AI",
+      "withheldCard": "Betaalkaart: verborgen voor de AI",
+      "scanning": "Scannen op virussen…",
+      "scanBlocked": "Geblokkeerd door de virusscan"
+    },
+    "page": {
+      "title": "Gesprekken",
+      "description": "Volg en beheer alle klantgesprekken",
+      "headTitle": "Gesprekken - Hay.chat",
+      "headDescription": "Volg en beheer alle klantgesprekken"
+    },
+    "actions": {
+      "playground": "Gespreksplayground",
+      "refresh": "Vernieuwen",
+      "select": "Selecteren",
+      "exit": "Afsluiten",
+      "archive": "Archiveren ({count})",
+      "tryAgain": "Opnieuw proberen",
+      "startPlayground": "Playground starten"
+    },
+    "stats": {
+      "totalConversations": "Totaal aantal gesprekken",
+      "todayIncrease": "+{count} vandaag",
+      "activeNow": "Nu actief",
+      "realTimeConversations": "Realtime gesprekken",
+      "avgResponseTime": "Gem. reactietijd",
+      "last7Days": "Afgelopen 7 dagen",
+      "noRepliesLast7Days": "Geen antwoorden in de afgelopen 7 dagen"
+    },
+    "filters": {
+      "searchPlaceholder": "Gesprekken zoeken...",
+      "allStatus": "Alle statussen",
+      "active": "Actief",
+      "resolved": "Opgelost",
+      "unresolved": "Niet opgelost",
+      "escalated": "Geëscaleerd",
+      "closed": "Gesloten",
+      "today": "Vandaag",
+      "thisWeek": "Deze week",
+      "thisMonth": "Deze maand",
+      "allTime": "Altijd"
+    },
+    "table": {
+      "conversation": "Gesprek",
+      "channel": "Kanaal",
+      "status": "Status",
+      "assignedTo": "Toegewezen aan",
+      "duration": "Duur",
+      "satisfaction": "Tevredenheid",
+      "updated": "Bijgewerkt",
+      "newConversation": "Nieuw gesprek",
+      "waiting": "Wacht {time}",
+      "notRated": "Niet beoordeeld"
+    },
+    "status": {
+      "open": "Open",
+      "processing": "Wordt verwerkt",
+      "pendingHuman": "Aandacht nodig",
+      "awaitingApproval": "Wacht op goedkeuring",
+      "humanTookOver": "Handmatige controle",
+      "resolved": "Opgelost",
+      "unresolved": "Niet opgelost",
+      "closed": "Gesloten",
+      "unknown": "Onbekend"
+    },
+    "error": {
+      "loadingConversations": "Fout bij het laden van gesprekken",
+      "failedToLoad": "Kan gesprekken niet laden"
+    },
+    "empty": {
+      "noConversationsFound": "Geen gesprekken gevonden",
+      "noConversationsYet": "Nog geen gesprekken",
+      "adjustSearch": "Probeer je zoektermen of filters aan te passen.",
+      "startFirst": "Klik op 'Nieuw gesprek' om je eerste gesprek te starten."
+    },
+    "detail": {
+      "moreActions": "Meer acties",
+      "details": "Details",
+      "exitPlayground": "Playground afsluiten",
+      "playgroundTitle": "Gespreksplayground",
+      "autoSends": "Verstuurt automatisch",
+      "playgroundDescription": "Test gesprekken met AI • Berichten worden automatisch verstuurd • Gebruik",
+      "rateQuality": "om de kwaliteit te beoordelen",
+      "newTest": "Nieuwe test",
+      "backToConversations": "Terug naar gesprekken",
+      "conversationNumber": "Gesprek #{id}",
+      "loading": "Laden...",
+      "testMode": "Testmodus: {state}",
+      "testModeOn": "AAN",
+      "testModeOff": "UIT",
+      "export": "Exporteren",
+      "exportPdf": "Exporteren als PDF",
+      "exportCsv": "Exporteren als CSV",
+      "evidencePack": "Bewijspakket voor een betwisting",
+      "exportFailed": "Kan gesprek niet exporteren. Probeer het opnieuw.",
+      "takeOver": "Overnemen",
+      "sendTestMessage": "Typ je testbericht...",
+      "sendMessage": "Typ je bericht...",
+      "sendMessageToStart": "Stuur een bericht om te beginnen met testen",
+      "noMessages": "Nog geen berichten in dit gesprek",
+      "conversationStarted": "Gesprek gestart op {date}",
+      "youAreHandling": "Jij behandelt dit gesprek",
+      "releaseConversation": "Gesprek vrijgeven",
+      "closeConversation": "Gesprek sluiten",
+      "simulatedBadge": "Acties worden gesimuleerd",
+      "liveStoreBadge": "Live winkel",
+      "useLiveStore": "Live winkel gebruiken",
+      "useSimulatedActions": "Acties simuleren",
+      "liveStoreConfirmTitle": "Je live winkel gebruiken?",
+      "liveStoreConfirmDescription": "Terugbetalingen, annuleringen, adreswijzigingen en andere acties in dit testgesprek worden naar je echte winkel gestuurd. Je kunt op elk moment terugschakelen.",
+      "liveStoreConfirm": "Live winkel gebruiken",
+      "actionModeFailed": "Kan de actiemodus niet wijzigen. Probeer het opnieuw.",
+      "testingDraft": "Playbookconcept wordt getest",
+      "testDraftFailed": "Kan geen test van dit concept starten. Mogelijk is het gepubliceerd of genegeerd."
+    },
+    "pendingHuman": {
+      "needsHuman": "Dit gesprek is overgedragen aan een menselijke agent",
+      "summaryPending": "Gesprekssamenvatting genereren…",
+      "notConfident": "Hay.chat was niet zeker genoeg om deze vraag te beantwoorden",
+      "handedOff": "Hay.chat heeft besloten dit gesprek over te dragen aan een menselijke agent. Meer context in de playbooks is een goed begin om Hay.chat meer informatie te geven, zodat het vergelijkbare gesprekken de volgende keer zelf kan afhandelen.",
+      "startNew": "Nieuw gesprek starten",
+      "editPlaybook": "Playbook bewerken",
+      "editPlaybooks": "Playbooks bewerken"
+    },
+    "orchestrator": {
+      "title": "Status van orchestrator",
+      "status": "Status:",
+      "lastCheck": "Laatste controle:",
+      "never": "Nooit",
+      "messages": "Berichten:",
+      "needsProcessing": "Verwerking nodig:"
+    },
+    "testScenarios": {
+      "title": "Testscenario's",
+      "askAboutHours": "Vragen naar openingstijden",
+      "requestSupport": "Ondersteuning aanvragen",
+      "cancelSubscription": "Abonnement opzeggen",
+      "requestHuman": "Een mens vragen"
+    },
+    "testingTips": {
+      "title": "Testtips",
+      "tip1": "Test verschillende soorten berichten om de AI-antwoorden te zien",
+      "tip2": "Wissel van playbook om verschillende scenario's te testen",
+      "tip3": "Gebruik \"Nieuwe test\" om opnieuw te beginnen met een nieuw gesprek"
+    },
+    "customerInfo": {
+      "title": "Klantinformatie",
+      "customer": "Klant",
+      "conversationId": "Gespreks-ID:",
+      "channel": "Kanaal:",
+      "email": "E-mail:",
+      "phone": "Telefoon:",
+      "firstSeen": "Eerst gezien:",
+      "status": "Status:",
+      "created": "Aangemaakt:"
+    },
+    "conversationDetails": {
+      "title": "Gespreksdetails",
+      "status": "Status:",
+      "messages": "Berichten:",
+      "created": "Aangemaakt:",
+      "updated": "Bijgewerkt:",
+      "legalHold": "Juridische bewaarplicht:",
+      "legalHoldNotice": "Dit gesprek is uitgezonderd van automatische anonimisering volgens de bewaartermijn."
+    },
+    "previousConversations": {
+      "title": "Eerdere gesprekken",
+      "none": "Geen eerdere gesprekken"
+    },
+    "relatedDocuments": {
+      "title": "Gerelateerde documenten",
+      "defaultCategory": "Algemeen"
+    },
+    "releaseDialog": {
+      "title": "Gesprek vrijgeven",
+      "description": "Wat wil je met dit gesprek doen nadat je het hebt vrijgegeven?",
+      "returnToAi": "Teruggeven aan AI",
+      "returnToAiDescription": "De AI gaat automatisch verder met dit gesprek",
+      "returnToQueue": "Terugzetten in wachtrij",
+      "returnToQueueDescription": "Een andere agent kan dit gesprek overnemen",
+      "release": "Vrijgeven"
+    },
+    "closeDialog": {
+      "title": "Gesprek sluiten",
+      "description": "Weet je zeker dat je dit gesprek wilt sluiten? Het wordt dan gemarkeerd als opgelost en gesloten.",
+      "confirm": "Gesprek sluiten"
+    },
+    "toast": {
+      "takenOver": "Gesprek overgenomen",
+      "takenOverMessage": "Jij behandelt dit gesprek nu",
+      "takeoverFailed": "Overnemen mislukt",
+      "takeoverFailedMessage": "Kan het gesprek niet overnemen",
+      "released": "Gesprek vrijgegeven",
+      "releasedToAi": "Gesprek teruggegeven aan AI",
+      "releasedToQueue": "Gesprek teruggezet in wachtrij",
+      "releaseFailed": "Vrijgeven mislukt",
+      "releaseFailedMessage": "Kan het gesprek niet vrijgeven",
+      "closed": "Gesprek gesloten",
+      "closedMessage": "Dit gesprek is gemarkeerd als gesloten",
+      "closeFailed": "Sluiten mislukt",
+      "legalHoldFailed": "Kan juridische bewaarplicht niet bijwerken"
+    },
+    "notifications": {
+      "humanAttentionNeeded": {
+        "title": "Menselijke aandacht nodig",
+        "bodyWithTitle": "Gesprek \"{title}\" heeft menselijke hulp nodig",
+        "bodyDefault": "Nieuw gesprek heeft menselijke hulp nodig"
+      }
+    },
+    "agentNotice": {
+      "teamMember": "Een teamlid",
+      "joined": "{name} neemt deel aan de chat",
+      "returnedToAi": "{name} heeft de chat verlaten. De AI-assistent antwoordt weer.",
+      "left": "{name} heeft de chat verlaten en teruggezet in de wachtrij"
+    },
+    "replyWindow": {
+      "open": "Antwoordvenster sluit {relative}",
+      "closed": "Het antwoordvenster is gesloten. Totdat de klant weer schrijft, bereikt alleen een goedgekeurd sjabloon de klant.",
+      "sendTemplate": "Een sjabloon versturen",
+      "composerClosed": "Antwoordvenster gesloten. Verstuur in plaats daarvan een sjabloon.",
+      "picker": {
+        "title": "Een sjabloon versturen",
+        "description": "Kies een goedgekeurd sjabloon. Wanneer de klant antwoordt, gaat het venster weer open.",
+        "loading": "Sjablonen laden…",
+        "loadFailed": "Kan sjablonen niet laden. Sluit dit en probeer het opnieuw.",
+        "unsupported": "Dit kanaal heeft geen sjablonen.",
+        "empty": "Nog geen goedgekeurde sjablonen. Een beheerder kan ze bekijken in de instellingen van het kanaal.",
+        "template": "Sjabloon",
+        "variable": "Waarde voor variabele {name}",
+        "preview": "Voorbeeld",
+        "send": "Sjabloon versturen",
+        "sent": "Sjabloon verstuurd",
+        "failed": "Kan het sjabloon niet versturen"
+      }
+    },
+    "toolStatus": {
+      "success": "Gelukt",
+      "failed": "Mislukt",
+      "running": "Bezig",
+      "simulated": "Gesimuleerd",
+      "pendingApproval": "Wacht op goedkeuring",
+      "rejected": "Afgewezen",
+      "expired": "Verlopen, niet uitgevoerd",
+      "needsConfirmation": "Klant wordt gevraagd",
+      "unknown": "Onbekend"
+    },
+    "pendingAction": {
+      "title": "Hay.chat wil deze actie uitvoeren",
+      "description": "De actie is niet uitgevoerd. Keur goed om hem nu uit te voeren, of wijs af en de AI laat het de klant weten.",
+      "approve": "Goedkeuren",
+      "reject": "Afwijzen",
+      "confirmReject": "Actie afwijzen",
+      "reasonLabel": "Reden (optioneel)",
+      "reasonPlaceholder": "Wordt gedeeld met de AI zodat die het aan de klant kan uitleggen",
+      "replyMyself": "Ik antwoord zelf",
+      "failed": "Kan je beslissing niet opslaan",
+      "takeoverFailed": "Je beslissing is opgeslagen, maar het overnemen van het gesprek is mislukt. Gebruik Overnemen om het zelf af te handelen.",
+      "conversationClosed": "Dit gesprek is gesloten, dus de actie is niet uitgevoerd. Heropen het gesprek om de actie goed te keuren, of wijs hem af.",
+      "done": {
+        "approve": "Goedgekeurd",
+        "reject": "Afgewezen",
+        "reply": "Jij behandelt dit gesprek nu"
+      }
+    },
+    "debug": {
+      "aiProcessing": "AI-verwerking",
+      "aiRegionEu": "Datacenters in de EU",
+      "aiRegionDefault": "Elke regio (standaard AI-provider)"
+    },
+    "translation": {
+      "translating": "Vertalen…",
+      "translatedFrom": "Vertaald uit het {language}",
+      "translated": "Vertaald",
+      "sentIn": "Verstuurd in het {language}",
+      "sentTranslated": "Vertaald verstuurd",
+      "showOriginal": "Origineel tonen",
+      "showSent": "Verstuurde versie tonen",
+      "showTranslation": "Vertaling tonen",
+      "customerLanguage": "Taal van de klant",
+      "replySentIn": "Je antwoord wordt verstuurd in het {language}",
+      "changeLanguage": "Wijzigen",
+      "targetLanguage": "Antwoorden versturen in",
+      "sendWithoutTranslating": "Versturen zonder vertalen",
+      "sendFailedTitle": "Antwoord niet verstuurd",
+      "sendFailedMessage": "We konden je antwoord niet vertalen. Het staat nog in het berichtvak.",
+      "sendUntranslated": "Onvertaald versturen",
+      "approvalTranslatedFrom": "Jouw vertaling (uit het {language})",
+      "approvalTranslated": "Jouw vertaling",
+      "approvalEditsOriginal": "Bewerkingen gelden voor het originele antwoord hieronder; dat is wat de klant ontvangt.",
+      "approvalOriginalLabel": "Origineel antwoord (verstuurd naar de klant)"
+    },
+    "draftApproval": {
+      "queued": "Wacht op goedkeuring",
+      "approve": "Goedkeuren en versturen",
+      "block": "Blokkeren",
+      "dialogTitle": "AI-antwoord beoordelen",
+      "dialogDescription": "Beoordeel het antwoord en bewerk het indien nodig voordat het naar de klant gaat.",
+      "original": "Origineel AI-antwoord:",
+      "content": "Antwoord",
+      "placeholder": "Bewerk het antwoord...",
+      "characters": "{count} tekens",
+      "blockMessage": "Antwoord blokkeren",
+      "approveEdited": "Bewerkte versie goedkeuren en versturen"
+    },
+    "productCase": {
+      "title": "Productprobleemcase voltooid",
+      "lot": "Lot {lot}",
+      "invoice": "Factuur {invoice}",
+      "forwardPending": "Versturen naar het case-e-mailadres van de winkel…",
+      "forwardSent": "Gemaild naar {to}",
+      "forwardSentToast": "Case gemaild",
+      "forwardFailed": "De case-e-mail kon niet worden verstuurd",
+      "forwardNotConfigured": "Geen case-e-mailadres ingesteld (Instellingen > Klantprivacy)",
+      "forwardAgain": "Opnieuw mailen"
+    }
+  }
+}
