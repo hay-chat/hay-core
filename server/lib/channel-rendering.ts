@@ -24,7 +24,7 @@ export interface RecommendedProductLike {
   title?: unknown;
   sourceUrl?: unknown;
   available?: unknown;
-  topVariant?: { price?: unknown; currency?: unknown } | null;
+  topVariant?: { price?: unknown; currency?: unknown; buyUrl?: unknown } | null;
 }
 
 /** Most products listed in one message (the tool already caps its results). */
@@ -46,10 +46,17 @@ function formatPrice(price: unknown, currency: unknown, language: string | null)
   return String(price);
 }
 
+function httpUrl(value: unknown): string | null {
+  const url = typeof value === "string" ? value.trim() : "";
+  return /^https?:\/\//i.test(url) ? url : null;
+}
+
 /**
  * Product cards as plain text, one product per block:
  *   • Blue running shoe · R$ 299,90
  *   https://store.example/products/blue-shoe
+ *   🛒 https://store.example/cart/123:1
+ * The cart line is only there when the product has a buy link.
  * No translated words, so it reads the same in every language.
  */
 export function renderProductList(
@@ -62,8 +69,12 @@ export function renderProductList(
     .map((product) => {
       const price = formatPrice(product.topVariant?.price, product.topVariant?.currency, language);
       const head = `• ${(product.title as string).trim()}${price ? ` · ${price}` : ""}`;
-      const url = typeof product.sourceUrl === "string" ? product.sourceUrl.trim() : "";
-      return /^https?:\/\//i.test(url) ? `${head}\n${url}` : head;
+      const lines = [head];
+      const url = httpUrl(product.sourceUrl);
+      if (url) lines.push(url);
+      const buyUrl = httpUrl(product.topVariant?.buyUrl);
+      if (buyUrl) lines.push(`🛒 ${buyUrl}`);
+      return lines.join("\n");
     })
     .join("\n\n");
 }

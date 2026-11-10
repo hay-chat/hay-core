@@ -55,6 +55,12 @@ export interface CanonicalVariant {
   weightValue?: number;
   weightUnit?: string;
   imageSrc?: string;
+  /**
+   * A link that puts this variant in the shopper's cart or opens checkout with
+   * it (Shopify cart permalink, WooCommerce `?add-to-cart=`). Omit when the
+   * platform has no such link.
+   */
+  buyUrl?: string;
   attributes?: Record<string, unknown>;
 }
 

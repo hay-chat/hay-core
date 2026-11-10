@@ -37,6 +37,7 @@ const variantSchema = z.object({
   weightValue: z.number().optional(),
   weightUnit: z.string().optional(),
   imageSrc: z.string().url().optional(),
+  buyUrl: z.string().url().max(2048).optional(),
   attributes: z.record(z.string(), z.unknown()).optional(),
 });
 

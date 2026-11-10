@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import type { CanonicalProduct } from "@hay/plugin-sdk";
-import { bulkSync, mapProduct, type WooGet, type WooProduct, type WooVariation } from "./catalog";
+import {
+  addToCartUrl,
+  bulkSync,
+  mapProduct,
+  type WooGet,
+  type WooProduct,
+  type WooVariation,
+} from "./catalog";
 
 // Shapes as wc/v3 returns them (trimmed to the fields the sync reads).
 const SIMPLE: WooProduct = {
@@ -194,5 +201,19 @@ describe("bulkSync", () => {
       ),
     ).rejects.toThrow("HTTP 500");
     expect(pruneCalls).toBe(0);
+  });
+});
+
+describe("addToCartUrl", () => {
+  it("adds a simple product to the cart from its own page", () => {
+    expect(addToCartUrl(SIMPLE)).toBe("https://shop.test/product/linen-shirt/?add-to-cart=10");
+    expect(mapProduct(SIMPLE, [], "USD").variants[0].buyUrl).toBe(
+      "https://shop.test/product/linen-shirt/?add-to-cart=10",
+    );
+  });
+
+  it("has no link for a product that needs options chosen, or is sold out", () => {
+    expect(addToCartUrl(VARIABLE)).toBeUndefined();
+    expect(addToCartUrl({ ...SIMPLE, stock_status: "outofstock" })).toBeUndefined();
   });
 });
