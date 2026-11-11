@@ -106,6 +106,82 @@
   display: none;
 }
 
+/* Teaser: a message above the button, before the chat is opened */
+.hay-chat-teaser {
+  position: fixed;
+  bottom: 92px;
+  right: 20px;
+  max-width: min(280px, calc(100vw - 40px));
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+  animation: hay-chat-teaser-in 0.3s ease;
+  z-index: 999999;
+}
+
+.hay-chat-teaser--left {
+  left: 20px;
+  right: auto;
+}
+
+.hay-chat-teaser__message {
+  all: unset;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  cursor: pointer;
+  color: #111827;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: start;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.hay-chat-teaser__dismiss {
+  all: unset;
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #4b5563;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hay-chat-teaser--left .hay-chat-teaser__dismiss {
+  left: -10px;
+  right: auto;
+}
+
+.hay-chat-teaser__dismiss-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.hay-chat-teaser__message:focus-visible,
+.hay-chat-teaser__dismiss:focus-visible {
+  outline: 2px solid var(--hay-primary);
+  outline-offset: 2px;
+}
+
+@keyframes hay-chat-teaser-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
 /* Accessibility - Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   #hay-webchat-root *,

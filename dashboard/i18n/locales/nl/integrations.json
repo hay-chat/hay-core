@@ -1,0 +1,401 @@
+{
+  "channels": {
+    "title": "Kanalen",
+    "description": "Actieve communicatiekanalen die je klanten met Hay.chat verbinden",
+    "headTitle": "Kanalen - Hay.chat",
+    "browseMarketplace": "Marketplace bekijken",
+    "loading": "Kanalen laden...",
+    "empty": {
+      "title": "Geen actieve kanalen",
+      "description": "Installeer een kanaalintegratie uit de marketplace om gesprekken te ontvangen.",
+      "action": "Marketplace bekijken"
+    },
+    "actions": {
+      "configure": "Instellen"
+    }
+  },
+  "marketplace": {
+    "title": "Integratie-marketplace",
+    "description": "Ontdek en installeer integraties om de mogelijkheden van je platform uit te breiden",
+    "headTitle": "Integratie-marketplace - Hay.chat",
+    "uploadPlugin": "Integratie uploaden",
+    "manageCustom": "Eigen integraties beheren ({count})",
+    "refresh": "Vernieuwen",
+    "stats": {
+      "totalPlugins": "Totaal integraties",
+      "availablePlugins": "Beschikbare integraties",
+      "installed": "Geïnstalleerd",
+      "activePlugins": "Actieve integraties",
+      "channels": "Kanalen",
+      "communicationChannels": "Communicatiekanalen",
+      "mcpConnectors": "MCP-connectors",
+      "modelContextProtocol": "Model Context Protocol"
+    },
+    "categories": {
+      "label": "Categorieën:",
+      "all": "Alle integraties",
+      "channels": "Kanalen",
+      "mcpConnectors": "MCP-connectors",
+      "documentImporters": "Documentimporteurs",
+      "retrievers": "Retrievers",
+      "playbooks": "Playbooks"
+    },
+    "search": "Integraties zoeken...",
+    "empty": {
+      "title": "Geen integraties gevonden",
+      "searchHint": "Pas je zoektermen aan.",
+      "categoryHint": "Er zijn geen integraties in de gekozen categorie."
+    },
+    "pluginTypes": {
+      "channel": "Kanaal",
+      "mcpConnector": "MCP-connector",
+      "documentImporter": "Documentimporteur",
+      "retriever": "Retriever",
+      "playbook": "Playbook"
+    },
+    "actions": {
+      "configure": "Instellen",
+      "remove": "Verwijderen",
+      "removing": "Verwijderen...",
+      "delete": "Verwijderen",
+      "deleting": "Verwijderen...",
+      "connect": "Koppelen",
+      "connecting": "Koppelen…"
+    },
+    "custom": "Eigen",
+    "confirmDelete": "Weet je zeker dat je deze integratie wilt verwijderen? Dit kan niet ongedaan worden gemaakt.",
+    "toast": {
+      "disabledSuccess": "Integratie {name} uitgeschakeld",
+      "deletedSuccess": "Integratie verwijderd",
+      "enableFailed": "Integratie inschakelen mislukt",
+      "disableFailed": "Integratie uitschakelen mislukt",
+      "deleteFailed": "Integratie verwijderen mislukt"
+    }
+  },
+  "manage": {
+    "title": "Eigen integraties beheren",
+    "description": "Bekijk en beheer de eigen integraties van je organisatie",
+    "headTitle": "Eigen integraties beheren - Hay.chat",
+    "uploadPlugin": "Integratie uploaden",
+    "refresh": "Vernieuwen",
+    "stats": {
+      "customPlugins": "Eigen integraties",
+      "uploadedByOrg": "Geüpload door je organisatie",
+      "enabled": "Ingeschakeld",
+      "currentlyActive": "Nu actief",
+      "totalSize": "Totale grootte",
+      "storageUsed": "Gebruikte opslag"
+    },
+    "loading": "Integraties laden...",
+    "empty": {
+      "title": "Geen eigen integraties",
+      "description": "Upload je eerste eigen integratie om te beginnen"
+    },
+    "table": {
+      "title": "Eigen integraties",
+      "version": "Versie: {version}",
+      "id": "ID: {id}",
+      "uploaded": "Geüpload: {date}"
+    },
+    "actions": {
+      "enable": "Inschakelen",
+      "enabling": "Inschakelen...",
+      "disable": "Uitschakelen",
+      "disabling": "Uitschakelen...",
+      "settings": "Instellingen",
+      "update": "Bijwerken",
+      "delete": "Verwijderen",
+      "deleting": "Verwijderen..."
+    },
+    "confirmDelete": "Weet je zeker dat je deze integratie wilt verwijderen? Dit kan niet ongedaan worden gemaakt.",
+    "updateComingSoon": "Bijwerken is binnenkort beschikbaar",
+    "toast": {
+      "enabledSuccess": "Integratie ingeschakeld",
+      "disabledSuccess": "Integratie uitgeschakeld",
+      "deletedSuccess": "Integratie verwijderd",
+      "enableFailed": "Integratie inschakelen mislukt",
+      "disableFailed": "Integratie uitschakelen mislukt",
+      "deleteFailed": "Integratie verwijderen mislukt"
+    }
+  },
+  "upload": {
+    "title": "Eigen integratie uploaden",
+    "description": "Upload een eigen integratie om je platform uit te breiden",
+    "headTitle": "Integratie uploaden - Hay.chat",
+    "backToMarketplace": "Terug naar marketplace",
+    "card": {
+      "title": "Integratie-ZIP uploaden",
+      "description": "Upload een ZIP-bestand met je eigen integratie. De ZIP moet in de hoofdmap een manifest.json-bestand bevatten."
+    },
+    "file": {
+      "label": "Integratiebestand",
+      "dropHint": "Zet je integratie-ZIP hier neer of klik om te bladeren",
+      "maxSize": "Maximale bestandsgrootte: 50 MB",
+      "selectFile": "Bestand kiezen",
+      "remove": "Verwijderen"
+    },
+    "success": {
+      "message": "Integratie geüpload!",
+      "uploadAnother": "Nog een uploaden",
+      "viewMarketplace": "Marketplace bekijken"
+    },
+    "progress": {
+      "uploading": "Uploaden...",
+      "uploadPlugin": "Integratie uploaden"
+    },
+    "errors": {
+      "title": "Uploaden mislukt",
+      "zipOnly": "Alleen ZIP-bestanden zijn toegestaan",
+      "tooLarge": "Bestand is groter dan de limiet van 50 MB",
+      "uploadFailed": "Integratie uploaden mislukt"
+    },
+    "requirements": {
+      "title": "Eisen voor integraties",
+      "manifest": {
+        "title": "Geldige package.json met hay-plugin-veld",
+        "description": "Moet een package.json bevatten met een 'hay-plugin'-veld met ten minste een 'entry' die naar de MCP-server verwijst"
+      },
+      "pluginId": {
+        "title": "Geldige integratie-ID",
+        "description": "De pakketnaam in package.json moet een geldige npm-naam zijn (kleine letters, cijfers, koppeltekens, optionele scope)"
+      },
+      "zipFormat": {
+        "title": "ZIP-formaat",
+        "description": "Het bestand moet een ZIP-bestand zijn van maximaal 50 MB"
+      },
+      "noPathTraversal": {
+        "title": "Geen path traversal",
+        "description": "De ZIP mag geen bestanden met absolute paden of .. bevatten"
+      }
+    },
+    "toast": {
+      "uploadedSuccess": "Integratie {name} geüpload!"
+    }
+  },
+  "pluginSettings": {
+    "backToMarketplace": "Terug naar marketplace",
+    "backToSetup": "Terug naar installatie",
+    "headTitle": "Integratie-instellingen - Hay.chat",
+    "headTitleWithName": "Instellingen {name} - Hay.chat",
+    "restartWorker": "Herstarten",
+    "restarting": "Herstarten...",
+    "disablePlugin": "Ontkoppelen en verwijderen",
+    "disableConfirm": {
+      "title": "Ontkoppelen en verwijderen?",
+      "description": "{name} werkt niet meer voor je workspace. De instellingen blijven bewaard voor als je het opnieuw koppelt.",
+      "confirm": "Ontkoppelen"
+    },
+    "error": {
+      "loadFailed": "Integratie laden mislukt",
+      "returnToMarketplace": "Terug naar marketplace"
+    },
+    "connection": {
+      "connectionFailed": "Verbinding mislukt",
+      "oauthUnavailableTitle": "Koppelen is nog niet beschikbaar",
+      "oauthUnavailable": "{name} kan pas worden gekoppeld als de OAuth-app op deze Hay.chat-server is ingesteld. Een beheerder moet de client-ID en het secret voor deze integratie toevoegen."
+    },
+    "capabilities": {
+      "title": "Mogelijkheden",
+      "description": "Wat deze integratie kan",
+      "items": {
+        "messages": {
+          "title": "Klantgesprekken",
+          "description": "Ontvangt de berichten van je klanten en verstuurt de antwoorden van Hay.chat."
+        },
+        "customers": {
+          "title": "Klantprofielen",
+          "description": "Koppelt elk gesprek aan de klant die het is begonnen."
+        },
+        "mcp": {
+          "title": "Acties voor je AI-agent",
+          "description": "Laat de agent dingen opzoeken en acties uitvoeren voor je klanten, zoals een bestelling controleren."
+        },
+        "products": {
+          "title": "Productcatalogus",
+          "description": "Houdt je producten gesynchroniseerd, zodat de agent er vragen over kan beantwoorden."
+        },
+        "disputes": {
+          "title": "Bewijs bij chargebacks",
+          "description": "Verzamelt de bestel- en gespreksgeschiedenis die je nodig hebt om op een chargeback te reageren."
+        },
+        "tickets": {
+          "title": "Helpdesktickets",
+          "description": "Maakt een ticket aan voor je team als een klant een mens nodig heeft en er niemand beschikbaar is."
+        },
+        "documents": {
+          "title": "Kennis importeren",
+          "description": "Importeert pagina's en documenten in je kennisbank."
+        },
+        "webchat": {
+          "title": "Webchat",
+          "description": "Breidt de chatwidget op je website uit."
+        }
+      },
+      "empty": "Deze integratie werkt op de achtergrond en voegt zelf geen acties toe."
+    },
+    "availableActions": {
+      "title": "Beschikbare acties",
+      "toolsAvailable": "{count} tools beschikbaar",
+      "showAll": "Alles tonen ({count})",
+      "hide": "Verbergen",
+      "classification": {
+        "read": "Lezen",
+        "write": "Schrijven",
+        "destructive": "Destructief"
+      },
+      "parameters": "Parameters"
+    },
+    "connectionTest": {
+      "title": "Verbinding controleren",
+      "description": "Controleer of Hay.chat {name} met deze gegevens kan bereiken.",
+      "testConnection": "Verbinding testen",
+      "success": "Verbinding geslaagd!",
+      "configRequired": "Configuratie vereist",
+      "failed": "Verbinding mislukt"
+    },
+    "tabs": {
+      "label": "Onderdelen van de integratie",
+      "setup": "Installatie",
+      "capabilities": "Wat het kan",
+      "advanced": "Geavanceerd"
+    },
+    "toast": {
+      "configSaved": "Configuratie opgeslagen",
+      "configSaveFailed": "Configuratie opslaan mislukt",
+      "enableFailed": "Integratie inschakelen mislukt",
+      "disabledSuccess": "Integratie uitgeschakeld",
+      "disableFailed": "Integratie uitschakelen mislukt",
+      "restartedSuccess": "Integratieworker herstart",
+      "restartFailed": "Integratie herstarten mislukt",
+      "resetToEnv": "Terug naar de beheerde waarde",
+      "resetToEnvFailed": "Teruggaan naar de beheerde waarde is niet gelukt",
+      "oauthSuccess": "OAuth-verbinding gemaakt",
+      "oauthFailed": "OAuth-verbinding mislukt. Probeer het opnieuw.",
+      "connectionEstablished": "Verbinding gemaakt",
+      "connectionCheckFailed": "Verbinding maken mislukt. Controleer je configuratie.",
+      "oauthConnectFailed": "Koppelen met {name} mislukt",
+      "oauthConnectedTo": "Gekoppeld met {name}!",
+      "oauthDisconnectedFrom": "Ontkoppeld van {name}",
+      "oauthDisconnectFailed": "Ontkoppelen mislukt"
+    },
+    "channelHealth": {
+      "failingTitle": "Dit kanaal werkt niet goed",
+      "since": "Sinds {time}",
+      "reasons": {
+        "delivery_failures": "{detail} antwoorden konden het afgelopen uur niet worden afgeleverd. Klanten op dit kanaal krijgen mogelijk geen antwoord.",
+        "token_revoked": "De koppeling is ingetrokken of verlopen. Koppel opnieuw om weer berichten te ontvangen en te versturen.",
+        "quality_drop": "De provider heeft de kwaliteitsscore van dit kanaal verlaagd ({detail}). Als die blijft dalen, kunnen de berichtlimieten omlaag gaan."
+      },
+      "alerted": "Eigenaren en beheerders zijn via e-mail en pushmelding op de hoogte gebracht."
+    },
+    "advanced": {
+      "title": "Geavanceerde instellingen",
+      "description": "Technische waarden die de meeste workspaces nooit wijzigen. Waarden met Beheerd door Hay.chat zijn al voor je ingesteld.",
+      "readOnlyDescription": "Hay.chat stelt deze waarden voor je in. Ze worden hier ter informatie getoond."
+    },
+    "form": {
+      "managedValue": "Ingesteld door Hay.chat",
+      "override": "Overschrijven",
+      "managedHint": "Hay.chat stelt deze waarde voor je in. Overschrijf hem alleen als je een eigen waarde voor deze workspace wilt gebruiken.",
+      "overridingHint": "Je vervangt de waarde die Hay.chat instelt. Annuleer om terug te gaan.",
+      "cancelOverride": "Overschrijven annuleren",
+      "encryptedValue": "Opgeslagen en verborgen",
+      "edit": "Bewerken",
+      "cancelEdit": "Bewerken annuleren",
+      "resetToManaged": "Terugzetten naar beheerde waarde",
+      "encryptedHint": "Versleuteld opgeslagen. Bewerk om te vervangen.",
+      "encryptedResetHint": "Versleuteld opgeslagen. Terugzetten herstelt de waarde die Hay.chat instelt.",
+      "overrideResetHint": "Je hebt de waarde van Hay.chat vervangen. Terugzetten herstelt die waarde.",
+      "willEncrypt": "Wordt versleuteld opgeslagen.",
+      "selectPlaceholder": "Kies een optie",
+      "discard": "Wijzigingen negeren",
+      "save": "Opslaan",
+      "managedReadOnlyHint": "Hay.chat stelt deze waarde voor je in.",
+      "badgeManaged": "Beheerd door Hay.chat",
+      "badgeSetByYou": "Door jou ingesteld"
+    },
+    "oauth": {
+      "title": "Koppel je {name}-account",
+      "description": "Log in bij {name} om Hay.chat toegang te geven. Je kunt op elk moment ontkoppelen.",
+      "notConnected": "Niet gekoppeld",
+      "expired": "Koppeling verlopen",
+      "connectedAs": "Gekoppeld als {account}",
+      "connected": "Gekoppeld",
+      "connectedAt": "Gekoppeld op {date}",
+      "expiredAt": "Verlopen op {date}. Koppel opnieuw om het werkend te houden.",
+      "expiredHint": "Koppel opnieuw om het werkend te houden.",
+      "expiresAt": "Toegang verloopt op {date}",
+      "connect": "{name} koppelen",
+      "reconnect": "Opnieuw koppelen",
+      "disconnect": "Ontkoppelen",
+      "statusFailed": "De koppeling kon niet worden gecontroleerd. Vernieuw de pagina om het opnieuw te proberen."
+    },
+    "status": {
+      "not_set_up": "Niet ingesteld",
+      "needs_action": "Actie nodig",
+      "connected": "Gekoppeld",
+      "error": "Werkt niet"
+    },
+    "actions": {
+      "connect": "Koppelen",
+      "finishSetup": "Installatie afronden",
+      "reviewSetup": "Installatie bekijken",
+      "more": "Meer opties",
+      "advancedMode": "Geavanceerde modus",
+      "version": "Versie {version}"
+    },
+    "setup": {
+      "fieldsTitle": "Jouw gegevens",
+      "fieldsDescription": "Wat {name} van je nodig heeft om te koppelen.",
+      "optional": "Optioneel",
+      "stepDone": "Klaar",
+      "stepsLabel": "Installatiestappen",
+      "openExternal": "Openen in nieuw tabblad"
+    },
+    "connect": {
+      "title": "{name} koppelen aan Hay.chat",
+      "saving": "Je winkelgegevens opslaan…",
+      "redirecting": "Je winkel wordt geopend om toegang goed te keuren. Je komt daarna hier terug en gaat vervolgens naar het beheer van je winkel.",
+      "failedTitle": "We konden de koppeling niet starten",
+      "networkError": "Hay.chat reageerde niet op tijd. Controleer je verbinding en probeer het opnieuw.",
+      "retry": "Opnieuw proberen"
+    }
+  },
+  "pluginConnect": {
+    "title": "{name} koppelen",
+    "subtitle": "De eerste keer klaarmaken. Dit kan tot een minuut duren.",
+    "readyTitle": "{name} is klaar",
+    "readySubtitle": "Rond nu de installatie af.",
+    "failedTitle": "{name} koppelen mislukt",
+    "failedSubtitle": "Er is niets ingeschakeld, dus je kunt het veilig opnieuw proberen.",
+    "runningNote": "Bij de eerste koppeling wordt de plugin gebouwd. De volgende keer gaat het sneller.",
+    "ready": "Klaar",
+    "continue": "Verder naar installatie",
+    "close": "Sluiten",
+    "tryAgain": "Opnieuw proberen",
+    "countdown": "Verder over {seconds} seconden",
+    "seconds": "{value}s",
+    "skipped": "Al gedaan",
+    "failed": "Mislukt",
+    "unknownError": "Er ging iets mis bij het koppelen. Probeer het zo opnieuw.",
+    "steps": {
+      "install": {
+        "label": "Dependencies downloaden",
+        "detail": "Pakketten installeren"
+      },
+      "build": {
+        "label": "De plugin bouwen",
+        "detail": "{name} compileren"
+      },
+      "enable": {
+        "label": "Inschakelen voor je organisatie",
+        "detail": "Instellingen opslaan"
+      },
+      "start": {
+        "label": "Opstarten",
+        "detail": "{name} starten en de tools laden"
+      }
+    },
+    "continueGeneric": "Doorgaan"
+  }
+}

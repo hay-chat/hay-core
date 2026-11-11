@@ -12,15 +12,23 @@
   },
   "metrics": {
     "totalConversations": "Total de Conversas",
-    "resolved": "resolvidas",
-    "resolutionRate": "Taxa de Resolução",
-    "ofConversations": "das conversas",
+    "resolved": "resolvidas pela IA",
+    "resolutionRate": "Taxa de Resolução da IA",
     "avgMessages": "Média de Mensagens",
     "messagesPer": "mensagens por",
     "conversation": "conversa",
     "avgResponseTime": "Tempo Médio de Resposta",
     "medianResponseTime": "mediana {value}",
     "noRepliesYet": "Nenhuma resposta neste período"
+  },
+  "quota": {
+    "title": "Resoluções neste período de cobrança",
+    "period": "{start} a {end}",
+    "viewUsage": "Uso",
+    "ofIncluded": "de {included} incluídas",
+    "daysLeft": "{count} dia restante | {count} dias restantes",
+    "projected": "no ritmo de {count}",
+    "noQuota": "As resoluções incluídas no seu plano estão na sua página de cobrança."
   },
   "activity": {
     "title": "Atividade de Conversas",

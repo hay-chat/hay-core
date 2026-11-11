@@ -187,6 +187,7 @@ export type {
   HayPluginSetupHints,
   HayPluginPackageJson,
   PluginCategory,
+  PluginMarketplaceCategory,
   PluginCapability,
 } from "./manifest";
 

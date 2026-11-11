@@ -6,12 +6,20 @@ import { DEFAULT_LANGUAGE } from "@server/types/language.types";
 const logger = createLogger("email-translation");
 
 /**
- * Locale mapping from SupportedLanguage enum values to translation file directories.
- * The enum uses short codes (e.g. "pt") but translation files use regional variants (e.g. "pt-BR").
+ * The email locale for a language: an exact match, else one with the same base
+ * language ("pt", "pt-PT" → "pt-BR"), else English.
  */
-const LOCALE_MAP: Record<string, string> = {
-  pt: "pt-BR",
-};
+export function resolveEmailLocale(
+  locale: string | null | undefined,
+  available: readonly string[],
+): string {
+  if (locale && available.includes(locale)) return locale;
+  const base = locale?.split("-")[0].toLowerCase();
+  return (
+    available.find((candidate) => candidate.split("-")[0].toLowerCase() === base) ??
+    DEFAULT_LANGUAGE
+  );
+}
 
 /**
  * Parsed contents of a locale JSON file: top-level sections ("common" and one
@@ -60,18 +68,8 @@ export class EmailTranslationService {
     }
   }
 
-  /**
-   * Resolve the actual locale key used in the cache.
-   * Maps short codes (e.g. "pt") to regional variants (e.g. "pt-BR").
-   */
   private resolveLocale(locale: string): string {
-    // Direct match
-    if (this.cache.has(locale)) return locale;
-    // Mapped match (e.g. "pt" -> "pt-BR")
-    const mapped = LOCALE_MAP[locale];
-    if (mapped && this.cache.has(mapped)) return mapped;
-    // Fallback to default
-    return DEFAULT_LANGUAGE;
+    return resolveEmailLocale(locale, [...this.cache.keys()]);
   }
 
   /**

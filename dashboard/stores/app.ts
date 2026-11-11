@@ -5,6 +5,9 @@ import type { RouterOutputs } from "@/types/trpc";
 // Derive the plugin shape from the tRPC router so the store stays in sync
 // with the server contract instead of duplicating (and drifting from) it.
 type Plugin = RouterOutputs["plugins"]["getAll"][number];
+type PluginConnectionStates = RouterOutputs["plugins"]["connectionStates"];
+/** What the marketplace and sidebar show for an enabled plugin. */
+export type PluginStatus = "connected" | "needs_setup";
 
 interface AppState {
   openConversationsCount: number;
@@ -15,6 +18,8 @@ interface AppState {
   plugins: Plugin[];
   pluginsLastUpdated: number | null;
   pluginsLoading: boolean;
+  /** Whether each enabled plugin is really connected. Loaded after the list, never blocking it. */
+  pluginConnectionStates: PluginConnectionStates;
   rowsPerPage: number;
   /** Plugin settings Advanced mode, remembered per user id (D20). */
   pluginAdvancedMode: Record<string, boolean>;
@@ -29,6 +34,7 @@ export const useAppStore = defineStore("app", {
     plugins: [],
     pluginsLastUpdated: null,
     pluginsLoading: false,
+    pluginConnectionStates: {},
     rowsPerPage: 10,
     pluginAdvancedMode: {},
   }),
@@ -45,9 +51,16 @@ export const useAppStore = defineStore("app", {
       return state.plugins.filter((plugin) => plugin.enabled);
     },
 
-    availablePlugins: (state): Plugin[] => {
-      return state.plugins.filter((plugin) => !plugin.enabled);
-    },
+    /**
+     * Status of an enabled plugin, null when it is not enabled. A plugin whose
+     * connection could not be established ("unknown") counts as connected.
+     */
+    pluginStatus:
+      (state) =>
+      (id: string): PluginStatus | null => {
+        if (!state.plugins.some((plugin) => plugin.id === id && plugin.enabled)) return null;
+        return state.pluginConnectionStates[id] === "not_connected" ? "needs_setup" : "connected";
+      },
 
     shouldRefreshPlugins: (state) => {
       if (!state.pluginsLastUpdated) return true;
@@ -136,15 +149,31 @@ export const useAppStore = defineStore("app", {
     async fetchPlugins() {
       try {
         this.pluginsLoading = true;
-        const response = await Hay.plugins.getAll.query();
+        // Names and descriptions come back in the dashboard's language.
+        const locale = String(useNuxtApp().$i18n.locale.value);
+        const response = await Hay.plugins.getAll.query({ locale });
         this.plugins = response;
         this.pluginsLastUpdated = Date.now();
+        void this.fetchPluginConnectionStates();
         return this.plugins;
       } catch (error) {
         console.error("[AppStore] Failed to fetch plugins:", error);
         return this.plugins;
       } finally {
         this.pluginsLoading = false;
+      }
+    },
+
+    async fetchPluginConnectionStates() {
+      if (!this.plugins.some((plugin) => plugin.enabled)) {
+        this.pluginConnectionStates = {};
+        return;
+      }
+      try {
+        this.pluginConnectionStates = await Hay.plugins.connectionStates.query();
+      } catch (error) {
+        // The list still works without it: enabled plugins simply show as connected.
+        console.error("[AppStore] Failed to fetch plugin connection states:", error);
       }
     },
 

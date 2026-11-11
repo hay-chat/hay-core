@@ -33,27 +33,20 @@ test.describe("Email inbox channel setup", () => {
     // 1. Marketplace → Email inbox card
     await navigateWithAuth(page, "/integrations/marketplace");
     await page.waitForLoadState("networkidle");
-    await expect(page.locator('h1:has-text("Plugin Marketplace")')).toBeVisible({
+    await expect(page.locator('h1:has-text("Marketplace")')).toBeVisible({
       timeout: 10000,
     });
     await expect(page.locator(".animate-pulse").first()).not.toBeVisible({ timeout: 15000 });
 
-    const heading = page.locator('h2:has-text("Email inbox")').first();
-    await expect(heading).toBeVisible({ timeout: 10000 });
-    const card = heading.locator(
-      "xpath=ancestor::*[self::div][contains(@class, 'card') or contains(@class, 'Card')][1]",
-    );
-    const scope = (await card.count()) > 0 ? card : heading.locator("xpath=ancestor::*[3]");
-
-    const configure = scope.locator('button:has-text("Configure")').first();
-    const install = scope.locator('button:has-text("Install")').first();
-    if (await configure.isVisible().catch(() => false)) {
-      await configure.click();
-    } else {
-      await expect(install).toBeVisible({ timeout: 5000 });
-      await install.click();
-    }
+    // The card opens the plugin page; a plugin that is not connected yet shows Connect there.
+    const card = page.locator('[data-testid="marketplace-card"]:has-text("Email inbox")').first();
+    await expect(card).toBeVisible({ timeout: 10000 });
+    await card.click();
     await page.waitForURL(/\/integrations\/plugins\//, { timeout: 20000 });
+    const connect = page.locator('[data-testid="plugin-connect"]');
+    if (await connect.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await connect.click();
+    }
     await expect(page.locator(".animate-pulse").first()).not.toBeVisible({ timeout: 15000 });
 
     // 2. Settings: support address → Save

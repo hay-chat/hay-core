@@ -1,7 +1,6 @@
 #!/usr/bin/env ts-node
 
 import { PromptService } from "../services/prompt.service";
-import { SupportedLanguage } from "../types/language.types";
 
 // Test colors for console output
 const GREEN = "\x1b[32m";
@@ -23,7 +22,7 @@ async function testPortuguesePrompts() {
     const prompt = await promptService.getPrompt(
       "perception/intent-analysis",
       { message: "Quero cancelar minha assinatura" },
-      { language: SupportedLanguage.PORTUGUESE },
+      { language: "pt" as const },
     );
 
     if (
@@ -58,7 +57,7 @@ async function testPortuguesePrompts() {
           },
         ],
       },
-      { language: SupportedLanguage.PORTUGUESE },
+      { language: "pt" as const },
     );
 
     if (
@@ -83,7 +82,7 @@ async function testPortuguesePrompts() {
     const prompt = await promptService.getPrompt(
       "conversation/title-generation",
       { conversationContext: "Cliente: Preciso resetar minha senha" },
-      { language: SupportedLanguage.PORTUGUESE },
+      { language: "pt" as const },
     );
 
     if (
@@ -111,7 +110,7 @@ async function testPortuguesePrompts() {
         hasTools: true,
         tools: "buscar_dados, enviar_email",
       },
-      { language: SupportedLanguage.PORTUGUESE },
+      { language: "pt" as const },
     );
 
     if (
@@ -141,14 +140,14 @@ async function testPortuguesePrompts() {
     const englishPrompt = await promptService.getPrompt(
       "perception/intent-analysis",
       { message: "test message" },
-      { language: SupportedLanguage.ENGLISH },
+      { language: "en" as const },
     );
 
     // Portuguese version should exist for this one
     const portuguesePrompt = await promptService.getPrompt(
       "perception/intent-analysis",
       { message: "mensagem teste" },
-      { language: SupportedLanguage.PORTUGUESE },
+      { language: "pt" as const },
     );
 
     if (

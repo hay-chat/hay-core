@@ -1,6 +1,7 @@
 {
   "name": "Klaviyo",
   "description": "Connect your Klaviyo account to manage profiles, lists, segments, campaigns, flows, events, and templates",
+  "summary": "Work with profiles, lists, segments, campaigns and flows.",
   "tools": {},
   "config": {
     "apiKey": {

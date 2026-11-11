@@ -1,0 +1,187 @@
+{
+  "analytics": {
+    "page": {
+      "title": "Análises",
+      "description": "Como a IA está indo: o que ela resolve, o que passa para sua equipe e como os clientes avaliam.",
+      "seoTitle": "Análises - Hay.chat"
+    },
+    "actions": {
+      "refresh": "Atualizar",
+      "export": "Exportar CSV"
+    },
+    "tabs": {
+      "overview": "Visão geral",
+      "csat": "CSAT",
+      "handoffs": "Transferências",
+      "topics": "Assuntos",
+      "playbooks": "Playbooks"
+    },
+    "comparisonNote": "Contado pelo dia em que a conversa foi encerrada. As variações comparam com o período de mesma duração imediatamente anterior.",
+    "vsPrevious": "vs. período anterior",
+    "noPrevious": "Sem período para comparar",
+    "loadFailed": "Não foi possível carregar este relatório.",
+    "retry": "Tentar de novo",
+    "exportFailed": "A exportação falhou",
+    "empty": {
+      "title": "Nenhuma conversa encerrada neste período",
+      "description": "Escolha um período maior ou volte quando houver conversas encerradas."
+    },
+    "table": {
+      "closes": "Encerradas",
+      "aiResolutionRate": "Taxa de resolução da IA",
+      "handoffRate": "Taxa de transferência",
+      "csat": "CSAT"
+    },
+    "overview": {
+      "aiResolutionRate": "Taxa de resolução da IA",
+      "aiResolved": "Resolvidas pela IA",
+      "closes": "Conversas encerradas",
+      "handoffRate": "Taxa de transferência",
+      "trendTitle": "Taxa de resolução da IA por dia",
+      "trendDescription": "Parte das conversas encerradas em cada dia que a IA resolveu",
+      "outcomesTitle": "Como as conversas terminaram",
+      "outcomesDescription": "Cada conversa encerrada recebe um resultado",
+      "definition": "A taxa de resolução da IA são as conversas que a IA resolveu, divididas por todas as conversas encerradas. Testes e spam ficam de fora. Uma resolução deixa de contar se o cliente voltar em até 72 horas ou se sua equipe a excluir, então o número bate com as resoluções da página de Uso."
+    },
+    "outcomes": {
+      "confirmed": {
+        "label": "Confirmada",
+        "description": "A IA resolveu e o cliente confirmou."
+      },
+      "assumed": {
+        "label": "Presumida",
+        "description": "A IA respondeu e o cliente não voltou."
+      },
+      "assisted": {
+        "label": "Transferência planejada",
+        "description": "Um playbook mandou a IA passar para sua equipe."
+      },
+      "human": {
+        "label": "Resolvida pela sua equipe",
+        "description": "A IA não conseguiu resolver e uma pessoa resolveu."
+      },
+      "unhappy": {
+        "label": "Insatisfeito",
+        "description": "O cliente disse que a resposta não ajudou."
+      },
+      "abandoned": {
+        "label": "Abandonada",
+        "description": "Sem pergunta real, ou terminou sem resposta real."
+      }
+    },
+    "csat": {
+      "average": "Nota média",
+      "responseRate": "Taxa de resposta",
+      "aiAverage": "Só IA",
+      "humanAverage": "Com sua equipe",
+      "ratings": "{count} avaliações",
+      "trendTitle": "Nota média por dia",
+      "trendDescription": "Pelo dia em que o cliente avaliou",
+      "distributionTitle": "Avaliações por nota",
+      "lowScoresTitle": "Notas baixas",
+      "lowScoresDescription": "Conversas com nota 1 ou 2, da mais baixa para a mais alta",
+      "noLowScores": "Nenhuma conversa recebeu nota 1 ou 2 neste período.",
+      "untitled": "Conversa sem título",
+      "ai": "Só IA",
+      "human": "Com sua equipe",
+      "columns": {
+        "conversation": "Conversa",
+        "rating": "Nota",
+        "handledBy": "Atendida por",
+        "ratedAt": "Avaliada em"
+      },
+      "emptyTitle": "Nenhuma avaliação neste período",
+      "emptyDescription": "{count} conversas do webchat foram encerradas e nenhuma foi avaliada. Confira se a pergunta de avaliação está ativa em Configurações, Webchat.",
+      "definition": "As notas vêm da pergunta que o widget faz quando a conversa termina, de 1 a 5. Os outros canais ainda não perguntam. A taxa de resposta são as conversas avaliadas divididas pelas conversas do webchat encerradas."
+    },
+    "handoffs": {
+      "title": "Transferências",
+      "rate": "Taxa de transferência",
+      "reasonsTitle": "Por que a IA transferiu",
+      "reasonsDescription": "Do mais comum para o menos comum",
+      "trendTitle": "Transferências por dia",
+      "trendDescription": "Conversas encerradas que chegaram à sua equipe",
+      "columns": {
+        "reason": "Motivo",
+        "category": "Tipo",
+        "count": "Transferências",
+        "share": "Parte"
+      },
+      "categories": {
+        "planned": { "label": "Planejada" },
+        "customer_asked": { "label": "Cliente pediu" },
+        "fallback": { "label": "Contingência" },
+        "not_recorded": { "label": "Não registrado" }
+      },
+      "reasons": {
+        "playbook": {
+          "label": "Etapa do playbook",
+          "description": "O playbook manda passar para uma pessoa."
+        },
+        "customer_request": {
+          "label": "Cliente pediu uma pessoa",
+          "description": "O cliente pediu para falar com alguém."
+        },
+        "low_confidence": {
+          "label": "Sem certeza da resposta",
+          "description": "A IA não conseguiu apoiar a resposta no seu conhecimento."
+        },
+        "company_interest": {
+          "label": "Proteção do seu negócio",
+          "description": "A resposta poderia ir contra os seus interesses."
+        },
+        "action_claim": {
+          "label": "Ação não executada",
+          "description": "A resposta afirmava uma ação que a IA não tinha feito."
+        },
+        "broken_link": {
+          "label": "Link quebrado",
+          "description": "A resposta tinha um link para uma página que não existe."
+        },
+        "unverified_date": {
+          "label": "Data não confirmada",
+          "description": "A resposta trazia uma data que a IA não conseguiu confirmar."
+        },
+        "unanswered_fact": {
+          "label": "Informação ausente",
+          "description": "A IA precisava de uma informação que não tem."
+        },
+        "ai_unavailable": {
+          "label": "IA indisponível",
+          "description": "O provedor de IA estava fora do ar ou o limite diário acabou."
+        },
+        "planning_exhausted": {
+          "label": "Etapas demais",
+          "description": "A IA não conseguiu terminar a resposta nas etapas permitidas."
+        },
+        "ai_decision": {
+          "label": "A IA decidiu transferir",
+          "description": "A IA decidiu que uma pessoa deveria assumir."
+        },
+        "not_recorded": {
+          "label": "Não registrado",
+          "description": "Anterior ao registro dos motivos, ou alguém da equipe assumiu."
+        }
+      },
+      "notRecordedNote": "{count} transferências não têm motivo: aconteceram antes de os motivos serem registrados, ou alguém da equipe assumiu a conversa.",
+      "emptyTitle": "Nenhuma transferência neste período",
+      "emptyDescription": "Nenhuma conversa encerrada chegou à sua equipe."
+    },
+    "topics": {
+      "title": "Assuntos",
+      "column": "Assunto",
+      "coverage": "{labelled} de {closes} conversas encerradas têm assunto",
+      "emptyTitle": "Nenhum assunto neste período",
+      "emptyDescription": "Os assuntos vêm da revisão que a IA escreve quando a conversa é encerrada.",
+      "definition": "O assunto são a uma ou duas palavras que a revisão de encerramento dá a cada conversa. Termos parecidos ainda não são unificados, então \"envio\" e \"entrega\" aparecem como dois assuntos. O CSAT é a nota média, com o número de avaliações entre parênteses."
+    },
+    "playbooks": {
+      "title": "Playbooks",
+      "description": "Como as conversas terminaram, pelo playbook que as atendeu",
+      "column": "Playbook",
+      "none": "Sem playbook",
+      "deleted": "Playbook excluído",
+      "definition": "A conversa conta para o playbook em que estava quando foi encerrada. O CSAT é a nota média, com o número de avaliações entre parênteses."
+    }
+  }
+}

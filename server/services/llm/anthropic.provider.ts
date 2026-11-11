@@ -126,11 +126,6 @@ export class AnthropicChatProvider implements ChatProvider {
   }
 
   private buildParams(req: ChatRequest): Anthropic.MessageCreateParamsNonStreaming {
-    const flags = req.flags ?? {};
-    // Reasoning models (Opus) reject sampling params; never send temperature to them.
-    const allowsSampling =
-      flags.acceptsSampling !== false && !flags.reasoningModel && !/opus/i.test(req.model);
-
     const system = req.messages
       .filter((m) => m.role === "system")
       .map((m) => m.content)
@@ -175,7 +170,8 @@ export class AnthropicChatProvider implements ChatProvider {
           ? [{ type: "text", text: system, cache_control: { type: "ephemeral" } }]
           : system;
     }
-    if (allowsSampling && req.temperature !== undefined) params.temperature = req.temperature;
+    // `req.temperature` is not forwarded: the API version this SDK sends
+    // (2026-10-21) rejects sampling parameters on every model.
 
     if (req.structured) {
       const name = req.structured.name ?? "structured_response";

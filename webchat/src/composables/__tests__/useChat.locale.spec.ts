@@ -4,15 +4,16 @@ import { FakeWebSocket, mockFetch, mountChat } from "./chatHarness";
 vi.mock("../useDPoP", async () => (await import("./chatHarness")).dpopMock());
 
 /**
- * Regression: a pt-BR shopper saw the Portuguese placeholder greeting replaced
- * by the server's English one. The widget now sends the locale its UI uses on
- * create, so the server writes the greeting in the same language.
+ * The widget sends the customer's raw language tag on create, so the server
+ * writes the greeting (and the conversation's language) in it. It must not be
+ * squeezed through the widget's UI locales: a Swedish browser once became "en".
  */
 
-describe("useChat create sends the widget locale", () => {
+describe("useChat create sends the customer's language", () => {
   const originalWebSocket = globalThis.WebSocket;
   const originalFetch = globalThis.fetch;
   const originalLanguage = navigator.language;
+  const originalLanguages = navigator.languages;
   let createBodies: Record<string, unknown>[];
 
   beforeEach(() => {
@@ -37,6 +38,10 @@ describe("useChat create sends the widget locale", () => {
     globalThis.WebSocket = originalWebSocket;
     globalThis.fetch = originalFetch;
     Object.defineProperty(navigator, "language", { value: originalLanguage, configurable: true });
+    Object.defineProperty(navigator, "languages", {
+      value: originalLanguages,
+      configurable: true,
+    });
     vi.restoreAllMocks();
   });
 
@@ -47,12 +52,23 @@ describe("useChat create sends the widget locale", () => {
     return createBodies[0];
   }
 
-  it("sends the configured locale", async () => {
-    expect(await firstCreateBody({ locale: "pt-BR" })).toMatchObject({ language: "pt-br" });
+  function setBrowserLanguages(languages: string[], language: string) {
+    Object.defineProperty(navigator, "languages", { value: languages, configurable: true });
+    Object.defineProperty(navigator, "language", { value: language, configurable: true });
+  }
+
+  it("sends the configured locale as given", async () => {
+    setBrowserLanguages(["sv-SE"], "sv-SE");
+    expect(await firstCreateBody({ locale: "pt-BR" })).toMatchObject({ language: "pt-BR" });
   });
 
-  it("falls back to the browser language, like the UI", async () => {
-    Object.defineProperty(navigator, "language", { value: "de-AT", configurable: true });
-    expect(await firstCreateBody({})).toMatchObject({ language: "de-de" });
+  it("sends the browser's preferred language, even one the widget UI lacks", async () => {
+    setBrowserLanguages(["sv-SE", "en-US"], "en-US");
+    expect(await firstCreateBody({})).toMatchObject({ language: "sv-SE" });
+  });
+
+  it("falls back to navigator.language when languages is empty", async () => {
+    setBrowserLanguages([], "de-AT");
+    expect(await firstCreateBody({})).toMatchObject({ language: "de-AT" });
   });
 });

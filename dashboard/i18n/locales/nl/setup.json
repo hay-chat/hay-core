@@ -1,0 +1,377 @@
+{
+  "setup": {
+    "nav": {
+      "title": "Instellen",
+      "progress": "{ready} van {total} klaar",
+      "upNext": "Hierna: {title}",
+      "continue": "Verder met instellen",
+      "widgetLabel": "Voortgang van de setup"
+    },
+    "state": {
+      "loadingLabel": "Je setup laden",
+      "errorTitle": "We konden je setup niet laden",
+      "errorDescription": "Controleer je verbinding en probeer het opnieuw. Er is niets gewijzigd.",
+      "retry": "Opnieuw proberen",
+      "forbiddenTitle": "Alleen eigenaren en beheerders kunnen Hay instellen",
+      "forbiddenDescription": "Vraag een eigenaar of beheerder van deze organisatie om de setup af te ronden.",
+      "goHome": "Naar home"
+    },
+    "questions": {
+      "stepLabel": "Vraag {current} van {total}",
+      "skip": "Vragen overslaan",
+      "backToList": "Terug naar je lijst",
+      "back": "Terug",
+      "continue": "Doorgaan",
+      "finish": "Bekijk wat je assistent kan",
+      "chooseTypeHint": "Kies een type bedrijf om door te gaan.",
+      "saveError": "We konden je antwoorden niet opslaan. Probeer het opnieuw.",
+      "type": {
+        "title": "Wat voor bedrijf is dit?",
+        "description": "We lezen je website om onze volgende suggesties af te stemmen. Dit bepaalt wat we vragen.",
+        "website": "Je website",
+        "websitePlaceholder": "jouwwinkel.nl",
+        "typeLabel": "Type bedrijf",
+        "inferring": "We lezen je website om een type voor te stellen",
+        "inferred": "Lijkt op jou, op basis van je website"
+      },
+      "tools": {
+        "title": "Wat gebruik je al?",
+        "description": "Kies alles wat van toepassing is. Dit bepaalt wat je assistent voor klanten kan doen.",
+        "channelsTitle": "Waar klanten contact met je opnemen",
+        "loading": "Suggesties laden",
+        "error": "We konden geen suggesties laden voor dit type bedrijf.",
+        "retry": "Opnieuw proberen",
+        "none": "We hebben nog geen platformsuggesties voor dit type bedrijf. Je kunt er later een koppelen."
+      },
+      "ask": {
+        "title": "Wat vragen klanten het vaakst?",
+        "description": "We testen je assistent hierop. Verwijder de vragen die niet passen en voeg je eigen vragen toe.",
+        "addLabel": "Voeg een vraag toe die klanten stellen",
+        "addPlaceholder": "Nog een vraag toevoegen",
+        "add": "Toevoegen"
+      }
+    },
+    "types": {
+      "store": {
+        "name": "Webwinkel",
+        "hint": "Je verkoopt producten online"
+      },
+      "saas": {
+        "name": "Software of SaaS",
+        "hint": "Klanten nemen een abonnement op je product"
+      },
+      "service": {
+        "name": "Dienstverlener",
+        "hint": "Klanten boeken of huren je in"
+      },
+      "other": {
+        "name": "Iets anders",
+        "hint": "We beginnen met de basis"
+      }
+    },
+    "groups": {
+      "commerce": "Waar je verkoopt",
+      "payments": "Betalingen",
+      "crm": "Klanten en CRM",
+      "helpdesk": "Support",
+      "marketing": "Marketing",
+      "knowledge": "Documentatie en kennis",
+      "booking": "Boekingen"
+    },
+    "live": {
+      "title": "Wat we voor je controleren",
+      "label": "Je lijst tot nu toe",
+      "empty": "Kies een paar vragen, dan verschijnen ze hier.",
+      "readingOne": "{site} lezen: tot nu toe {count} pagina",
+      "readingOther": "{site} lezen: tot nu toe {count} pagina's",
+      "readingOfOne": "{site} lezen: {processed} van {total} pagina",
+      "readingOfOther": "{site} lezen: {processed} van {total} pagina's",
+      "doneOne": "{count} pagina van {site} gelezen",
+      "doneOther": "{count} pagina's van {site} gelezen",
+      "failed": "We konden {site} niet lezen",
+      "yours": "Van jou",
+      "site": "Je site",
+      "platform": "Je platform",
+      "waiting": "We beginnen {site} te lezen zodra je het hebt ingevuld.",
+      "progressLabel": "Voortgang van het lezen",
+      "partialOne": "Tot nu toe {count} pagina van {site} gelezen. De rest volgt bij de volgende dagelijkse update.",
+      "partialOther": "Tot nu toe {count} pagina's van {site} gelezen. De rest volgt bij de volgende dagelijkse update."
+    },
+    "board": {
+      "title": "Wat kan je assistent afhandelen?",
+      "answers": "Je antwoorden",
+      "changeAnswers": "Antwoorden wijzigen",
+      "finishLater": "Later afronden",
+      "finishError": "We konden je voortgang niet opslaan. Probeer het opnieuw.",
+      "addToSite": "Toevoegen aan je site",
+      "ready": "{ready} van {total} klaar",
+      "testingOne": "Je assistent wordt getest op {count} vraag",
+      "testingOther": "Je assistent wordt getest op {count} vragen",
+      "testingHint": "Je kunt de testchat nu al gebruiken.",
+      "checkErrorTitle": "We konden de controles niet uitvoeren",
+      "checkErrorDescription": "Je lijst is ongewijzigd. Controleer opnieuw om te zien hoe elk verzoek ervoor staat.",
+      "checkAgain": "Opnieuw controleren",
+      "rowsLabel": "Klantverzoeken",
+      "progressLabel": "Verzoeken klaar",
+      "emptyTitle": "Nog geen vragen op je lijst",
+      "emptyDescription": "Voeg een vraag toe die klanten stellen, dan testen we je assistent erop.",
+      "addLabel": "Voeg een vraag toe die klanten stellen",
+      "addPlaceholder": "Voeg een vraag toe die klanten stellen",
+      "add": "Toevoegen",
+      "addError": "We konden die vraag niet toevoegen. Probeer het opnieuw.",
+      "removed": "Vraag verwijderd",
+      "undo": "Ongedaan maken",
+      "undoError": "We konden dat niet ongedaan maken. Voeg de vraag opnieuw toe.",
+      "removeError": "We konden die vraag niet verwijderen. Probeer het opnieuw.",
+      "partialNoticeOne": "We hebben tot nu toe {count} pagina van je site gelezen, dus een verzoek dat als ontbrekend staat, kan op een pagina staan die we nog niet hebben bereikt.",
+      "partialNoticeOther": "We hebben tot nu toe {count} pagina's van je site gelezen, dus een verzoek dat als ontbrekend staat, kan op een pagina staan die we nog niet hebben bereikt.",
+      "filtersLabel": "Tonen",
+      "filterAll": "Alle",
+      "filterNeedsYou": "Heeft jou nodig",
+      "filterReady": "Klaar",
+      "needYouOne": "1 heeft jou nodig",
+      "needYouOther": "{count} hebben jou nodig",
+      "allSet": "Alles klaar",
+      "groups": {
+        "needs_you": "Heeft jou nodig",
+        "checking": "Wordt gecontroleerd",
+        "ready": "Klaar"
+      },
+      "filterEmpty": "Hier staat op dit moment niets."
+    },
+    "status": {
+      "checking": "Controleren…",
+      "reading_site": "Je site wordt gelezen",
+      "ready": "Klaar",
+      "missing": "Antwoord ontbreekt",
+      "needs_connection": "Koppeling nodig",
+      "playbook_off": "Playbook uit",
+      "playbook_missing": "Playbook nodig",
+      "check_failed": "Kon niet controleren"
+    },
+    "why": {
+      "checking": "Wordt getest op je assistent",
+      "readingSite": "Je website wordt nog gelezen",
+      "readyFound": "Op basis van {source}",
+      "readyOwn": "Jouw antwoord",
+      "readyLinked": "Jouw antwoord, op basis van {document}",
+      "readyTool": "{plugin} gekoppeld, {playbook} aan",
+      "readyGeneric": "Je assistent kan dit beantwoorden",
+      "missingSite": "Je website vermeldt dit niet",
+      "missingNoSite": "Je documenten vermelden dit niet",
+      "connect": "Koppel {plugin}, dan kan je assistent {capability}",
+      "connectAny": "Koppel je platform, dan kan je assistent {capability}",
+      "playbook": "Playbook {playbook} staat klaar om te beoordelen",
+      "playbookAny": "Er staat een playbook klaar om te beoordelen",
+      "playbookWriting": "Er wordt een playbook geschreven op basis van je {plugin}-tools",
+      "playbookNoTool": "{plugin} heeft hier nog geen tool voor. Je kunt zelf een playbook schrijven.",
+      "playbookFailed": "We konden geen playbook schrijven. Probeer het opnieuw of schrijf er zelf een.",
+      "failed": "Er ging iets mis tijdens het controleren. Probeer het opnieuw.",
+      "missingHandedOff": "We hebben iets gevonden, maar niet genoeg om met zekerheid te antwoorden. Dit zou naar je team gaan.",
+      "missingPartial": "Niet gevonden in de tot nu toe gelezen pagina's",
+      "readyFoundMoreOne": "Op basis van {source} en nog 1 document",
+      "readyFoundMoreOther": "Op basis van {source} en nog {count} documenten",
+      "readyLinkedMoreOne": "Jouw antwoord, op basis van {document} en nog 1 document",
+      "readyLinkedMoreOther": "Jouw antwoord, op basis van {document} en nog {count} documenten"
+    },
+    "needs": {
+      "orders": "bestellingen opzoeken",
+      "refunds": "terugbetalingen doen",
+      "order_changes": "bestellingen bijwerken",
+      "billing": "facturen vinden",
+      "subscriptions": "abonnementen beheren",
+      "bookings": "afspraken inplannen",
+      "generic": "acties voor klanten uitvoeren"
+    },
+    "action": {
+      "tryIt": "Proberen",
+      "tryItFor": "Proberen: {question}",
+      "edit": "“{question}” bewerken",
+      "addAnswer": "Antwoord toevoegen",
+      "addAnswerFor": "Antwoord toevoegen: {question}",
+      "connect": "Koppelen",
+      "connectFor": "Koppelen: {question}",
+      "choosePlatform": "Platform kiezen",
+      "writeOwn": "Zelf schrijven",
+      "review": "Beoordelen",
+      "retry": "Opnieuw proberen",
+      "expand": "Uitklappen",
+      "collapse": "Inklappen",
+      "connectPlugin": "{plugin} koppelen",
+      "tryInChat": "Probeer het in de chat"
+    },
+    "answer": {
+      "label": "Hoe moet je assistent antwoorden?",
+      "placeholder": "Schrijf het antwoord dat klanten moeten krijgen",
+      "save": "Opslaan",
+      "cancel": "Annuleren",
+      "error": "We konden je wijzigingen niet opslaan. Probeer het opnieuw.",
+      "saveAnswer": "Antwoord opslaan"
+    },
+    "panel": {
+      "questionLabel": "Vraag",
+      "searchLabel": "Je documenten doorzoeken",
+      "searchHint": "Typ minstens 2 tekens.",
+      "searching": "Zoeken…",
+      "searchError": "We konden je documenten niet doorzoeken. Probeer het opnieuw.",
+      "noResults": "Geen documenten gevonden voor “{query}”.",
+      "resultsLabel": "Gevonden documenten",
+      "draftReady": "We hebben een antwoord opgesteld op basis van je documenten. Je tekst blijft staan totdat je hem vervangt.",
+      "replaceDraft": "Vervangen door concept",
+      "draftError": "We konden geen antwoord opstellen op basis van deze documenten. Schrijf het zelf of probeer het opnieuw.",
+      "loadingAnswer": "Je antwoord laden",
+      "answerLoadError": "We konden je antwoord niet laden.",
+      "formatted": "Dit antwoord heeft opmaak die hier verloren zou gaan.",
+      "editInKnowledge": "Bewerk het in Kennis",
+      "removeQuestion": "Vraag verwijderen",
+      "answerLabel": "Wat je assistent zegt",
+      "editAnswer": "Antwoord bewerken",
+      "draftingOne": "Antwoord opstellen op basis van {document}…",
+      "draftingOther": "Antwoord opstellen op basis van {count} documenten…",
+      "noAnswerOne": "{document} geeft hier geen antwoord op. Schrijf het antwoord of voeg een ander document toe.",
+      "noAnswerOther": "Deze {count} documenten geven hier geen antwoord op. Schrijf het antwoord of voeg een ander document toe."
+    },
+    "playbook": {
+      "whatItDoes": "Wat {playbook} doet",
+      "open": "Playbook openen",
+      "close": "Niet nu",
+      "turnOn": "Inschakelen",
+      "turnOnError": "We konden dit playbook niet inschakelen. Probeer het opnieuw.",
+      "generateError": "We konden het playbook niet schrijven. Probeer het opnieuw.",
+      "reviewHint": "Er verandert niets voor klanten totdat je het inschakelt.",
+      "stepsLabel": "Stappen",
+      "writtenFrom": "Geschreven op basis van je {plugin}-tools"
+    },
+    "connectError": {
+      "message": "We konden {plugin} niet koppelen. Er is niets gewijzigd. Probeer het opnieuw.",
+      "detail": "{plugin} meldde: {detail}"
+    },
+    "upNext": {
+      "connect": {
+        "title": "{plugin} koppelen",
+        "whyOne": "Zo kan je assistent meer doen dan alleen antwoorden. Dit ontgrendelt {count} verzoek op je lijst.",
+        "whyOther": "Zo kan je assistent meer doen dan alleen antwoorden. Dit ontgrendelt {count} verzoeken op je lijst.",
+        "whyCapabilityOne": "Zo kan je assistent {capability}. Dit ontgrendelt {count} verzoek op je lijst.",
+        "whyCapabilityOther": "Zo kan je assistent {capability}. Dit ontgrendelt {count} verzoeken op je lijst.",
+        "label": "{plugin} koppelen"
+      },
+      "choosePlatform": {
+        "title": "Kies je platform",
+        "whyOne": "Vertel ons wat je gebruikt, zodat je assistent voor klanten kan handelen. Dit ontgrendelt {count} verzoek op je lijst.",
+        "whyOther": "Vertel ons wat je gebruikt, zodat je assistent voor klanten kan handelen. Dit ontgrendelt {count} verzoeken op je lijst.",
+        "whyCapabilityOne": "Vertel ons wat je gebruikt, dan kan je assistent {capability}. Dit ontgrendelt {count} verzoek op je lijst.",
+        "whyCapabilityOther": "Vertel ons wat je gebruikt, dan kan je assistent {capability}. Dit ontgrendelt {count} verzoeken op je lijst.",
+        "label": "Platform kiezen"
+      },
+      "playbook": {
+        "title": "{playbook} inschakelen",
+        "why": "We hebben dit playbook voor je bedrijf geschreven. Beoordeel het en schakel het in.",
+        "label": "Playbook beoordelen"
+      },
+      "writePlaybook": {
+        "title": "Schrijf het playbook voor “{question}”",
+        "why": "We konden dit playbook niet schrijven op basis van je tools. Schrijf er zelf een, dan volgt je assistent het.",
+        "label": "Playbook schrijven"
+      },
+      "answer": {
+        "title": "Beantwoord “{question}”",
+        "why": "Je website behandelt dit niet, dus je assistent zou het aan jou overdragen.",
+        "label": "Antwoord toevoegen"
+      },
+      "done": {
+        "title": "Je assistent kan alles op deze lijst afhandelen",
+        "why": "Voeg hem toe aan je site wanneer je er klaar voor bent.",
+        "label": "Toevoegen aan je site"
+      }
+    },
+    "chat": {
+      "title": "Test je assistent",
+      "intro": "Vraag alles wat een klant zou vragen. Niets hiervan bereikt echte klanten.",
+      "messageLabel": "Bericht",
+      "placeholder": "Vraag wat een klant zou vragen",
+      "send": "Versturen",
+      "typing": "Je assistent antwoordt",
+      "source": "Bron",
+      "handedOff": "Je assistent was niet zeker van dit antwoord, dus het gesprek is overgedragen aan je team.",
+      "startError": "We konden de testchat niet starten.",
+      "replyError": "Nog geen antwoord. Probeer het opnieuw te versturen.",
+      "retry": "Opnieuw proberen",
+      "log": "Testgesprek"
+    },
+    "install": {
+      "title": "Voeg je assistent toe aan je site",
+      "close": "Sluiten",
+      "instructions": "Plak dit in de HTML van je site, vlak voor het einde van de pagina.",
+      "codeLabel": "Installatiecode",
+      "copy": "Code kopiëren",
+      "copied": "Gekopieerd",
+      "copyError": "We konden het niet kopiëren. Selecteer de code en kopieer hem handmatig.",
+      "loading": "Je installatiecode laden…",
+      "error": "We konden je installatiecode niet laden.",
+      "retry": "Opnieuw proberen",
+      "moreOptions": "Uiterlijk en meer opties",
+      "notReadyOne": "{count} verzoek op je lijst is nog niet klaar. Je assistent draagt die over aan je team in plaats van te gokken.",
+      "notReadyOther": "{count} verzoeken op je lijst zijn nog niet klaar. Je assistent draagt die over aan je team in plaats van te gokken.",
+      "allReady": "Alles op je lijst is klaar.",
+      "noRequests": "Je lijst is leeg, dus er valt nog niets te controleren. Je kunt de chat wel al aan je site toevoegen."
+    },
+    "channels": {
+      "title": "Waar klanten je bereiken",
+      "webchatHint": "Een chatvenster op je website.",
+      "connectedHint": "Klanten kunnen je assistent hier bereiken.",
+      "connectHint": "Koppel {plugin} zodat klanten je assistent daar kunnen bereiken.",
+      "connected": "Gekoppeld",
+      "notConnected": "Niet gekoppeld",
+      "connect": "{plugin} koppelen",
+      "addToSite": "Toevoegen aan je site"
+    },
+    "replay": {
+      "title": "Testen op echte gesprekken",
+      "description": "Importeer eerdere gesprekken en zie hoe je assistent zou hebben geantwoord. Optioneel, en er wordt niets naar klanten verstuurd.",
+      "loading": "Zoeken naar eerdere gesprekken…",
+      "loadError": "We konden je eerdere gesprekken niet laden.",
+      "retry": "Opnieuw proberen",
+      "import": "Gesprekken importeren",
+      "importMore": "Meer importeren",
+      "runOne": "{count} gesprek opnieuw afspelen",
+      "runOther": "{count} gesprekken opnieuw afspelen",
+      "again": "Opnieuw afspelen",
+      "cost": "Bij het afspelen draait je assistent op elk gesprek, dus het duurt een paar minuten. Het wordt niet gefactureerd. Het telt mee voor je maandelijkse tegoed aan testgesprekken (nog {remaining} van {limit} over).",
+      "allowanceUsed": "Je hebt het tegoed aan testgesprekken voor deze maand opgebruikt. Het wordt volgende maand opnieuw ingesteld.",
+      "startError": "We konden het afspelen niet starten. Probeer het opnieuw.",
+      "running": "Je gesprekken worden afgespeeld: {done} van {total} berichten klaar",
+      "sampleOne": "Van {count} opnieuw afgespeeld klantbericht",
+      "sampleOther": "Van {count} opnieuw afgespeelde klantberichten",
+      "resultsLabel": "Resultaten van het afspelen",
+      "buckets": {
+        "answered": "Zou antwoorden",
+        "handed_off": "Zou overdragen",
+        "knowledge_missing": "Ontbrekende kennis",
+        "needed_action": "Had een actie nodig",
+        "wrong_or_risky": "Fout of riskant"
+      },
+      "notJudgedOne": "{count} kon niet worden beoordeeld en telt niet mee.",
+      "notJudgedOther": "{count} konden niet worden beoordeeld en tellen niet mee.",
+      "nothingJudged": "Geen van de opnieuw afgespeelde berichten kon worden beoordeeld.",
+      "capped": "Dit afspelen is vroegtijdig gestopt bij de AI-verbruikslimiet. De aantallen gelden voor wat klaar is.",
+      "cancelled": "Dit afspelen is gestopt. De aantallen gelden voor wat klaar is.",
+      "openReport": "Volledig rapport openen"
+    },
+    "documents": {
+      "basedOnOne": "Op basis van 1 document",
+      "basedOnOther": "Op basis van {count} documenten",
+      "draftingFromOne": "Opstellen op basis van 1 document",
+      "draftingFromOther": "Opstellen op basis van {count} documenten",
+      "none": "Niet gebaseerd op een document",
+      "startFrom": "Beginnen vanuit een document",
+      "edit": "Documenten bewerken",
+      "addDocuments": "Documenten toevoegen",
+      "done": "Klaar",
+      "remove": "{document} verwijderen",
+      "removeTip": "Document verwijderen",
+      "open": "{document} openen",
+      "openTip": "Document openen",
+      "redraftHint": "Wanneer je op Klaar klikt, stellen we het antwoord opnieuw op basis van deze documenten op en slaan we het op als jouw antwoord."
+    }
+  }
+}

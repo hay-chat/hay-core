@@ -1,6 +1,7 @@
 {
   "name": "Nuvemshop",
   "description": "Conecte sua loja Nuvemshop para o agente encontrar pedidos, rastrear entregas, cancelar ou alterar o endereço de pedidos não despachados, registrar pedidos de estorno, enviar o Pix de pedidos não pagos, dar cupons de cortesia com limite e responder sobre produtos e estoque.",
+  "summary": "Encontre pedidos, rastreie entregas, envie links de pagamento e dê cupons de cortesia com limite.",
   "tools": {
     "nuvemshop_get_store": {
       "label": "Ver Dados da Loja",

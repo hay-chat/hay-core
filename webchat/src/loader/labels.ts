@@ -1,4 +1,5 @@
-// The button's accessible name, the only translated string the loader needs.
+// The accessible names of the button and of the teaser's dismiss button, the
+// only translated strings the loader needs.
 import type { Locale } from "@/i18n/resolve";
 import enUs from "@/i18n/locales/en-us";
 import ptBr from "@/i18n/locales/pt-br";
@@ -14,18 +15,28 @@ import zhCn from "@/i18n/locales/zh-cn";
 import koKr from "@/i18n/locales/ko-kr";
 import trTr from "@/i18n/locales/tr-tr";
 
-export const openChatLabels: Record<Locale, string> = {
-  "en-us": enUs["chat.open"],
-  "pt-br": ptBr["chat.open"],
-  "pt-pt": ptPt["chat.open"],
-  "es-es": esEs["chat.open"],
-  "de-de": deDe["chat.open"],
-  "it-it": itIt["chat.open"],
-  "fr-fr": frFr["chat.open"],
-  "nl-nl": nlNl["chat.open"],
-  "pl-pl": plPl["chat.open"],
-  "ja-jp": jaJp["chat.open"],
-  "zh-cn": zhCn["chat.open"],
-  "ko-kr": koKr["chat.open"],
-  "tr-tr": trTr["chat.open"],
+export interface LauncherLabels {
+  open: string;
+  dismissTeaser: string;
+}
+
+const pick = (messages: Record<"chat.open" | "chat.dismissTeaser", string>): LauncherLabels => ({
+  open: messages["chat.open"],
+  dismissTeaser: messages["chat.dismissTeaser"],
+});
+
+export const launcherLabels: Record<Locale, LauncherLabels> = {
+  "en-us": pick(enUs),
+  "pt-br": pick(ptBr),
+  "pt-pt": pick(ptPt),
+  "es-es": pick(esEs),
+  "de-de": pick(deDe),
+  "it-it": pick(itIt),
+  "fr-fr": pick(frFr),
+  "nl-nl": pick(nlNl),
+  "pl-pl": pick(plPl),
+  "ja-jp": pick(jaJp),
+  "zh-cn": pick(zhCn),
+  "ko-kr": pick(koKr),
+  "tr-tr": pick(trTr),
 };

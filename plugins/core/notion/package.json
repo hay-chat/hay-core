@@ -2,6 +2,7 @@
   "name": "hay-plugin-notion",
   "version": "0.1.0",
   "description": "Notion integration — import Notion pages and database entries as documents into Hay.chat's knowledge base",
+  "homepage": "https://hay.chat/docs/user-guide/integrations/notion/",
   "author": "Hay",
   "license": "MIT",
   "type": "module",
@@ -10,6 +11,7 @@
     "entry": "./dist/index.js",
     "displayName": "Notion",
     "category": "integration",
+    "marketplaceCategory": "knowledge",
     "autoActivate": true,
     "trpcRouter": "./dist/router.cjs",
     "capabilities": [
@@ -60,7 +62,7 @@
     "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^26.6.6",
     "typescript": "^5.0.0"
   }
 }

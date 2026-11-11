@@ -1,6 +1,7 @@
 {
   "name": "Chatwoot",
   "description": "Conecte o Chatwoot como canal de atendimento: as conversas passam pela IA do Hay.chat e voltam para os agentes humanos do Chatwoot quando preciso.",
+  "summary": "Deixe o agente atender conversas do Chatwoot e devolvê-las à sua equipe humana.",
   "tools": {},
   "config": {
     "baseUrl": {

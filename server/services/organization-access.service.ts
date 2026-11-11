@@ -159,29 +159,35 @@ class OrganizationAccessService {
   }
 
   /**
-   * Plan limits the operator sets (Lane A4): today the monthly simulation
-   * allowance. Merged into `organization.limits`; null removes it (core
-   * default applies). Re-sent on every usage run, so only a change is written.
+   * Plan limits the operator sets (Lane A4): the monthly simulation allowance
+   * and the resolutions the plan includes per billing period. Merged into
+   * `organization.limits`; null removes a limit (for simulations the core
+   * default then applies), a limit left out is not touched. Re-sent on every
+   * usage run, so only a change is written.
    */
   async setLimits(input: {
     organizationId: string;
     maxSimulationsPerMonth: number | null;
+    includedResolutions?: number | null;
   }): Promise<Organization["limits"] | null> {
     const organization = await this.repository.findOneBy({ id: input.organizationId });
     if (!organization) return null;
 
-    const current = organization.limits?.maxSimulationsPerMonth ?? null;
-    if (current === input.maxSimulationsPerMonth) return organization.limits ?? {};
-
     const limits = { ...(organization.limits ?? {}) };
-    if (input.maxSimulationsPerMonth === null) delete limits.maxSimulationsPerMonth;
-    else limits.maxSimulationsPerMonth = input.maxSimulationsPerMonth;
+    const changes: Record<string, { from: number | null; to: number | null }> = {};
+    for (const key of ["maxSimulationsPerMonth", "includedResolutions"] as const) {
+      const next = input[key];
+      const current = limits[key] ?? null;
+      if (next === undefined || next === current) continue;
+      if (next === null) delete limits[key];
+      else limits[key] = next;
+      changes[key] = { from: current, to: next };
+    }
+    if (Object.keys(changes).length === 0) return organization.limits ?? {};
+
     await this.repository.update({ id: organization.id }, { limits });
     logger.info(
-      {
-        organizationId: organization.id,
-        maxSimulationsPerMonth: { from: current, to: input.maxSimulationsPerMonth },
-      },
+      { organizationId: organization.id, ...changes },
       "Organization limits updated by the operator",
     );
     return limits;

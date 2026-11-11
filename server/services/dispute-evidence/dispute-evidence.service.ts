@@ -11,6 +11,12 @@
  * - The PDF is kept under 4 MB: images are downscaled step by step, and as a
  *   last resort left out with a note (they stay in the ZIP, D2-5).
  * - Uses whatever data the org's retention setting still keeps (no hold).
+ * - Card networks read evidence in English: a message written in another
+ *   language keeps its original verbatim, with a labelled English translation
+ *   under it (stored `translations.en`, else translated now and stored). It
+ *   is text inside the same PDF, so the file (what platforms accept, D2-5)
+ *   grows by a few KB; the page cap still cuts the timeline with a note. A
+ *   failed translation leaves the originals alone rather than block the pack.
  */
 import sharp from "sharp";
 import { In, IsNull } from "typeorm";
@@ -28,8 +34,16 @@ import { fetchPublicFile } from "@server/utils/fetch-public-file";
 import { createLogger } from "@server/lib/logger";
 import { isSimulationConversation } from "@server/services/simulation/simulation-kind";
 import { safeTimeZone } from "@server/utils/zoned-datetime";
+import { normalizeLanguage } from "@server/types/language.types";
+import { translationService } from "@server/services/translation.service";
 import { evidenceLocale, type EvidenceLocale, type EvidenceTemplate } from "./copy";
-import { buildTimeline, policyExcerpt, type PolicyUse, type SourceTakeover } from "./timeline";
+import {
+  buildTimeline,
+  evidenceAuthor,
+  policyExcerpt,
+  type PolicyUse,
+  type SourceTakeover,
+} from "./timeline";
 import {
   isImageAttachment,
   renderEvidencePdf,
@@ -135,6 +149,13 @@ export class DisputeEvidenceService {
       byConversation.set(message.conversation_id, list);
     }
 
+    const english = await this.englishTranslations(
+      organizationId,
+      conversations,
+      byConversation,
+      organization.defaultLanguage,
+    );
+
     const locale = evidenceLocale(
       conversations.find((c) => c.language)?.language ?? organization.defaultLanguage,
     );
@@ -144,7 +165,10 @@ export class DisputeEvidenceService {
         id: c.id,
         channel: c.channel,
         created_at: c.created_at,
-        messages: byConversation.get(c.id) ?? [],
+        messages: (byConversation.get(c.id) ?? []).map((message) => ({
+          ...message,
+          englishTranslation: english.get(message.id) ?? null,
+        })),
       })),
       actionLogs,
       takeovers,
@@ -199,6 +223,59 @@ export class DisputeEvidenceService {
       storeName: organization.name,
       generatedAt,
     };
+  }
+
+  /**
+   * English text of every evidence message written in another language, by
+   * message id. A message's language is its detected one, else its
+   * conversation's, else the store's default.
+   */
+  private async englishTranslations(
+    organizationId: string,
+    conversations: Conversation[],
+    byConversation: Map<string, Message[]>,
+    defaultLanguage: string | null,
+  ): Promise<Map<string, string>> {
+    const english = new Map<string, string>();
+    const missing: Message[] = [];
+    for (const conversation of conversations) {
+      const fallback =
+        normalizeLanguage(conversation.language) ?? normalizeLanguage(defaultLanguage);
+      for (const message of byConversation.get(conversation.id) ?? []) {
+        if (!evidenceAuthor(message) || !message.content?.trim()) continue;
+        if ((normalizeLanguage(message.detectedLanguage) ?? fallback) === "en") continue;
+        const stored = message.translations?.en;
+        if (stored) english.set(message.id, stored);
+        else missing.push(message);
+      }
+    }
+    if (missing.length === 0) return english;
+
+    try {
+      const translated = await translationService.translateTexts({
+        organizationId,
+        items: missing.map((message) => ({ id: message.id, text: message.content })),
+        targetLanguage: "en",
+      });
+      await Promise.all(
+        missing.map((message) => {
+          const result = translated.get(message.id)!;
+          english.set(message.id, result.text);
+          return translationService.saveMessageTranslation({
+            messageId: message.id,
+            language: "en",
+            text: result.text,
+            detectedLanguage: result.sourceLanguage,
+          });
+        }),
+      );
+    } catch (err) {
+      logger.warn(
+        { err, organizationId, messages: missing.length },
+        "English translation for dispute evidence failed; originals only",
+      );
+    }
+    return english;
   }
 
   private async loadTakeovers(organizationId: string, ids: string[]): Promise<SourceTakeover[]> {

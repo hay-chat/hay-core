@@ -87,7 +87,7 @@ async function memberCtx(userId: string): Promise<Context> {
   const user = await AppDataSource.getRepository(User).findOneOrFail({ where: { id: userId } });
   const userOrganization = await AppDataSource.getRepository(UserOrganization).findOneOrFail({
     where: { userId, organizationId: ORG_ID },
-    relations: ["organization"],
+    relations: { organization: true },
   });
   return {
     user: new AuthUser(user, "jwt", { organizationId: ORG_ID, userOrganization }),

@@ -7,7 +7,11 @@ const read = (locale: string) =>
   JSON.parse(readFileSync(join(__dirname, "..", "i18n/locales", locale, "insights.json"), "utf8"));
 
 describe("insights list count", () => {
-  it.each(["en", "pt-BR"])("pluralizes in %s", (locale) => {
+  it.each([
+    ["en", "1 insight", "2 insights"],
+    ["pt-BR", "1 insight", "2 insights"],
+    ["nl", "1 inzicht", "2 inzichten"],
+  ])("pluralizes in %s", (locale, one, many) => {
     const i18n = createI18n({
       legacy: false,
       locale,
@@ -15,7 +19,7 @@ describe("insights list count", () => {
     });
     const t = i18n.global.t;
     const count = (n: number) => t("insights.page.list.count", { count: n }, n);
-    expect(count(1)).toBe("1 insight");
-    expect(count(2)).toBe("2 insights");
+    expect(count(1)).toBe(one);
+    expect(count(2)).toBe(many);
   });
 });

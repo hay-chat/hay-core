@@ -55,7 +55,7 @@ export async function anonymizeConversations(
 
   const messages = await manager.getRepository(Message).find({
     where: { conversation_id: In(ownedIds) },
-    select: ["id"],
+    select: { id: true },
   });
   const messageIds = messages.map((message) => message.id);
 

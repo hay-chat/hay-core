@@ -530,7 +530,7 @@ export const playbooksRouter = t.router({
       if (input.documentIds.length > 0) {
         const docs = await documentRepository.findByOrganization(ctx.organizationId!, {
           where: { id: In(input.documentIds) },
-          select: ["id", "title", "description"],
+          select: { id: true, title: true, description: true },
         });
         documents = docs.map((doc) => ({
           id: doc.id,

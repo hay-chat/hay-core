@@ -7,6 +7,17 @@ export interface PluginNetwork {
   egress?: EgressEntry[];
 }
 
+/** Marketplace sections a plugin can list itself under (package.json hay-plugin.marketplaceCategory). */
+export const MARKETPLACE_CATEGORIES = [
+  "channels",
+  "commerce",
+  "payments",
+  "crm",
+  "knowledge",
+  "security",
+] as const;
+export type MarketplaceCategory = (typeof MARKETPLACE_CATEGORIES)[number];
+
 export interface HayPluginManifest {
   id: string;
   name: string;
@@ -30,6 +41,10 @@ export interface HayPluginManifest {
   autoActivate?: boolean;
   /** When in-app setup should suggest this plugin, and what it can do for customers. */
   setup?: PluginSetupHints;
+  /** Marketplace section. Plugins without one are listed under "Other". */
+  marketplaceCategory?: MarketplaceCategory;
+  /** The plugin's setup guide (package.json homepage), when it is an https URL. */
+  homepage?: string;
   /** Enabled automatically for newly created organizations (package.json hay-plugin.defaultEnabled). */
   defaultEnabled?: boolean;
   invisible?: boolean;
@@ -170,6 +185,8 @@ export interface HayPluginManifest {
 export interface PluginLocale {
   name?: string;
   description?: string;
+  /** One short sentence for the marketplace card. Falls back to `description`. */
+  summary?: string;
   tools?: Record<string, { label: string; description?: string }>;
   config?: Record<string, { label: string; description?: string }>;
 }
