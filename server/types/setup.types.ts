@@ -21,6 +21,7 @@ export type SetupHandle = (typeof SETUP_HANDLES)[number];
 
 export const SETUP_PLUGIN_GROUPS = [
   "commerce",
+  "shipping",
   "payments",
   "crm",
   "helpdesk",

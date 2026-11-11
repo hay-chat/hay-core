@@ -1,0 +1,42 @@
+{
+  "name": "hay-plugin-correios",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Connect your Correios contract so the agent can track a shipment by its tracking code: current status, latest event, history, delivery date, and whether the parcel has stopped moving",
+  "author": "Hay",
+  "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "Correios",
+    "category": "integration",
+    "capabilities": [
+      "mcp",
+      "auth"
+    ],
+    "setup": {
+      "businessTypes": [
+        "store"
+      ],
+      "group": "shipping"
+    },
+    "env": [],
+    "network": {
+      "egress": [
+        "api.correios.com.br"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3",
+    "vitest": "^5.1.0"
+  }
+}

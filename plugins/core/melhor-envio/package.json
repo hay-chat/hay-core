@@ -1,0 +1,47 @@
+{
+  "name": "hay-plugin-melhor-envio",
+  "version": "1.0.0",
+  "description": "Connect your Melhor Envio account so the agent can answer where-is-my-order questions: shipment status, carrier, tracking code and link, posting and delivery dates, and parcels that look stuck",
+  "author": "Hay",
+  "type": "module",
+  "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "Melhor Envio",
+    "category": "integration",
+    "capabilities": [
+      "mcp",
+      "auth"
+    ],
+    "setup": {
+      "businessTypes": [
+        "store"
+      ],
+      "group": "shipping"
+    },
+    "env": [
+      "MELHOR_ENVIO_OAUTH_CLIENT_ID",
+      "MELHOR_ENVIO_OAUTH_CLIENT_SECRET",
+      "MELHOR_ENVIO_CONTACT_EMAIL"
+    ],
+    "network": {
+      "egress": [
+        "melhorenvio.com.br"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3",
+    "vitest": "^5.1.0"
+  }
+}
