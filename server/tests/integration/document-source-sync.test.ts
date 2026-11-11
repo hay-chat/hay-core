@@ -354,6 +354,9 @@ describe("DocumentSourceSyncService", () => {
     for (const d of docs) {
       expect(d.importMethod).toBe(ImportMethod.PLUGIN);
       expect(d.organizationId).toBe(TEST_ORG_ID);
+      // A plugin page's URL may be private (Notion, Confluence): never public.
+      expect(d.externalUrl).toBeTruthy();
+      expect(d.sourceUrl).toBeFalsy();
     }
 
     // Vector store side: one delete + one add per upsert (two pages).

@@ -125,6 +125,21 @@ describe("website source sync", () => {
     expect(outcome).toEqual({ continueNow: false });
   });
 
+  it("stores each page's address as its public sourceUrl", async () => {
+    mockDiscover.mockResolvedValue({ pages: pages(1), total: 1 });
+
+    await service().processSyncJob(job);
+
+    expect(mockCreateDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceUrl: "https://docs.test/p0" }),
+    );
+    expect(mockUpdateDocument).toHaveBeenCalledWith(
+      "https://docs.test/p0",
+      "org-1",
+      expect.objectContaining({ sourceUrl: "https://docs.test/p0" }),
+    );
+  });
+
   it("asks to continue now when the budget runs out after some progress", async () => {
     mockDiscover.mockResolvedValue({ pages: pages(20), nextCursor: "20", total: 40 });
     // Each fetched page costs 20 s of budget: the run stops after the first wave.
