@@ -52,7 +52,9 @@ a recommended product's card gets an **Add to cart** button and the widget calls
 Store API from the shopper's browser (`GET /wp-json/wc/store/v1/cart` for the `Nonce` header, then
 `POST /wp-json/wc/store/v1/cart/add-item` with `{ id, quantity }`). The catalog sync sets
 `cartItemId` on what the cart takes by id alone: simple products and variations with every
-attribute fixed, when not sold out.
+attribute fixed, when not sold out. After an add the widget fires `wc_fragment_refresh` (classic
+themes' cart fragments) and `wc-blocks_added_to_cart` (the blocks' cart store) on `document.body`
+so the page redraws its cart; a page with only the Mini-Cart block updates on the next page load.
 
 Settings: **Add to cart from chat** (on by default), **Checkout page path** (default `/checkout/`)
 and the two **Cart API paths**, which only need changing when WordPress lives in a folder

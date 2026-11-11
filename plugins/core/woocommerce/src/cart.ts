@@ -39,6 +39,19 @@ export const CART_DEFAULTS = {
 /** The Store API returns the nonce in this header and expects it back in the same one. */
 const NONCE_HEADER = "Nonce";
 
+/**
+ * Fired on `document.body` after an add so the page redraws its cart:
+ *  - `wc_fragment_refresh`: classic themes. cart-fragments.js re-fetches the
+ *    mini-cart fragments (when the theme loads that script, i.e. shows the
+ *    cart widget).
+ *  - `wc-blocks_added_to_cart`: block pages. The blocks' cart data store
+ *    re-fetches the cart (Cart block and whatever else reads that store).
+ * Neither handler needs event arguments. The Mini-Cart block on its own listens
+ * only for `wc-blocks_store_sync_required` on `window` with a detail payload,
+ * which a plain event cannot carry: there the count updates on the next page.
+ */
+export const CART_AFTER_ADD_EVENTS = "wc_fragment_refresh,wc-blocks_added_to_cart";
+
 export const CART_ADD_BODY = '{"id":{{cartItemId}},"quantity":{{quantity}}}';
 
 export const cartConfigFields: Record<string, ConfigFieldDescriptor> = {
@@ -94,6 +107,7 @@ export function cartContribution(
       tokenPath: field("cartTokenPath"),
       tokenResponseHeader: NONCE_HEADER,
       tokenRequestHeader: NONCE_HEADER,
+      afterAddEvents: CART_AFTER_ADD_EVENTS,
     },
   };
 }

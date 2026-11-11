@@ -6,6 +6,7 @@ import { CART_ADD_BODY, CART_DEFAULTS, cartConfigFields, cartContribution } from
 // a plugin cannot import Core.
 const SAME_ORIGIN_PATH = /^\/(?!\/)[^\s\\]{0,500}$/;
 const HEADER_NAME = /^[A-Za-z0-9-]{1,64}$/;
+const AFTER_ADD_EVENTS = /^[A-Za-z0-9_:.-]{1,64}(,[A-Za-z0-9_:.-]{1,64}){0,7}$/;
 
 const contribution = cartContribution((name) => ({ name }));
 
@@ -50,7 +51,9 @@ describe("cart@1 contribution", () => {
       tokenPath: "/wp-json/wc/store/v1/cart",
       tokenResponseHeader: "Nonce",
       tokenRequestHeader: "Nonce",
+      afterAddEvents: "wc_fragment_refresh,wc-blocks_added_to_cart",
     });
+    expect(props.afterAddEvents).toMatch(AFTER_ADD_EVENTS);
     for (const path of Object.values(CART_DEFAULTS)) expect(path).toMatch(SAME_ORIGIN_PATH);
     expect(props.tokenResponseHeader).toMatch(HEADER_NAME);
     expect(props.tokenRequestHeader).toMatch(HEADER_NAME);
