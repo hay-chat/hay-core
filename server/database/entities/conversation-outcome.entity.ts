@@ -8,6 +8,7 @@ import {
   Unique,
 } from "typeorm";
 import type { ConversationOutcomeKind } from "../../services/close-classification/outcome-rules";
+import type { UsageRecord } from "../../services/llm/provider.types";
 
 export type ResolutionExclusionStatus = "excluded" | "pending_review" | "denied";
 
@@ -125,7 +126,7 @@ export class ConversationOutcome {
 
   /** Token usage of the classifier call, for per-org LLM cost tracking. */
   @Column({ type: "jsonb", nullable: true })
-  llm_usage!: Record<string, unknown> | null;
+  llm_usage!: UsageRecord | null;
 
   @CreateDateColumn({ type: "timestamptz" })
   created_at!: Date;

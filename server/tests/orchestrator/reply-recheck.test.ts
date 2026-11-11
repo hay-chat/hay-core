@@ -97,6 +97,7 @@ function makeConversation() {
   return {
     ...freshRow(),
     title: "Where is my order?",
+    language: "en",
     needs_processing: true,
     processing_attempts: 0,
     orchestration_status: { version: "v1", lastTurn: 0, toolLog: [] },

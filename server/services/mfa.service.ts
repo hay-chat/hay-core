@@ -158,7 +158,7 @@ export class MfaService {
   ): Promise<boolean> {
     const memberships = await AppDataSource.getRepository(UserOrganization).find({
       where: { userId, isActive: true },
-      relations: ["organization"],
+      relations: { organization: true },
     });
     return memberships.some(
       (membership) =>

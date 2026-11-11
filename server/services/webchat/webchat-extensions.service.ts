@@ -109,6 +109,14 @@ export const cartV1Schema = z
     tokenPath: sameOriginPath.optional(),
     tokenResponseHeader: headerName.optional(),
     tokenRequestHeader: headerName.optional(),
+    /**
+     * DOM events the widget fires on `document.body` after a successful add, so
+     * the store's theme refreshes its cart (comma-separated event names).
+     */
+    afterAddEvents: z
+      .string()
+      .regex(/^[A-Za-z0-9_:.-]{1,64}(,[A-Za-z0-9_:.-]{1,64}){0,7}$/)
+      .optional(),
   })
   .refine(
     (props) =>

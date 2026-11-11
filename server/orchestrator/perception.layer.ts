@@ -3,13 +3,15 @@ import { fenceData } from "@server/services/core/prompt-data";
 import { LLMService } from "../services/core/llm.service";
 import { PromptService } from "../services/prompt.service";
 import { createLogger } from "@server/lib/logger";
+import { normalizeLanguage, type LanguageCode } from "@server/types/language.types";
 
 const logger = createLogger("perception");
 
 export interface Perception {
   intent: { label: MessageIntent; score: number; rationale?: string };
   sentiment: { label: MessageSentiment; score: number };
-  language: string;
+  /** The message's language, or null when the model named one Hay does not know. */
+  language: LanguageCode | null;
 }
 
 export class PerceptionLayer {
@@ -74,8 +76,11 @@ export class PerceptionLayer {
         },
         language: {
           type: "string",
-          description: "ISO 639-1 two-letter language code (e.g., 'en', 'pt', 'es', 'de', 'fr')",
-          pattern: "^[a-z]{2}$",
+          description:
+            "ISO 639-1 two-letter language code (e.g., 'en', 'pt', 'es', 'sv', 'ja'). " +
+            "'pt' means Brazilian Portuguese: use 'pt-PT' for European Portuguese. " +
+            "'zh' means Simplified Chinese: use 'zh-Hant' for Traditional Chinese.",
+          pattern: "^[a-z]{2}(-[A-Za-z]{2,4})?$",
         },
       },
       required: ["intent", "sentiment", "language"],
@@ -85,6 +90,7 @@ export class PerceptionLayer {
     log.debug("Invoking LLM for perception analysis");
 
     const perception = await this.llmService.invoke({
+      caller: "perception",
       prompt: perceptionPrompt,
       jsonSchema: perceptionSchema,
       // Intent/sentiment/language classification against a strict schema. Medium
@@ -94,7 +100,8 @@ export class PerceptionLayer {
       organizationId,
     });
 
-    const result = JSON.parse(perception) as Perception;
+    const raw = JSON.parse(perception) as Omit<Perception, "language"> & { language: string };
+    const result: Perception = { ...raw, language: normalizeLanguage(raw.language) };
 
     log.debug(
       {
@@ -103,6 +110,7 @@ export class PerceptionLayer {
         sentiment: result.sentiment.label,
         sentimentScore: result.sentiment.score,
         language: result.language,
+        rawLanguage: raw.language,
       },
       "Perception analysis complete",
     );

@@ -1,0 +1,177 @@
+{
+  "tests": {
+    "headTitle": "Tests - Hay.chat",
+    "title": "Tests",
+    "description": "Speel eerdere gesprekken opnieuw af tegen je AI-agent voordat hij met klanten praat. Antwoorden worden nooit verstuurd, acties die gegevens wijzigen worden gesimuleerd en testruns worden nooit gefactureerd.",
+    "allowance": "Nog {remaining} van {limit} gratis testantwoorden over deze maand",
+    "draft": {
+      "title": "Een playbookconcept testen",
+      "description": "Antwoorden gebruiken het concept van {name}, niet de gepubliceerde versie.",
+      "clear": "In plaats daarvan de gepubliceerde playbooks testen"
+    },
+    "replay": {
+      "title": "Eerdere gesprekken opnieuw afspelen",
+      "description": "Elk bericht van de shopper wordt één keer door de AI beantwoord, met de echte geschiedenis tot dat moment. Het antwoord van de AI wordt vergeleken met wat je team daadwerkelijk heeft verstuurd.",
+      "source": "Af te spelen gesprekken",
+      "sources": {
+        "recent": "Mijn meest recent gesloten gesprekken",
+        "transcripts": "Geïmporteerde gesprekken"
+      },
+      "recentCount": "Hoeveel gesprekken",
+      "maxTurns": "Af te spelen shopperberichten per gesprek",
+      "label": "Naam (optioneel)",
+      "start": "Afspelen starten",
+      "started": "Afspelen gestart",
+      "noTranscripts": "Nog geen geïmporteerde gesprekken. Importeer eerst gesprekken uit een andere tool.",
+      "selectedTranscripts": "Geen gesprekken geselecteerd | {count} gesprek geselecteerd | {count} gesprekken geselecteerd"
+    },
+    "import": {
+      "button": "Gesprekken importeren",
+      "title": "Eerdere gesprekken importeren",
+      "description": "Plak gesprekken of upload een export uit een andere tool. Ze worden bewaard gedurende de bewaartermijn van je organisatie en alleen gebruikt voor tests.",
+      "format": "Formaat",
+      "formats": {
+        "paste": "Geplakte tekst",
+        "csv": "CSV (elke tool)",
+        "whatsapp": "WhatsApp-chatexport",
+        "tidio": "Tidio CSV-export",
+        "gorgias": "Gorgias (recente tickets)"
+      },
+      "content": "Gesprekken",
+      "contentPlaceholder": "Klant: Waar is mijn bestelling?\nAgent: Mag ik het bestelnummer?",
+      "file": "Of kies een bestand",
+      "businessName": "Je naam in de WhatsApp-chat",
+      "gorgiasSubdomain": "Gorgias-subdomein",
+      "gorgiasEmail": "E-mailadres van Gorgias-gebruiker",
+      "gorgiasApiKey": "Gorgias API-sleutel",
+      "gorgiasHelp": "Het e-mailadres en de API-sleutel worden alleen voor deze import gebruikt en niet opgeslagen.",
+      "submit": "Importeren",
+      "done": "Geen gesprekken geïmporteerd | {count} gesprek geïmporteerd | {count} gesprekken geïmporteerd",
+      "backgroundStarted": "Importeren uit Gorgias op de achtergrond. Dit kan een paar minuten duren; je kunt gewoon doorwerken.",
+      "backgroundFailed": "De Gorgias-import is gestopt: {error} ({count} gesprekken waren geïmporteerd voordat hij stopte)"
+    },
+    "runs": {
+      "title": "Testruns",
+      "empty": "Nog geen testruns.",
+      "open": "Rapport openen",
+      "kinds": {
+        "replay": "Afspelen",
+        "test_cases": "Testcases",
+        "simulation": "Simulatie"
+      },
+      "status": {
+        "running": "Bezig",
+        "completed": "Voltooid",
+        "cancelled": "Geannuleerd",
+        "capped": "Gestopt bij de tokenlimiet"
+      },
+      "progress": "{done} van {total} beantwoord"
+    },
+    "report": {
+      "headTitle": "Testrapport - Hay.chat",
+      "title": "Testrapport",
+      "back": "Alle tests",
+      "cancel": "Run stoppen",
+      "estimated": "Geschat op basis van {count} opnieuw afgespeelde shopperberichten. Een steekproef van eerdere gesprekken laat zien wat je moet verbeteren; het voorspelt geen exact percentage.",
+      "inProgress": "{count} worden nog beantwoord…",
+      "notJudged": "{count} konden niet worden beantwoord of beoordeeld.",
+      "agreement": "Vergeleken met wat je team verstuurde: {same} hetzelfde antwoord, {partial} deels hetzelfde, {different} anders.",
+      "empty": "Niets in deze groep.",
+      "showing": "{shown} van {count} getoond",
+      "customer": "Shopper",
+      "aiReply": "Antwoord van de AI",
+      "humanReply": "Wat je team verstuurde",
+      "expected": "Verwachte uitkomst",
+      "noReply": "Geen antwoord",
+      "noHumanReply": "De shopper had het laatste woord",
+      "mockedCalls": "Zou hebben aangeroepen (gesimuleerd, niets gewijzigd):",
+      "storeDataChanged": "Winkelgegevens zijn sindsdien gewijzigd: de AI las de bestellingen en voorraad van vandaag, niet wat toen klopte.",
+      "judge": "Waarom",
+      "improvePlaybook": "Playbook verbeteren",
+      "improveKnowledge": "Kennis verbeteren",
+      "viewConversation": "Gesprek bekijken",
+      "passed": "Geslaagd",
+      "failed": "Mislukt",
+      "unknown": "Niet beoordeeld",
+      "buckets": {
+        "answered": "Zou hebben geantwoord",
+        "handed_off": "Zou hebben overgedragen",
+        "needed_action": "Zou een actie nodig hebben gehad",
+        "wrong_or_risky": "Antwoord lijkt fout of riskant",
+        "knowledge_missing": "Kennis ontbreekt"
+      },
+      "bucketHelp": {
+        "answered": "De AI antwoordde zelfstandig.",
+        "handed_off": "De AI droeg het gesprek over aan je team.",
+        "needed_action": "De AI zou iets in je winkel hebben gewijzigd. De aanroep is gesimuleerd.",
+        "wrong_or_risky": "Los deze eerst op: onjuiste feiten, riskante beloftes of een bewering die door geen enkele actie wordt onderbouwd.",
+        "knowledge_missing": "De AI miste winkelinformatie. Voeg die toe aan je kennisbank of playbook."
+      }
+    },
+    "save": {
+      "button": "Opslaan als testcase",
+      "title": "Opslaan als testcase",
+      "description": "Het gesprek tot dit shopperbericht wordt opgeslagen. Voordat je een playbookconcept publiceert, worden de testcases ertegen uitgevoerd en krijg je een waarschuwing over testcases die mislukken.",
+      "name": "Naam (optioneel)",
+      "expectedOutcome": "Wat een goed antwoord doet (optioneel)",
+      "expectedOutcomePlaceholder": "Vraagt om het bestelnummer voordat er iets wordt beloofd",
+      "handoff": "Overdracht aan je team",
+      "handoffEither": "Beide is goed",
+      "handoffMust": "Moet overdragen",
+      "handoffMustNot": "Mag niet overdragen",
+      "submit": "Testcase opslaan",
+      "saved": "Testcase opgeslagen"
+    },
+    "cases": {
+      "title": "Testcases",
+      "description": "Opgeslagen uit afspeelsessies, bewerkte of geblokkeerde antwoorden en feedback. De testcases van een playbook worden uitgevoerd voordat het concept wordt gepubliceerd.",
+      "empty": "Nog geen testcases. Sla er een op vanuit een testrapport of vanuit een AI-antwoord in een gesprek.",
+      "runAll": "Alle testcases uitvoeren",
+      "delete": "Verwijderen",
+      "deleted": "Testcase verwijderd",
+      "sources": {
+        "replay": "Uit een afspeelsessie",
+        "approval_edit": "Bewerkt antwoord",
+        "approval_block": "Geblokkeerd antwoord",
+        "feedback": "Feedback",
+        "conversation": "Gesprek",
+        "insight": "Inzicht"
+      }
+    },
+    "regression": {
+      "title": "Testcases",
+      "checking": "Controleren op testcases…",
+      "none": "Dit playbook heeft nog geen testcases. Sla er een paar op vanuit een testrapport of een gesprek om concepten te controleren voordat je ze publiceert.",
+      "running": "Testcases uitvoeren tegen dit concept: {done} van {total} klaar…",
+      "allPassed": "Alle {count} testcases zijn geslaagd met dit concept.",
+      "failing": "{failing} van {total} testcases mislukken met dit concept.",
+      "newFailures": "{count} slaagden eerder wel.",
+      "passedBefore": "eerder geslaagd",
+      "warnOnly": "Je kunt nog steeds publiceren. Bekijk het rapport om te zien wat er is veranderd.",
+      "openReport": "Testrapport openen"
+    },
+    "readiness": {
+      "title": "Gereedheid voor soft launch",
+      "description": "Hoe je team de antwoorden van de assistent beoordeelde terwijl \"Standaard goedkeuring vereisen voor AI-berichten\" aan stond in Instellingen > Algemeen. Die instelling houdt alleen de antwoorden van de assistent tegen; acties die winkelgegevens wijzigen volgen de goedkeuringen voor acties.",
+      "approvalOff": "\"Standaard goedkeuring vereisen voor AI-berichten\" staat uit in Instellingen > Algemeen, dus de antwoorden van de assistent worden zonder beoordeling verstuurd.",
+      "week": "Week van {date}",
+      "approved": "Goedgekeurd zoals geschreven",
+      "edited": "Bewerkt voor verzending",
+      "blocked": "Geblokkeerd",
+      "noWeeks": "Nog geen beoordeelde antwoorden.",
+      "window": "Afgelopen {days} dagen: {reviewed} antwoorden beoordeeld, {approved} goedgekeurd zoals geschreven, {edited} bewerkt, {blocked} geblokkeerd.",
+      "waiting": "{count} antwoorden wachten op beoordeling.",
+      "hints": {
+        "approval_off": "Niets te beslissen: antwoorden worden al automatisch verstuurd.",
+        "not_enough_reviews": "Blijf beoordelen. Met minstens {min} beoordeelde antwoorden in {days} dagen zie je of het veilig is om antwoorden zonder goedkeuring te versturen.",
+        "too_many_changes": "Je team wijzigt nog meer dan 1 op de 20 antwoorden. Verbeter eerst playbooks of kennis op basis van de bewerkte antwoorden.",
+        "ready": "Je team wijzigde in de afgelopen {days} dagen minder dan 1 op de 20 antwoorden. Het kan veilig zijn om \"Standaard goedkeuring vereisen voor AI-berichten\" uit te zetten in Instellingen > Algemeen. Acties blijven de goedkeuringen voor acties volgen."
+      }
+    },
+    "insight": {
+      "replayDraft": "Deze gesprekken opnieuw afspelen tegen het concept",
+      "replayDraftHint": "Bekijk voordat je de oplossing publiceert hoe het concept de gesprekken achter dit inzicht beantwoordt. Afspelen is gratis en er wordt niets naar shoppers verstuurd.",
+      "noDraft": "Sla de voorgestelde playbookwijzigingen eerst op als concept."
+    }
+  }
+}

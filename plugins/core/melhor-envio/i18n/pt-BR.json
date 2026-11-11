@@ -1,0 +1,45 @@
+{
+  "name": "Melhor Envio",
+  "description": "Conecte sua conta do Melhor Envio para que o agente responda onde está o pedido: status do envio, transportadora, código e link de rastreio, datas de postagem e entrega, e encomendas que parecem paradas.",
+  "summary": "Responda onde está o pedido: status, transportadora, link de rastreio e encomendas que parecem paradas.",
+  "tools": {
+    "melhorenvio_track_shipment": {
+      "label": "Rastrear envio",
+      "description": "Consulta um envio pelo código de rastreio, protocolo do Melhor Envio ou id do envio: status, transportadora, link de rastreio, datas e se parece parado."
+    },
+    "melhorenvio_find_customer_shipments": {
+      "label": "Localizar envios do cliente",
+      "description": "Localiza os envios destinados a um cliente verificado pelo CPF ou CNPJ, do mais recente ao mais antigo."
+    }
+  },
+  "config": {
+    "authMode": {
+      "label": "Forma de conexão",
+      "description": "Conectar com o Melhor Envio: aprove o Hay.chat na sua conta com um clique. Token de acesso: cole um token gerado no seu painel do Melhor Envio.",
+      "options": {
+        "oauth": "Conectar com o Melhor Envio (recomendado)",
+        "token": "Token de acesso"
+      }
+    },
+    "clientId": {
+      "label": "ID do cliente OAuth",
+      "description": "Definido pelo servidor do Hay.chat. Deixe em branco."
+    },
+    "clientSecret": {
+      "label": "Segredo do cliente OAuth",
+      "description": "Definido pelo servidor do Hay.chat. Deixe em branco."
+    },
+    "accessToken": {
+      "label": "Token de acesso",
+      "description": "Token gerado no painel do Melhor Envio (Integrações → Permissões de acesso) com permissão para visualizar etiquetas."
+    },
+    "contactEmail": {
+      "label": "E-mail de contato",
+      "description": "E-mail de contato técnico. O Melhor Envio exige um em todas as requisições à API para poder falar com quem mantém a integração."
+    },
+    "staleTrackingDays": {
+      "label": "Rastreio parado (dias)",
+      "description": "Considera um envio postado como parado quando não foi entregue depois de mais do que este número de dias."
+    }
+  }
+}

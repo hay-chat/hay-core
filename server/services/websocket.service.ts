@@ -36,6 +36,7 @@ import {
   pageToolService,
   validatePageTools,
 } from "./webchat/page-tools.service";
+import { registerStoreCart } from "./webchat/store-cart.service";
 
 // Largest frame a client may send. Clients only send small JSON control frames
 // and chat messages (capped at PUBLIC_WIDGET_LIMITS.maxMessageLength); the ws
@@ -131,6 +132,8 @@ interface IdentifyMessage extends WebSocketMessage {
   proof?: unknown;
   /** Page tools (WebMCP) the host page registered; see page-tools.service. */
   tools?: unknown;
+  /** True when this widget build can run the store's cart requests (cart@1). */
+  storeCart?: unknown;
 }
 
 interface RegisterToolsMessage extends WebSocketMessage {
@@ -479,7 +482,7 @@ export class WebSocketService {
       AppDataSource.getRepository(User).find({ where: { id: In(userIds) } }),
       AppDataSource.getRepository(UserOrganization).find({
         where: { userId: In(userIds), isActive: true },
-        relations: ["organization"],
+        relations: { organization: true },
       }),
       sessionIds.length === 0
         ? Promise.resolve([] as Session[])
@@ -575,7 +578,7 @@ export class WebSocketService {
     // active member before streaming that organization's events.
     const membership = await AppDataSource.getRepository(UserOrganization).findOne({
       where: { userId: decoded.userId, organizationId: client.organizationId, isActive: true },
-      relations: ["organization"],
+      relations: { organization: true },
     });
     if (!membership) {
       logger.warn({ clientId }, "WebSocket client is not a member of the requested organization");
@@ -744,6 +747,12 @@ export class WebSocketService {
     logger.debug({ conversationId: conversation.id }, "Webchat client connected to conversation");
 
     if (message.tools !== undefined) await this.registerPageTools(client, message.tools);
+    await registerStoreCart(
+      conversation.id,
+      client.organizationId,
+      requestHostname({ origin: client.origin }),
+      message.storeCart === true,
+    );
 
     client.ws.send(
       JSON.stringify({

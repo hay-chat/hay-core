@@ -17,8 +17,9 @@
       />
     </div>
 
-    <Textarea
+    <Input
       :id="`form-description-${uid}`"
+      type="textarea"
       :model-value="modelValue.description"
       :label="$t('webchat.preChatFormFormDescription')"
       :placeholder="$t('webchat.preChatFormFormDescriptionPlaceholder')"

@@ -12,7 +12,7 @@ import { hasTiptapContent, type TiptapDoc } from "@server/types/tiptap.types";
 import { createLogger } from "@server/lib/logger";
 import type { Organization } from "@server/entities/organization.entity";
 import type { BusinessType, SetupSettings } from "@server/types/setup.types";
-import { languageName } from "./playbook-generation";
+import { languageName } from "@server/types/language.types";
 import { readSetup, updateSetup } from "./store";
 
 const logger = createLogger("setup-assistant");

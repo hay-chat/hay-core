@@ -5,7 +5,11 @@ import { organizationRepository } from "@server/repositories/organization.reposi
 import { getDashboardUrl } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
 import { formatZonedDateTime, safeTimeZone } from "@server/utils/zoned-datetime";
-import { organizationNotificationLocale } from "../notification-locale";
+import {
+  organizationNotificationLocale,
+  recipientNotificationLocale,
+  type NotificationLocale,
+} from "../notification-locale";
 import { orderLinkService, type OrderGroup } from "../order-links/order-link.service";
 import { disputeEvidenceService } from "../dispute-evidence/dispute-evidence.service";
 import { orderSummaryForGroup } from "../dispute-evidence/order-summary";
@@ -109,6 +113,7 @@ const fileSlug = (value: string) =>
 interface Recipient {
   email: string;
   first_name: string | null;
+  interface_language: string | null;
 }
 
 /** Plugin display name; injectable for tests. */
@@ -252,12 +257,11 @@ export class DisputesService {
 
     try {
       const { organizationId } = dispute;
-      const [locale, organization, platform] = await Promise.all([
+      const [organizationLocale, organization, platform] = await Promise.all([
         organizationNotificationLocale(organizationId),
         organizationRepository.findById(organizationId),
         this.platformName(dispute.pluginId),
       ]);
-      const copy = ALERT_COPY[locale];
       const facts: AlertFacts = {
         order: dispute.orderLabel,
         platform: platform ?? dispute.pluginId,
@@ -270,24 +274,30 @@ export class DisputesService {
           : null,
       };
       const path = orgDashboardPath(organizationId, `/evidence?dispute=${dispute.id}`);
-      const title = kind === "opened" ? copy.title : copy.reminderTitle;
-      const subject = kind === "opened" ? copy.subject(facts) : copy.reminderSubject(facts);
-      const message = kind === "opened" ? copy.message(facts) : copy.reminderMessage(facts);
-      const details = (
-        [
-          [copy.labels.order, facts.order],
-          [copy.labels.platform, facts.platform],
-          [copy.labels.amount, facts.amount],
-          [copy.labels.reason, facts.reason],
-          [copy.labels.dueBy, facts.dueBy],
-        ] as Array<[string, string | null]>
-      )
-        .filter(([, value]) => value)
-        .map(([label, value]) => ({ label, value: value as string }));
+      const content = (locale: NotificationLocale) => {
+        const copy = ALERT_COPY[locale];
+        return {
+          copy,
+          title: kind === "opened" ? copy.title : copy.reminderTitle,
+          subject: kind === "opened" ? copy.subject(facts) : copy.reminderSubject(facts),
+          message: kind === "opened" ? copy.message(facts) : copy.reminderMessage(facts),
+          details: (
+            [
+              [copy.labels.order, facts.order],
+              [copy.labels.platform, facts.platform],
+              [copy.labels.amount, facts.amount],
+              [copy.labels.reason, facts.reason],
+              [copy.labels.dueBy, facts.dueBy],
+            ] as Array<[string, string | null]>
+          )
+            .filter(([, value]) => value)
+            .map(([label, value]) => ({ label, value: value as string })),
+        };
+      };
 
       const { emailService } = await import("../email.service");
       const recipients: Recipient[] = await AppDataSource.query(
-        `SELECT u.email, u.first_name
+        `SELECT u.email, u.first_name, u.interface_language
            FROM user_organizations uo
            JOIN users u ON u.id = uo.user_id
           WHERE uo.organization_id = $1
@@ -297,8 +307,13 @@ export class DisputesService {
         [organizationId],
       );
       await Promise.all(
-        recipients.map((recipient) =>
-          emailService
+        recipients.map((recipient) => {
+          const locale = recipientNotificationLocale(
+            recipient.interface_language,
+            organizationLocale,
+          );
+          const { copy, title, subject, message, details } = content(locale);
+          return emailService
             .sendTemplateEmail({
               to: recipient.email,
               subject,
@@ -316,15 +331,17 @@ export class DisputesService {
             })
             .catch((error: unknown) => {
               logger.error({ err: error, organizationId }, "Dispute alert email failed");
-            }),
-        ),
+            });
+        }),
       );
 
       const { pushNotificationService } = await import("../push-notification.service");
       await pushNotificationService.onDisputeOpened({
         organizationId,
-        title,
-        body: message,
+        copy: (locale) => {
+          const { title, message } = content(locale);
+          return { title, body: message };
+        },
         url: path,
         tag: `dispute:${dispute.id}`,
       });

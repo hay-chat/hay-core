@@ -86,7 +86,7 @@ const publicCtx = (): Context =>
 async function ownerCtx(user: User, organizationId = ORG_ID): Promise<Context> {
   const userOrganization = await AppDataSource.getRepository(UserOrganization).findOneOrFail({
     where: { userId: user.id, organizationId },
-    relations: ["organization"],
+    relations: { organization: true },
   });
   return {
     user: new AuthUser(user, "jwt", { sessionId: "s", organizationId, userOrganization }),
@@ -684,7 +684,10 @@ describe("single sign-on (OpenID Connect)", () => {
     const membershipOf = (user: User, organizationId = ORG_ID) =>
       AppDataSource.getRepository(UserMfa)
         .manager.getRepository(UserOrganization)
-        .findOneOrFail({ where: { userId: user.id, organizationId }, relations: ["organization"] });
+        .findOneOrFail({
+          where: { userId: user.id, organizationId },
+          relations: { organization: true },
+        });
 
     async function addSecondFactor(user: User) {
       const repo = AppDataSource.getRepository(UserMfa);

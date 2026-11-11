@@ -1,0 +1,15 @@
+{
+  "name": "correios-mcp-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local Node MCP server for Correios: shipment tracking over the CWS REST APIs (Token + SRO Rastro). Spawned over stdio by the Correios plugin.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../../packages/plugin-sdk",
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "zod": "^3.25.76"
+  }
+}

@@ -26,6 +26,8 @@ const logger = createLogger("page-tools");
 /** Planner-visible prefix: `page:add_to_cart`. */
 export const PAGE_TOOL_PREFIX = "page:";
 export const PAGE_TOOLS_REDIS_PREFIX = "webchat:page-tools:";
+/** The catalog source whose cart the conversation's page can use (see store-cart.service). */
+const STORE_CART_REDIS_PREFIX = "webchat:store-cart:";
 export const PAGE_TOOL_RESULTS_CHANNEL = "webchat:page-tool-results";
 export const PAGE_TOOL_CALL_EVENT = "page_tool_call";
 /** How long a registration lives without a refresh (sockets re-identify on reconnect). */
@@ -179,6 +181,7 @@ export function unwrapPageToolResult(result: unknown): unknown {
 
 class PageToolService {
   private memory = new Map<string, PageToolDescriptor[]>();
+  private storeCarts = new Map<string, string>();
   private pending = new Map<string, PendingCall>();
   private subscribing: Promise<void> | null = null;
 
@@ -210,8 +213,45 @@ class PageToolService {
   /** The page went away: its tools go with it. */
   async clear(conversationId: string): Promise<void> {
     this.memory.delete(conversationId);
+    this.storeCarts.delete(conversationId);
     const client = (await this.redis())?.getClient();
-    if (client) await client.del(PAGE_TOOLS_REDIS_PREFIX + conversationId);
+    if (client) {
+      await client.del(
+        PAGE_TOOLS_REDIS_PREFIX + conversationId,
+        STORE_CART_REDIS_PREFIX + conversationId,
+      );
+    }
+  }
+
+  /**
+   * Remember that the conversation's page is the store of catalog `source` and
+   * its widget can add to that store's cart (null: it cannot).
+   */
+  async registerStoreCart(conversationId: string, source: string | null): Promise<void> {
+    if (!this.isEnabled()) return;
+    const client = (await this.redis())?.getClient();
+    const key = STORE_CART_REDIS_PREFIX + conversationId;
+    if (source) {
+      this.storeCarts.set(conversationId, source);
+      if (client) await client.set(key, source, "EX", REGISTRATION_TTL_SECONDS);
+    } else {
+      this.storeCarts.delete(conversationId);
+      if (client) await client.del(key);
+    }
+  }
+
+  /** The catalog source whose cart this conversation's page can use, if any. */
+  async storeCartSource(conversationId: string): Promise<string | null> {
+    if (!this.isEnabled()) return null;
+    const client = (await this.redis())?.getClient();
+    if (client) {
+      try {
+        return await client.get(STORE_CART_REDIS_PREFIX + conversationId);
+      } catch (error) {
+        logger.warn({ err: error, conversationId }, "Could not read the store cart from Redis");
+      }
+    }
+    return this.storeCarts.get(conversationId) ?? null;
   }
 
   /** The conversation's tools, when its organization still has page tools on. */
@@ -251,6 +291,8 @@ class PageToolService {
     name: string,
     args: Record<string, unknown>,
     timeoutMs = PAGE_TOOL_TIMEOUT_MS,
+    /** A store action the widget runs itself, not a tool the page registered. */
+    builtin = false,
   ): Promise<unknown> {
     if (!this.isEnabled()) throw new Error("Page tools are disabled on this server");
     const callId = uuidv4();
@@ -268,6 +310,7 @@ class PageToolService {
         callId,
         name,
         args,
+        ...(builtin ? { builtin: true } : {}),
       });
       if (!delivered) throw new Error(`No page is connected to run "${name}"`);
     } catch (error) {
@@ -304,7 +347,7 @@ class PageToolService {
   private async deliverCall(
     conversationId: string,
     organizationId: string,
-    payload: { callId: string; name: string; args: Record<string, unknown> },
+    payload: { callId: string; name: string; args: Record<string, unknown>; builtin?: boolean },
   ): Promise<boolean> {
     const { websocketService } = await import("@server/services/websocket.service");
     const frame = { type: "tool_call", ...payload };

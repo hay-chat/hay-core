@@ -1,5 +1,4 @@
 import type { Attachment, HayChatConfig, ProductClickType } from "@/types";
-import { resolveLocale } from "@/i18n/resolve";
 import type { FormResponse } from "@hay/form-schema";
 
 interface ConversationMetadata {
@@ -122,8 +121,10 @@ export function useConversation(config: HayChatConfig) {
         organizationId: config.organizationId,
         publicJwk,
         metadata,
-        // Same locale the widget UI uses, so the server greeting matches it.
-        language: resolveLocale(config.locale),
+        // The customer's raw language tag, not the widget UI locale: the UI only knows a few
+        // languages, while the server normalizes any tag (unknown ones fall back to the
+        // organization's default language).
+        language: config.locale ?? navigator.languages?.[0] ?? navigator.language,
         ...(context && Object.keys(context).length > 0 ? { context } : {}),
         ...(customer?.externalId ? { customerExternalId: customer.externalId } : {}),
         ...(customer?.externalId && customer.signature

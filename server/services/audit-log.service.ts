@@ -260,7 +260,7 @@ export class AuditLogService {
     try {
       const user = await AppDataSource.getRepository(User).findOne({
         where: { email: email.toLowerCase() },
-        select: ["id"],
+        select: { id: true },
       });
 
       return await this.log({

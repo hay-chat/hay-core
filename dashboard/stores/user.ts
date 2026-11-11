@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { hasRouteAccess } from "@/utils/route-access";
 import { clearQueryCache } from "@/utils/query-cache";
+import type { LanguageCode } from "@/utils/languages";
 
 const SUSPENSION_REASONS = ["trial_expired", "payment_failed", "cancelled", "manual"] as const;
 export type SuspensionReason = (typeof SUSPENSION_REASONS)[number];
@@ -64,6 +65,10 @@ export interface User {
   emailVerificationExpiresAt?: Date;
   /** An organization requires two-factor authentication and this user has not enrolled. */
   mfaEnrolmentRequired?: boolean;
+  /** Dashboard UI locale (an i18n locale code); null follows the browser. */
+  interfaceLanguage?: string | null;
+  /** Language this person reads and writes conversations in; null turns translation off. */
+  translationLanguage?: LanguageCode | null;
 }
 
 export const useUserStore = defineStore("user", {
@@ -264,6 +269,8 @@ export const useUserStore = defineStore("user", {
         pendingEmail: userData.pendingEmail,
         emailVerificationExpiresAt: userData.emailVerificationExpiresAt,
         mfaEnrolmentRequired: userData.mfaEnrolmentRequired,
+        interfaceLanguage: userData.interfaceLanguage ?? null,
+        translationLanguage: userData.translationLanguage ?? null,
       };
 
       // Set organizations if provided
@@ -280,8 +287,12 @@ export const useUserStore = defineStore("user", {
       }
 
       // Every sign-in path funnels through here (login, token exchange, session
-      // restore), so this is the one place that keeps telemetry identity in sync.
+      // restore), so this is the one place that keeps telemetry identity and
+      // the UI language in sync.
       this.syncTelemetryIdentity();
+      useLocale()
+        .applyInterfaceLanguage(this.user.interfaceLanguage)
+        .catch((error) => console.warn("[User] Could not apply the interface language:", error));
     },
 
     /**

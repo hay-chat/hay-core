@@ -50,7 +50,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
 
     return this.getRepository().findOne({
       where: { organizationId, pluginId: pluginRegistry.id },
-      relations: ["plugin"],
+      relations: { plugin: true },
       cache: false, // Disable cache to always get fresh data
     });
   }
@@ -58,7 +58,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   override async findByOrganization(organizationId: string): Promise<PluginInstance[]> {
     return this.getRepository().find({
       where: { organizationId },
-      relations: ["plugin"],
+      relations: { plugin: true },
       order: { createdAt: "ASC" },
     });
   }
@@ -70,21 +70,21 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   async findEnabledByOrganization(organizationId: string): Promise<PluginInstance[]> {
     return this.getRepository().find({
       where: { organizationId, enabled: true },
-      relations: ["plugin"],
+      relations: { plugin: true },
     });
   }
 
   async findRunningInstances(): Promise<PluginInstance[]> {
     return this.getRepository().find({
       where: { running: true },
-      relations: ["plugin", "organization"],
+      relations: { plugin: true, organization: true },
     });
   }
 
   async findOAuthInstances(): Promise<PluginInstance[]> {
     return this.getRepository().find({
       where: { authMethod: "oauth" },
-      relations: ["plugin", "organization"],
+      relations: { plugin: true, organization: true },
     });
   }
 
@@ -97,7 +97,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   async findEnabledInstancesByCapability(capability: string): Promise<PluginInstance[]> {
     const rows = await this.getRepository().find({
       where: { enabled: true },
-      relations: ["plugin", "organization"],
+      relations: { plugin: true, organization: true },
     });
     return rows.filter((instance) => {
       // Stored manifests use the flat registry form where `capabilities` is a
@@ -112,7 +112,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   async findByPlugin(pluginRegistryId: string): Promise<PluginInstance[]> {
     return this.getRepository().find({
       where: { pluginId: pluginRegistryId },
-      relations: ["plugin", "organization"],
+      relations: { plugin: true, organization: true },
     });
   }
 
@@ -144,7 +144,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     // Get the plugin instance with its registry to access the manifest
     const instance = await this.getRepository().findOne({
       where: { id },
-      relations: ["plugin"],
+      relations: { plugin: true },
     });
 
     if (!instance) {
@@ -206,7 +206,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
 
     const existing = await this.getRepository().findOne({
       where: { organizationId, pluginId: pluginRegistry.id },
-      relations: ["plugin"],
+      relations: { plugin: true },
     });
 
     if (existing) {

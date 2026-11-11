@@ -1,6 +1,7 @@
 {
   "name": "Cal.com",
   "description": "Conecte sua conta do Cal.com para que o agente possa listar tipos de evento, encontrar horários livres e agendar, remarcar ou cancelar reuniões.",
+  "summary": "Liste tipos de evento, encontre horários livres e agende, remarque ou cancele reuniões.",
   "tools": {
     "get_me": {
       "label": "Obter Conta",

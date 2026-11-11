@@ -1,7 +1,13 @@
 <template>
   <Page width="max">
-    <div class="flex flex-wrap items-center gap-2">
-      <Button variant="ghost" size="sm" @click="router.push('/integrations/marketplace')">
+    <!-- The pre-connect view has its own breadcrumb back to the marketplace. -->
+    <div v-if="!showPreConnect || setupReturn" class="flex flex-wrap items-center gap-2">
+      <Button
+        v-if="!showPreConnect"
+        variant="ghost"
+        size="sm"
+        @click="router.push('/integrations/marketplace')"
+      >
         <ArrowLeft class="h-4 w-4 mr-2" />
         {{ $t("pluginSettings.backToMarketplace") }}
       </Button>
@@ -17,6 +23,15 @@
       :confirm-text="$t('pluginSettings.disableConfirm.confirm')"
       destructive
       @confirm="handleDisablePlugin"
+    />
+    <ConfirmDialog
+      v-model:open="showDeleteConfirm"
+      :title="$t('pluginSettings.deleteConfirm.title')"
+      :description="$t('pluginSettings.deleteConfirm.description', { name: displayName })"
+      :confirm-text="$t('pluginSettings.deleteConfirm.confirm')"
+      :loading="deleting"
+      destructive
+      @confirm="handleDeletePlugin"
     />
 
     <!-- External connect hand-off (e.g. from the Shopify app): say what is happening -->
@@ -71,8 +86,34 @@
           </Button>
         </AlertDescription>
       </Alert>
+      <!-- Not connected yet: what it does and how connecting works -->
+      <PluginPreConnect
+        v-if="!enabled"
+        :plugin="plugin"
+        :name="displayName"
+        :summary="pluginSummary"
+        :connecting="enabling"
+        :can-delete="canDelete"
+        @connect="handleConnect"
+        @delete="showDeleteConfirm = true"
+      >
+        <!-- A plugin's own pre-connect UI -->
+        <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
+          <CardContent>
+            <PluginPageSlot
+              :plugin-id="plugin.id"
+              :plugin-path="plugin.pluginPath"
+              :component-name="ext.componentName"
+              :plugin="plugin"
+              :config="slotConfig"
+              :api-base-url="apiBaseUrl"
+            />
+          </CardContent>
+        </Card>
+      </PluginPreConnect>
+
       <!-- Status header: identity, status, one primary action, ⋯ menu -->
-      <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <header v-else class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div class="flex items-start gap-4 min-w-0">
           <div class="w-12 h-12 min-w-12 rounded-lg overflow-hidden bg-background-tertiary">
             <img
@@ -114,16 +155,7 @@
 
         <div class="flex items-center gap-2 sm:shrink-0">
           <Button
-            v-if="setupState === 'not_set_up'"
-            class="flex-1 sm:flex-none"
-            :loading="enabling"
-            data-testid="plugin-connect"
-            @click="handleConnect"
-          >
-            {{ $t("pluginSettings.actions.connect") }}
-          </Button>
-          <Button
-            v-else-if="setupState === 'needs_action' || setupState === 'error'"
+            v-if="setupState === 'needs_action' || setupState === 'error'"
             class="flex-1 sm:flex-none"
             :variant="setupState === 'error' ? 'outline' : 'default'"
             @click="openSetup"
@@ -136,7 +168,7 @@
           </Button>
 
           <!-- DropdownMenu's root is w-full; the wrapper keeps it to the icon's width. -->
-          <div v-if="enabled" class="shrink-0">
+          <div class="shrink-0">
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
                 <Button
@@ -172,6 +204,15 @@
                   <Power class="h-4 w-4 mr-2" />
                   {{ $t("pluginSettings.disablePlugin") }}
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="canDelete"
+                  class="text-destructive"
+                  data-testid="plugin-delete"
+                  @click="showDeleteConfirm = true"
+                >
+                  <Trash2 class="h-4 w-4 mr-2" />
+                  {{ $t("pluginSettings.deletePlugin") }}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -205,22 +246,6 @@
           </p>
         </AlertDescription>
       </Alert>
-
-      <!-- Not connected yet: a plugin's own pre-connect UI -->
-      <template v-if="!enabled">
-        <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
-          <CardContent>
-            <PluginPageSlot
-              :plugin-id="plugin.id"
-              :plugin-path="plugin.pluginPath"
-              :component-name="ext.componentName"
-              :plugin="plugin"
-              :config="slotConfig"
-              :api-base-url="apiBaseUrl"
-            />
-          </CardContent>
-        </Card>
-      </template>
 
       <!-- Tabs: Setup | What it can do | Advanced (Advanced mode only) -->
       <div
@@ -416,12 +441,12 @@
         </Card>
       </section>
 
-      <!-- What it can do (also what a not-yet-connected plugin shows) -->
+      <!-- What it can do -->
       <section
-        v-if="!enabled || activeTab === 'capabilities'"
+        v-if="enabled && activeTab === 'capabilities'"
         id="plugin-panel-capabilities"
-        :role="enabled ? 'tabpanel' : undefined"
-        :aria-labelledby="enabled ? 'plugin-tab-capabilities' : undefined"
+        role="tabpanel"
+        aria-labelledby="plugin-tab-capabilities"
         class="space-y-4"
       >
         <Card v-if="capabilities.length > 0" data-testid="plugin-capabilities">
@@ -602,8 +627,10 @@ import {
   ExternalLink,
   Ticket,
   Loader2,
+  Trash2,
 } from "lucide-vue-next";
-import { Hay } from "@/utils/api";
+import { Hay, ensureFreshAccessToken } from "@/utils/api";
+import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
 import { useAppStore } from "@/stores/app";
 import { useToast } from "@/composables/useToast";
@@ -612,6 +639,7 @@ import { useDomain } from "@/composables/useDomain";
 import { classifyTool } from "@/utils/toolClassification";
 import PluginOAuthConnection from "@/components/plugins/PluginOAuthConnection.vue";
 import PluginPageSlot from "@/components/plugins/PluginPageSlot.vue";
+import PluginPreConnect from "@/components/plugins/PluginPreConnect.vue";
 import PluginTestResult from "@/components/plugins/PluginTestResult.vue";
 import McpToolInputSchema from "@/components/plugins/McpToolInputSchema.vue";
 import { useToolLabel } from "@/composables/useToolLabel";
@@ -639,6 +667,7 @@ const { loadTranslations: loadPluginTranslations } = usePluginTranslations();
 const route = useRoute();
 const router = useRouter();
 const userStore = useUserStore();
+const authStore = useAuthStore();
 const appStore = useAppStore();
 const pluginConnect = usePluginConnect();
 const toast = useToast();
@@ -662,6 +691,8 @@ const enabling = ref(false);
 const disabling = ref(false);
 const restarting = ref(false);
 const showDisableConfirm = ref(false);
+const deleting = ref(false);
+const showDeleteConfirm = ref(false);
 const thumbnailFailed = ref(false);
 const testResult = ref<{
   success: boolean;
@@ -678,12 +709,24 @@ const oauthAvailable = ref(false); // Plugin has OAuth2 registered
 const oauthConfigured = ref(false); // OAuth credentials configured
 const oauthConnected = ref(false); // OAuth flow completed and access token exists
 
+// Pre-connect view: a loaded plugin that is not enabled (and no connect hand-off in flight).
+const showPreConnect = computed(
+  () => !!plugin.value && !enabled.value && !loading.value && !error.value && !connectStep.value,
+);
+
 const displayName = computed(() =>
   plugin.value ? getPluginName(plugin.value.id, plugin.value.name) : "",
 );
 const pluginDescription = computed(() =>
   plugin.value ? getPluginDescription(plugin.value.id, plugin.value.manifest?.description) : "",
 );
+
+// The marketplace one-liner, in the dashboard's language (the list is loaded by the layout).
+const pluginSummary = computed(
+  () => appStore.getPluginById(pluginId.value)?.summary || pluginDescription.value,
+);
+// Organizations can delete the plugins they uploaded.
+const canDelete = computed(() => plugin.value?.sourceType === "custom" && userStore.isAdmin);
 
 // Connection testing only applies to MCP plugins
 const isMcpPlugin = computed(() =>
@@ -1239,6 +1282,36 @@ const handleDisablePlugin = async () => {
     toast.error(err?.message || err?.data?.message || t("pluginSettings.toast.disableFailed"));
   } finally {
     disabling.value = false;
+  }
+};
+
+const handleDeletePlugin = async () => {
+  deleting.value = true;
+
+  try {
+    await ensureFreshAccessToken();
+    const { getApiUrl } = useDomain();
+    const response = await fetch(getApiUrl(`/v1/plugins/${encodeURIComponent(pluginId.value)}`), {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${authStore.tokens?.accessToken}`,
+        "x-organization-id": userStore.activeOrganizationId!,
+      },
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.error || t("pluginSettings.toast.deleteFailed"));
+    }
+
+    toast.success(t("pluginSettings.toast.deletedSuccess"));
+    await appStore.fetchPlugins();
+    router.push("/integrations/marketplace");
+  } catch (err: any) {
+    console.error("Failed to delete plugin:", err);
+    toast.error(err?.message || t("pluginSettings.toast.deleteFailed"));
+  } finally {
+    deleting.value = false;
+    showDeleteConfirm.value = false;
   }
 };
 

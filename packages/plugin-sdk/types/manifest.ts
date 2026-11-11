@@ -14,6 +14,19 @@
 export type PluginCategory = "integration" | "channel" | "tool" | "analytics" | "products";
 
 /**
+ * Marketplace section the plugin is listed under.
+ *
+ * - `channels`: where customers reach the merchant
+ * - `commerce`: store platforms (orders, products, stock)
+ * - `payments`: payments and shipping
+ * - `crm`: CRM, helpdesk and marketing
+ * - `knowledge`: knowledge sources and bookings
+ * - `security`: protection for the webchat
+ */
+export type PluginMarketplaceCategory =
+  "channels" | "commerce" | "payments" | "crm" | "knowledge" | "security";
+
+/**
  * Plugin capabilities.
  *
  * Declares what features the plugin uses.
@@ -107,6 +120,14 @@ export interface HayPluginManifest {
   category: PluginCategory;
 
   /**
+   * Section of the Hay marketplace the plugin is listed under. Plugins without
+   * one appear under "Other".
+   *
+   * @example "commerce"
+   */
+  marketplaceCategory?: PluginMarketplaceCategory;
+
+  /**
    * List of capabilities the plugin uses.
    *
    * @remarks
@@ -161,7 +182,15 @@ export interface HayPluginSetupHints {
   /** Business types that should be offered this plugin. */
   businessTypes: Array<"store" | "saas" | "service" | "other">;
   /** Where the plugin appears in the "what do you already use" step. */
-  group: "commerce" | "payments" | "crm" | "helpdesk" | "marketing" | "knowledge" | "booking";
+  group:
+    | "commerce"
+    | "shipping"
+    | "payments"
+    | "crm"
+    | "helpdesk"
+    | "marketing"
+    | "knowledge"
+    | "booking";
   /** Customer requests the plugin's tools can fulfil. */
   handles?: Array<
     "orders" | "refunds" | "order_changes" | "billing" | "subscriptions" | "bookings"

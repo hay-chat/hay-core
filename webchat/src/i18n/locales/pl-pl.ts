@@ -4,6 +4,7 @@ export default {
   "widget.defaultGreeting": "Cześć! Jak możemy Ci dziś pomóc?",
   "chat.close": "Zamknij czat",
   "chat.open": "Otwórz czat",
+  "chat.dismissTeaser": "Zamknij wiadomość",
   "chat.expand": "Rozwiń czat",
   "chat.collapse": "Zwiń czat",
   "chat.conversationEnded": "Ta rozmowa została zakończona",

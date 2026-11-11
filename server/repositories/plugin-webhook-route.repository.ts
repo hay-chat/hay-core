@@ -119,7 +119,7 @@ export class PluginWebhookRouteRepository extends BaseRepository<PluginWebhookRo
   ): Promise<{ organizationId: string; pluginInstanceId: string } | null> {
     const row = await this.getRepository().findOne({
       where: { pluginId, routingKey },
-      select: ["organizationId", "pluginInstanceId"],
+      select: { organizationId: true, pluginInstanceId: true },
     });
 
     if (!row) {

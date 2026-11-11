@@ -112,7 +112,7 @@ async function sessionCtx(
 ) {
   const userOrganization = await AppDataSource.getRepository(UserOrganization).findOneOrFail({
     where: { userId: user.id, organizationId },
-    relations: ["organization"],
+    relations: { organization: true },
   });
   return ctxFor({
     user: new AuthUser(user, "jwt", {
@@ -302,7 +302,7 @@ describe("single sign-on session scope", () => {
       const { assertSsoPolicy } = await import("../../lib/auth/sso/policy");
       const membershipB = await AppDataSource.getRepository(UserOrganization).findOneOrFail({
         where: { userId: user.id, organizationId: ORG_B },
-        relations: ["organization"],
+        relations: { organization: true },
       });
       await expect(
         assertSsoPolicy(

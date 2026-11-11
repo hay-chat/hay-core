@@ -1,6 +1,7 @@
 {
   "name": "WhatsApp",
   "description": "Conecte um número do WhatsApp Business e troque mensagens, mídias e áudios pela IA do Hay.chat",
+  "summary": "Responda mensagens, mídias e áudios do WhatsApp com o seu agente.",
   "tools": {},
   "config": {
     "handoffTemplateName": {

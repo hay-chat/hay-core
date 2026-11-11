@@ -25,6 +25,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
     conversationId: string;
     createProof: IdentifyProofFactory;
     tools?: PageToolDescriptor[];
+    storeCart?: boolean;
   } | null = null;
 
   const connect = () => {
@@ -136,6 +137,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
             callId: data.callId,
             name: data.name,
             args: data.args && typeof data.args === "object" ? data.args : {},
+            ...(data.builtin === true ? { builtin: true } : {}),
           });
         }
         break;
@@ -162,8 +164,9 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
     existingConversationId: string,
     createProof: IdentifyProofFactory,
     tools?: PageToolDescriptor[],
+    storeCart = false,
   ) => {
-    identity = { conversationId: existingConversationId, createProof, tools };
+    identity = { conversationId: existingConversationId, createProof, tools, storeCart };
     await sendIdentify();
   };
 
@@ -175,7 +178,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
       return;
     }
 
-    const { conversationId: convId, createProof, tools } = identity;
+    const { conversationId: convId, createProof, tools, storeCart } = identity;
     let proof: string;
     try {
       proof = await createProof(socketUrl);
@@ -192,6 +195,8 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
         proof,
         // Page tools (WebMCP) the host page registered, if any.
         ...(tools && tools.length > 0 ? { tools } : {}),
+        // This build can run the store's cart requests (cart@1) on this page.
+        ...(storeCart ? { storeCart: true } : {}),
       }),
     );
   };
@@ -273,4 +278,6 @@ export interface PageToolCall {
   callId: string;
   name: string;
   args: Record<string, unknown>;
+  /** A store action the widget runs itself (add to cart), not a tool the page registered. */
+  builtin?: boolean;
 }

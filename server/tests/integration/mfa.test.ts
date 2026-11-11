@@ -87,7 +87,7 @@ async function jwtCtx(userId: string, sessionId = SESSION_ID): Promise<Context> 
   const user = await AppDataSource.getRepository(User).findOneOrFail({ where: { id: userId } });
   const userOrganization = await AppDataSource.getRepository(UserOrganization).findOneOrFail({
     where: { userId, organizationId: ORG_ID },
-    relations: ["organization"],
+    relations: { organization: true },
   });
   return {
     user: new AuthUser(user, "jwt", { sessionId, organizationId: ORG_ID, userOrganization }),

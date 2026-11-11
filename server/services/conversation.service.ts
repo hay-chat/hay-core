@@ -5,19 +5,11 @@ import { Conversation, type ConversationStatus } from "../database/entities/conv
 import { Message, MessageType } from "../database/entities/message.entity";
 import { getUTCNow } from "../utils/date.utils";
 import { hookManager } from "./hooks/hook-manager";
-import { SupportedLanguage } from "../types/language.types";
+import { normalizeLanguage } from "../types/language.types";
 import { createLogger } from "@server/lib/logger";
 import { StorageService } from "./storage.service";
 
 const logger = createLogger("conversation");
-
-const SUPPORTED_LANGUAGE_VALUES = new Set<string>(Object.values(SupportedLanguage));
-
-/** "pt-BR" / "pt" -> "pt"; anything we don't support -> null. */
-function toSupportedLanguage(value: string | null | undefined): SupportedLanguage | null {
-  const primary = value?.split("-")[0].toLowerCase();
-  return primary && SUPPORTED_LANGUAGE_VALUES.has(primary) ? (primary as SupportedLanguage) : null;
-}
 
 /** A customer id given for a new conversation is not in its organization. */
 export class ConversationReferenceNotFoundError extends Error {
@@ -69,7 +61,7 @@ export class ConversationService {
       metadata: data.metadata || {},
       needs_processing: false,
       customer_id: customerId,
-      language: toSupportedLanguage(data.language),
+      language: normalizeLanguage(data.language),
     });
 
     // An open conversation starts with its instructions and the greeting,

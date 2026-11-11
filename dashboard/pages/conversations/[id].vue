@@ -179,7 +179,7 @@
             </Button>
             <div class="min-w-0">
               <h1 class="text-xl font-semibold truncate">
-                {{ conversation?.title || $t("conversations.detail.loading") }}
+                {{ conversationTitle || $t("conversations.detail.loading") }}
               </h1>
               <p class="text-sm text-neutral-muted hidden sm:block">
                 {{
@@ -191,6 +191,17 @@
             </div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
+            <Badge
+              v-if="customerLanguage"
+              variant="outline"
+              class="max-sm:!hidden"
+              data-testid="customer-language"
+              :title="$t('conversations.translation.customerLanguage')"
+            >
+              <Languages class="h-3 w-3 mr-1" aria-hidden="true" />
+              <span class="sr-only">{{ $t("conversations.translation.customerLanguage") }}:</span>
+              {{ languageName(customerLanguage, locale) }}
+            </Badge>
             <Badge :variant="getStatusVariant(conversation?.status)">
               <component :is="getStatusIcon(conversation?.status)" class="h-3 w-3 mr-1" />
               {{ formatStatus(conversation?.status) }}
@@ -436,6 +447,8 @@
                 :show-timestamp="shouldShowTimestamp(conversation?.messages, index)"
                 :bot-avatar-url="botAvatarUrl"
                 :human-avatar-url="humanAvatarUrl"
+                :translation="translationFor(message)"
+                :translating="isTranslating(message.id)"
                 @message-approved="handleMessageApproved"
                 @message-blocked="handleMessageBlocked"
                 @feedback-submitted="handleFeedbackSubmitted"
@@ -541,7 +554,7 @@
                   {{ $t("conversations.pendingHuman.needsHuman") }}
                 </p>
                 <p class="text-sm text-amber-700 mt-1">
-                  {{ conversation?.summary || $t("conversations.pendingHuman.summaryPending") }}
+                  {{ conversationSummary || $t("conversations.pendingHuman.summaryPending") }}
                 </p>
               </div>
             </div>
@@ -575,7 +588,52 @@
             v-model="pendingAttachments"
             :conversation-id="conversation.id"
           />
-          <form class="flex gap-2 md:gap-3" @submit.prevent="sendMessage">
+          <div
+            v-if="showsReplyTranslation"
+            class="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-muted"
+            data-testid="composer-translation"
+          >
+            <Languages class="h-3 w-3" aria-hidden="true" />
+            <span>
+              {{
+                $t("conversations.translation.replySentIn", {
+                  language: languageName(replyTargetLanguage, locale),
+                })
+              }}
+            </span>
+            <span aria-hidden="true">·</span>
+            <button
+              type="button"
+              class="underline underline-offset-2 hover:text-foreground focus-visible:outline focus-visible:outline-2"
+              :aria-expanded="showReplyTargetPicker"
+              aria-controls="composer-translation-target"
+              @click="showReplyTargetPicker = !showReplyTargetPicker"
+            >
+              {{ $t("conversations.translation.changeLanguage") }}
+            </button>
+            <span aria-hidden="true">·</span>
+            <button
+              type="button"
+              class="underline underline-offset-2 hover:text-foreground focus-visible:outline focus-visible:outline-2 disabled:opacity-50 disabled:no-underline"
+              data-testid="composer-send-untranslated"
+              :disabled="!canSendMessage"
+              @click="sendMessage({ translate: false })"
+            >
+              {{ $t("conversations.translation.sendWithoutTranslating") }}
+            </button>
+          </div>
+          <div
+            v-if="showsReplyTranslation && showReplyTargetPicker"
+            id="composer-translation-target"
+            class="mb-2 max-w-xs"
+          >
+            <LanguageSelect
+              :model-value="replyTargetLanguage"
+              :label="$t('conversations.translation.targetLanguage')"
+              @update:model-value="onReplyTargetSelected"
+            />
+          </div>
+          <form class="flex gap-2 md:gap-3" @submit.prevent="sendMessage()">
             <Button
               v-if="conversation && !isPlaygroundMode"
               type="button"
@@ -601,17 +659,13 @@
               "
               class="flex-1 max-md:!text-base"
               :disabled="(isPlaygroundMode && !conversation) || isReplyWindowClosed"
-              @keyup.enter="sendMessage"
+              @keyup.enter="sendMessage()"
             />
             <Button
               type="submit"
-              :disabled="
-                (!newMessage.trim() && !readyAttachments.length) ||
-                isUploadingAttachments ||
-                isSendingMessage ||
-                (isPlaygroundMode && !conversation) ||
-                isReplyWindowClosed
-              "
+              :loading="isSendingMessage"
+              :aria-label="$t('conversations.detail.sendMessage')"
+              :disabled="!canSendMessage"
             >
               <Send class="h-4 w-4" />
             </Button>
@@ -1066,6 +1120,7 @@ import {
   FlaskConical,
   Zap,
   Paperclip,
+  Languages,
 } from "lucide-vue-next";
 import { createReusableTemplate, useMediaQuery } from "@vueuse/core";
 import { TRPCClientError } from "@trpc/client";
@@ -1086,9 +1141,12 @@ import { parseUTCDate } from "~/utils/date";
 import type { AssignedUser } from "@/composables/useConversationTakeover";
 import type { RouterOutputs } from "@/types/trpc";
 import type { ComposerAttachmentItem } from "@/components/conversations/ComposerAttachments.vue";
+import { useMessageTranslations } from "@/composables/useMessageTranslations";
+import { useConversationTextTranslations } from "@/composables/useTextTranslations";
+import { isLanguageCode, languageName, type LanguageCode } from "@/utils/languages";
 
 // i18n
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const { formatDateTime } = useOrgDateTime();
 
 /** Raw conversation payload as returned by the conversations.get / create procedures. */
@@ -1119,6 +1177,10 @@ interface DisplayMessage {
   attachments?: ServerMessage["attachments"];
   providerStatus?: ServerMessage["providerStatus"];
   providerError?: ServerMessage["providerError"];
+  /** Team-facing text by language; `content` is always what the customer saw. */
+  translations?: Partial<Record<LanguageCode, string>> | null;
+  /** Language of `content`. */
+  detectedLanguage?: string | null;
 }
 
 /** Full conversation as consumed by this page (messages widened to {@link DisplayMessage}). */
@@ -1139,6 +1201,8 @@ interface MessageEventPayload {
     metadata?: ServerMessage["metadata"];
     attachments?: ServerMessage["attachments"];
     status?: string;
+    translations?: Partial<Record<LanguageCode, string>> | null;
+    detectedLanguage?: string | null;
   };
 }
 
@@ -1390,6 +1454,66 @@ const botAvatarUrl = computed<string | null>(
   () => conversation.value?.organization?.assistantAvatarUrl ?? null,
 );
 const humanAvatarUrl = computed<string | null>(() => assignedUser.value?.avatarUrl ?? null);
+
+// Multilingual inbox: messages are shown in the team member's translation language,
+// and their replies are translated into the customer's language before sending.
+const { translationFor, isTranslating } = useMessageTranslations(
+  () => (isPlaygroundMode.value ? null : conversation.value?.id),
+  () => (isPlaygroundMode.value ? null : conversation.value?.messages),
+);
+const translationLanguage = computed(() => userStore.user?.translationLanguage ?? null);
+
+// The title, and the hand-off summary while it is shown, in the reader's language too.
+const { textFor: conversationTextFor } = useConversationTextTranslations(
+  () => (isPlaygroundMode.value || !conversation.value ? [] : [conversation.value]),
+  ["title"],
+);
+useConversationTextTranslations(
+  () =>
+    !isPlaygroundMode.value && isPendingHuman.value && conversation.value
+      ? [conversation.value]
+      : [],
+  ["summary"],
+);
+const conversationTitle = computed(() =>
+  conversation.value ? conversationTextFor(conversation.value, "title") : null,
+);
+const conversationSummary = computed(() =>
+  conversation.value ? conversationTextFor(conversation.value, "summary") : null,
+);
+
+/**
+ * The customer's language: their latest detected message, else the conversation's,
+ * else the organization's default (what the AI replies in).
+ */
+const customerLanguage = computed<string | null>(() => {
+  if (isPlaygroundMode.value) return null;
+  const list = conversation.value?.messages ?? [];
+  for (let index = list.length - 1; index >= 0; index--) {
+    const message = list[index];
+    if (message?.type === MessageType.CUSTOMER && message.detectedLanguage) {
+      return message.detectedLanguage;
+    }
+  }
+  return conversation.value?.language ?? conversation.value?.organization?.defaultLanguage ?? null;
+});
+
+/** A language the team member picked for their replies in this conversation. */
+const replyTargetOverride = ref<LanguageCode | null>(null);
+const showReplyTargetPicker = ref(false);
+const replyTargetLanguage = computed(() => replyTargetOverride.value ?? customerLanguage.value);
+const showsReplyTranslation = computed(
+  () =>
+    !isPlaygroundMode.value &&
+    isTakenOverByCurrentUser.value &&
+    !!translationLanguage.value &&
+    !!replyTargetLanguage.value &&
+    (replyTargetOverride.value !== null || replyTargetLanguage.value !== translationLanguage.value),
+);
+const onReplyTargetSelected = (code: string | null) => {
+  replyTargetOverride.value = isLanguageCode(code) ? code : null;
+  showReplyTargetPicker.value = false;
+};
 
 // Message types that render a sender header + timestamp.
 const TIMESTAMP_GROUP_TYPES: string[] = [
@@ -1768,7 +1892,34 @@ const confirmClose = async () => {
 // Track if message is being sent to prevent duplicate sends
 const isSendingMessage = ref(false);
 
-const sendMessage = async () => {
+const canSendMessage = computed(
+  () =>
+    (!!newMessage.value.trim() || readyAttachments.value.length > 0) &&
+    !isUploadingAttachments.value &&
+    !isSendingMessage.value &&
+    !(isPlaygroundMode.value && !conversation.value) &&
+    !isReplyWindowClosed.value,
+);
+
+/** The server could not translate a reply (nothing was sent). */
+const isTranslationFailure = (error: unknown): boolean =>
+  error instanceof TRPCClientError && error.message === "TRANSLATION_FAILED";
+
+/**
+ * Translation options for a team reply: translate into the language the composer
+ * shows, or not at all. Customer messages (playground) are never translated.
+ */
+const replyTranslationInput = (
+  role: "user" | "assistant",
+  translate: boolean,
+): { translate?: boolean; targetLanguage?: LanguageCode } => {
+  if (role !== "assistant" || !translationLanguage.value) return {};
+  if (!translate) return { translate: false };
+  const target = replyTargetLanguage.value;
+  return showsReplyTranslation.value && isLanguageCode(target) ? { targetLanguage: target } : {};
+};
+
+const sendMessage = async (options: { translate?: boolean } = {}) => {
   const attachments = isPlaygroundMode.value ? [] : readyAttachments.value;
   if ((!newMessage.value.trim() && !attachments.length) || isSendingMessage.value) return;
   if (isUploadingAttachments.value) return;
@@ -1815,6 +1966,7 @@ const sendMessage = async () => {
       content: messageContent,
       role,
       ...(attachments.length ? { attachmentIds: attachments.map((a) => a.id) } : {}),
+      ...replyTranslationInput(role, options.translate !== false),
     });
 
     // Play message sent sound
@@ -1824,11 +1976,19 @@ const sendMessage = async () => {
     const messagesList = isPlaygroundMode.value ? messages.value : conversation.value?.messages;
     if (messagesList) {
       const messageIndex = messagesList.findIndex((m) => m.id === tempId);
-      if (messageIndex !== -1) {
-        // Update the message with real ID and mark as sent
+      if (messageIndex !== -1 && messagesList.some((m) => m.id === result.id)) {
+        // The websocket already delivered the saved message (a translated reply's
+        // content differs from what was typed, so it did not replace this one).
+        messagesList.splice(messageIndex, 1);
+      } else if (messageIndex !== -1) {
+        // Update the message with real ID and mark as sent. A translated reply's
+        // content is what the customer got; `translations` holds what was typed.
         messagesList[messageIndex] = {
           ...messagesList[messageIndex],
           id: result.id,
+          content: result.content,
+          translations: result.translations ?? null,
+          detectedLanguage: result.detectedLanguage ?? null,
           deliveryState: "sent",
         };
       }
@@ -1848,8 +2008,35 @@ const sendMessage = async () => {
   } catch (error: unknown) {
     console.error("Failed to send message:", error);
 
-    // Mark optimistic message as failed
     const messagesList = isPlaygroundMode.value ? messages.value : conversation.value?.messages;
+
+    // Translation failed and nothing was sent: put the reply back in the composer
+    // and offer to send it as typed.
+    if (isTranslationFailure(error)) {
+      const messageIndex = messagesList?.findIndex((m) => m.id === tempId) ?? -1;
+      if (messagesList && messageIndex !== -1) messagesList.splice(messageIndex, 1);
+      if (!newMessage.value.trim()) newMessage.value = messageContent;
+      if (!pendingAttachments.value.length) {
+        pendingAttachments.value = attachments.map((attachment) => ({
+          key: attachment.id,
+          name: attachment.name,
+          attachment,
+        }));
+      }
+      useToast().show({
+        type: "error",
+        title: t("conversations.translation.sendFailedTitle"),
+        message: t("conversations.translation.sendFailedMessage"),
+        duration: 10000,
+        action: {
+          label: t("conversations.translation.sendUntranslated"),
+          onClick: () => void sendMessage({ translate: false }),
+        },
+      });
+      return;
+    }
+
+    // Mark optimistic message as failed
     if (messagesList) {
       const messageIndex = messagesList.findIndex((m) => m.id === tempId);
       if (messageIndex !== -1) {
@@ -1919,6 +2106,11 @@ const exportConversation = async (format: "pdf" | "csv") => {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
+    // The export carries the reader's translation; the original text is always there.
+    if (result.translationIncomplete) {
+      const { useToast } = await import("@/composables/useToast");
+      useToast().warning(t("conversations.detail.exportTranslationIncomplete"));
+    }
   } catch (error) {
     console.error("Failed to export conversation:", error);
     const { useToast } = await import("@/composables/useToast");
@@ -2206,10 +2398,16 @@ onMounted(async () => {
         scrollToBottom();
       } else if (conversation.value && conversation.value.messages) {
         // First, try to find and replace optimistic message (pending message with matching content)
+        // A translated reply's saved content differs from what was typed, which
+        // is kept in its translations.
+        const sentVersions = [
+          messageData.content,
+          ...Object.values(messageData.translations ?? {}),
+        ];
         const optimisticIndex = conversation.value.messages.findIndex(
           (m) =>
             m.deliveryState === "pending" &&
-            m.content === messageData.content &&
+            sentVersions.includes(m.content) &&
             m.type === messageData.type,
         );
 
@@ -2230,6 +2428,8 @@ onMounted(async () => {
             metadata: messageData.metadata,
             attachments:
               messageData.attachments ?? conversation.value.messages[optimisticIndex].attachments,
+            translations: messageData.translations ?? null,
+            detectedLanguage: messageData.detectedLanguage ?? null,
             deliveryState: "sent",
           };
           return;
@@ -2241,6 +2441,9 @@ onMounted(async () => {
         );
         if (existingMessageIndex !== -1) {
           logger.debug("[WebSocket] Updating existing message:", messageData.id);
+          const existing = conversation.value.messages[existingMessageIndex];
+          // Keep cached translations unless the content changed.
+          const sameContent = existing?.content === messageData.content;
           conversation.value.messages[existingMessageIndex] = {
             id: messageData.id,
             content: messageData.content,
@@ -2253,6 +2456,12 @@ onMounted(async () => {
             attachments:
               messageData.attachments ??
               conversation.value.messages[existingMessageIndex].attachments,
+            translations:
+              messageData.translations ?? (sameContent ? existing?.translations : null) ?? null,
+            detectedLanguage:
+              messageData.detectedLanguage ??
+              (sameContent ? existing?.detectedLanguage : null) ??
+              null,
             deliveryState: "sent",
           };
           return;
@@ -2269,6 +2478,8 @@ onMounted(async () => {
           status: messageData.status || "approved",
           metadata: messageData.metadata,
           attachments: messageData.attachments,
+          translations: messageData.translations ?? null,
+          detectedLanguage: messageData.detectedLanguage ?? null,
           deliveryState: "sent",
         });
 

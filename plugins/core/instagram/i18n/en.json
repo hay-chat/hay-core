@@ -1,6 +1,7 @@
 {
   "name": "Instagram",
   "description": "Connect an Instagram Professional account and exchange direct messages through Hay.chat's AI",
+  "summary": "Answer Instagram DMs with your agent.",
   "tools": {},
   "config": {
     "clientId": {

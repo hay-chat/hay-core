@@ -3,12 +3,14 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Connect your Wix Stores site so the agent can find a customer's orders, track shipments, cancel or re-route undispatched orders, issue refunds, and answer product questions",
+  "homepage": "https://hay.chat/docs/user-guide/integrations/wix/",
   "author": "Hay",
   "main": "dist/index.js",
   "hay-plugin": {
     "entry": "./dist/index.js",
     "displayName": "Wix Stores",
     "category": "integration",
+    "marketplaceCategory": "commerce",
     "capabilities": [
       "mcp",
       "auth"
@@ -40,7 +42,7 @@
   },
   "devDependencies": {
     "typescript": "^5.3.3",
-    "@types/node": "^20.10.0",
+    "@types/node": "^26.6.6",
     "vitest": "^5.1.0"
   }
 }
