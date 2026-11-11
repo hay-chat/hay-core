@@ -384,4 +384,30 @@ describe("organizationAccessService.setLimits", () => {
     });
     expect(rows.get(ORG_ID)?.limits).toEqual({ maxUsers: 5 });
   });
+
+  it("sets the plan's included resolutions, and leaves them alone when not sent", async () => {
+    await organizationAccessService.setLimits({
+      organizationId: ORG_ID,
+      maxSimulationsPerMonth: null,
+      includedResolutions: 500,
+    });
+    expect(rows.get(ORG_ID)?.limits).toEqual({ maxUsers: 5, includedResolutions: 500 });
+
+    await organizationAccessService.setLimits({
+      organizationId: ORG_ID,
+      maxSimulationsPerMonth: 100,
+    });
+    expect(rows.get(ORG_ID)?.limits).toEqual({
+      maxUsers: 5,
+      includedResolutions: 500,
+      maxSimulationsPerMonth: 100,
+    });
+
+    await organizationAccessService.setLimits({
+      organizationId: ORG_ID,
+      maxSimulationsPerMonth: 100,
+      includedResolutions: null,
+    });
+    expect(rows.get(ORG_ID)?.limits).toEqual({ maxUsers: 5, maxSimulationsPerMonth: 100 });
+  });
 });

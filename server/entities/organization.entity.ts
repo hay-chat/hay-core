@@ -106,6 +106,8 @@ export class Organization extends BaseEntity {
     maxStorageGb?: number;
     /** Simulated conversations per month (D7-7); see config/simulation-caps.ts. */
     maxSimulationsPerMonth?: number;
+    /** Resolutions the plan includes per billing period, from the operator. */
+    includedResolutions?: number;
   };
 
   @Column({ type: "varchar", length: 255, nullable: true })

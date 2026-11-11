@@ -178,10 +178,15 @@ const navMain = computed(() => {
     });
   }
 
-  // Insights and feedback on AI replies; the agent role cannot open /insights.
+  // Analytics, insights and feedback on AI replies; the agent role cannot open them.
   const qualityItems = [{ title: t("nav.tests"), url: "/tests", isActive: isPathActive("/tests") }];
   if (!userStore.isAgent) {
     qualityItems.push(
+      {
+        title: t("nav.analytics"),
+        url: "/analytics",
+        isActive: isPathActive("/analytics"),
+      },
       {
         title: t("nav.insights"),
         url: "/insights",

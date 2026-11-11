@@ -50,6 +50,7 @@ import { isPageToolResult } from "@server/services/webchat/page-tools.service";
 import { Document } from "@server/entities/document.entity";
 import { describeLocalTime } from "./local-time";
 import { handoffCopy } from "./handoff-copy";
+import type { HandoffReason } from "./handoff-reason";
 import { hasFactualSpecifics } from "@server/services/core/reply-risk";
 import {
   resolveQuickCheckSettings,
@@ -169,6 +170,8 @@ export interface ExecutionResult {
   };
   handoff?: {
     reason: string;
+    /** Why, as a fixed code, when a guardrail or fallback caused the hand-off. */
+    code?: HandoffReason;
     fields?: Record<string, unknown>;
   };
   close?: {
@@ -467,10 +470,12 @@ export class ExecutionLayer {
 
       // ASK_TEAM (D19): only offered when the organization turned quick checks
       // on; the question defaults to the shopper's own words.
+      let unansweredFact = false;
       if (result.step === "ASK_TEAM") {
         if (!quickCheck) {
           result.step = "HANDOFF";
           result.handoffReason ??= "The AI could not answer a fact";
+          unansweredFact = true;
         } else if (!result.teamQuestion?.trim()) {
           result.teamQuestion = lastCustomerContent(messages);
         }
@@ -501,6 +506,7 @@ export class ExecutionLayer {
       if (result.handoffReason) {
         result.handoff = {
           reason: result.handoffReason,
+          ...(unansweredFact ? { code: "unanswered_fact" as const } : {}),
         };
       }
       if (result.closeReason) {
@@ -805,6 +811,7 @@ export class ExecutionLayer {
           reason: companyInterestAssessment.evaluationFailed
             ? "Company interest check unavailable"
             : `Company interest violation: ${companyInterestAssessment.violationType}`,
+          code: "company_interest",
           fields: {
             violationType: companyInterestAssessment.violationType,
             severity: companyInterestAssessment.severity,
@@ -907,6 +914,7 @@ export class ExecutionLayer {
             userMessage: fallbackMessage,
             handoff: {
               reason: "Low confidence in AI response - unverified company claims",
+              code: "low_confidence",
               fields: {
                 confidenceScore: result.confidence?.score,
                 confidenceTier: result.confidence?.tier,
@@ -1065,6 +1073,7 @@ export class ExecutionLayer {
           reason: assessment.evaluationFailed
             ? "Action claim check unavailable"
             : "Claimed action without tool execution",
+          code: "action_claim",
           fields: {
             claimedActions: assessment.claimedActions,
             toolsCalledThisTurn: options.toolsCalledThisTurn ?? [],
@@ -1188,6 +1197,7 @@ export class ExecutionLayer {
       userMessage: fallbackMessage,
       handoff: {
         reason: "Reply linked to a page that does not exist",
+        code: "broken_link",
         fields: { deadLinks: badLinks.map((link) => link.url) },
       },
       badLinks,
@@ -1287,6 +1297,7 @@ export class ExecutionLayer {
       ),
       handoff: {
         reason: "Reply stated a date that could not be verified",
+        code: "unverified_date",
         fields: { badDates: badDates.map((date) => date.raw) },
       },
       badDates,

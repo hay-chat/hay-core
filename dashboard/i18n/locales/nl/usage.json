@@ -10,6 +10,7 @@
       "title": "Factureerbare resoluties",
       "period": "{start} t/m {end}",
       "periodNote": "Geteld over je factuurperiode, dezelfde data als op je factuur.",
+      "included": "van {included} inbegrepen in je abonnement",
       "planNote": "De tegoeden van je abonnement en eventuele kosten voor extra resoluties staan op je facturatiepagina.",
       "paused": "De AI-agent is gepauzeerd omdat de resoluties van het abonnement op zijn. Gesprekken wachten op je team.",
       "calendarNote": "Geteld per kalendermaand (UTC). Je factuur kan andere periodedata gebruiken."
