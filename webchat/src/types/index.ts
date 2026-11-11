@@ -9,6 +9,14 @@ export interface HayChatConfig {
   theme?: "blue" | "green" | "purple" | "black";
   showGreeting?: boolean;
   greetingMessage?: string;
+  /**
+   * Short message shown next to the chat button until the visitor opens the
+   * chat or dismisses it. Overrides the one set in Settings > Webchat; an empty
+   * string shows none on this page. With `loading: 'interaction'` the settings
+   * are not fetched up front, so only a message given here shows. To set it
+   * later (after a delay, on scroll...), call `window.HayChat.setTeaserMessage`.
+   */
+  teaserMessage?: string;
   /** Whether to show a 1–5 satisfaction rating when a conversation ends. Populated from public config. */
   csatEnabled?: boolean;
   /** Question shown above the satisfaction rating. Populated from public config. */
@@ -89,6 +97,8 @@ export interface PublicConfig {
   contributions?: WidgetContribution[];
   /** The org's pre-chat form, asked before the first message. */
   preChatForm?: FormSchema | null;
+  /** Message shown next to the button before the chat is opened; null = none. */
+  teaserMessage?: string | null;
 }
 
 /** A declarative plugin contribution, rendered by the widget's own code. */
@@ -214,6 +224,12 @@ declare global {
        * with an optional label; call it from a tool while it acts on the page.
        */
       highlight?: (target: Element | string | null, label?: string) => boolean;
+      /**
+       * Show (or replace) the message next to the chat button, from the moment
+       * widget.js has run; an empty string removes it. It shows even if the
+       * visitor dismissed an earlier one, but not while the chat is open.
+       */
+      setTeaserMessage?: (message: string) => void;
     };
   }
   interface Navigator {
