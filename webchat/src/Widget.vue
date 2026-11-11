@@ -50,20 +50,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, provide, watch } from "vue";
 import ChatWindow from "./components/ChatWindow.vue";
 import { useChat } from "./composables/useChat";
 import { provideI18n, type Translations } from "./i18n";
 import { resolveWidgetSubtitle } from "./utils/subtitle";
 import { resolveLocale } from "./i18n/resolve";
 import { resumeConversationId } from "./utils/resume";
+import { cartContextKey } from "./utils/cart";
 import {
   fetchAvailability,
   headerStatus,
   waitingDetail,
   type WidgetAvailability,
 } from "./utils/availability";
-import type { HayChatConfig, LauncherBridge, PublicConfig } from "./types";
+import type { ChallengeContribution, HayChatConfig, LauncherBridge, PublicConfig } from "./types";
 
 // The chat window. The button lives in the loader (src/loader), which mounts
 // this component once the chat chunk has loaded and hands over its button.
@@ -118,7 +119,9 @@ const resolvedAgentName = computed(
 
 // The org's bot check, when one is on (declarative challenge@1 contribution).
 const challengeContribution =
-  props.publicConfig?.contributions?.find((c) => c.type === "challenge@1") ?? null;
+  props.publicConfig?.contributions?.find(
+    (c): c is ChallengeContribution => c.type === "challenge@1",
+  ) ?? null;
 
 // CSAT: host config wins, then server config; enabled by default.
 const resolvedCsatEnabled = computed(
@@ -160,6 +163,7 @@ const {
   submitPreChatForm,
   submitInConversationForm,
   trackProductClick,
+  conversationId,
 } = useChat(
   {
     ...props.config,
@@ -172,6 +176,12 @@ const {
   },
   { challenge: challengeContribution, preChatForm: props.publicConfig?.preChatForm ?? null },
 );
+
+// Product cards add to the store's cart through the plugins' cart@1 contributions.
+provide(cartContextKey, {
+  contributions: props.publicConfig?.contributions ?? [],
+  conversationId,
+});
 
 function setChallengeHost(el: HTMLElement | null) {
   challengeHost.value = el;

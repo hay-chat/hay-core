@@ -42,24 +42,46 @@ export function withShoppingAttribution(url: unknown, conversationId: string): s
 }
 
 /**
- * A variant's buy link (cart permalink, add-to-cart URL) lives under this key
- * of the variant's `attributes`. Core owns the key: the catalog sync writes it
- * from `CanonicalVariant.buyUrl` and drops whatever an adapter put there.
+ * What an adapter says about buying a variant lives under these keys of the
+ * variant's `attributes`. Core owns the keys: the catalog sync writes them
+ * from `CanonicalVariant.buyUrl` / `cartItemId` and drops whatever an adapter
+ * put there itself.
  */
 const BUY_URL_ATTRIBUTE = "buyUrl";
+const CART_ITEM_ID_ATTRIBUTE = "cartItemId";
 
-/** The variant attributes to store, with the adapter's buy link (if any). */
-export function withBuyUrl(
+/** A cart item id is put into a request the shopper's browser sends: keep it plain. */
+export const CART_ITEM_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+function cartItemIdOf(value: unknown): string | undefined {
+  return typeof value === "string" && CART_ITEM_ID_PATTERN.test(value) ? value : undefined;
+}
+
+/** The variant attributes to store, with the adapter's buy link and cart item id (if any). */
+export function withPurchaseFields(
   attributes: Record<string, unknown> | undefined,
-  buyUrl: string | undefined,
+  purchase: { buyUrl?: string; cartItemId?: string },
 ): Record<string, unknown> | undefined {
-  const { [BUY_URL_ATTRIBUTE]: _adapterValue, ...rest } = attributes ?? {};
-  const url = parseHttpUrl(buyUrl)?.toString();
-  const stored = url ? { ...rest, [BUY_URL_ATTRIBUTE]: url } : rest;
+  const {
+    [BUY_URL_ATTRIBUTE]: _adapterUrl,
+    [CART_ITEM_ID_ATTRIBUTE]: _adapterId,
+    ...stored
+  } = attributes ?? {};
+  const buyUrl = parseHttpUrl(purchase.buyUrl)?.toString();
+  if (buyUrl) stored[BUY_URL_ATTRIBUTE] = buyUrl;
+  const cartItemId = cartItemIdOf(purchase.cartItemId);
+  if (cartItemId) stored[CART_ITEM_ID_ATTRIBUTE] = cartItemId;
   return Object.keys(stored).length ? stored : undefined;
 }
 
 /** The buy link stored on a variant, if it has one. */
 export function variantBuyUrl(attributes: Record<string, unknown> | undefined): string | undefined {
   return parseHttpUrl(attributes?.[BUY_URL_ATTRIBUTE])?.toString();
+}
+
+/** The id the store's cart takes for a variant, if the adapter gave one. */
+export function variantCartItemId(
+  attributes: Record<string, unknown> | undefined,
+): string | undefined {
+  return cartItemIdOf(attributes?.[CART_ITEM_ID_ATTRIBUTE]);
 }

@@ -1,5 +1,10 @@
 import { describe, it, expect } from "@jest/globals";
-import { variantBuyUrl, withBuyUrl, withShoppingAttribution } from "@server/lib/shopping-links";
+import {
+  variantBuyUrl,
+  variantCartItemId,
+  withPurchaseFields,
+  withShoppingAttribution,
+} from "@server/lib/shopping-links";
 
 const CONVERSATION = "0b0f6a0e-1c1c-4c1c-8c1c-0123456789ab";
 
@@ -30,21 +35,34 @@ describe("withShoppingAttribution", () => {
   });
 });
 
-describe("variant buy link", () => {
-  it("is stored with the variant's other attributes and read back", () => {
-    const stored = withBuyUrl({ material: "linen" }, "https://shop.test/cart/44:1");
-    expect(stored).toEqual({ material: "linen", buyUrl: "https://shop.test/cart/44:1" });
+describe("variant purchase fields", () => {
+  it("are stored with the variant's other attributes and read back", () => {
+    const stored = withPurchaseFields(
+      { material: "linen" },
+      { buyUrl: "https://shop.test/cart/44:1", cartItemId: "44" },
+    );
+    expect(stored).toEqual({
+      material: "linen",
+      buyUrl: "https://shop.test/cart/44:1",
+      cartItemId: "44",
+    });
     expect(variantBuyUrl(stored)).toBe("https://shop.test/cart/44:1");
+    expect(variantCartItemId(stored)).toBe("44");
   });
 
-  it("only comes from the canonical field, never from adapter attributes", () => {
-    expect(withBuyUrl({ buyUrl: "https://evil.test/", material: "linen" }, undefined)).toEqual({
-      material: "linen",
-    });
+  it("only come from the canonical fields, never from adapter attributes", () => {
+    expect(
+      withPurchaseFields({ buyUrl: "https://evil.test/", cartItemId: "9", material: "linen" }, {}),
+    ).toEqual({ material: "linen" });
   });
 
   it("drops a link that is not http(s)", () => {
-    expect(withBuyUrl(undefined, "javascript:alert(1)")).toBeUndefined();
+    expect(withPurchaseFields(undefined, { buyUrl: "javascript:alert(1)" })).toBeUndefined();
     expect(variantBuyUrl({ buyUrl: "javascript:alert(1)" })).toBeUndefined();
+  });
+
+  it("drops a cart item id that could change the request it is put into", () => {
+    expect(withPurchaseFields(undefined, { cartItemId: '1,"quantity":99' })).toBeUndefined();
+    expect(variantCartItemId({ cartItemId: "../admin" })).toBeUndefined();
   });
 });

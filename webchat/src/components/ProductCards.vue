@@ -31,8 +31,30 @@
           </div>
         </div>
       </a>
+      <template v-if="cartOf(p) && cartState[p.id] !== 'failed'">
+        <a
+          v-if="cartState[p.id] === 'added'"
+          :href="cartOf(p)!.props.checkoutPath"
+          class="hay-product-card__buy"
+        >
+          {{ t("product.checkout") }}
+        </a>
+        <button
+          v-else
+          type="button"
+          class="hay-product-card__buy"
+          :disabled="cartState[p.id] === 'adding'"
+          @click="add(p)"
+        >
+          {{ t("product.addToCart") }}
+        </button>
+        <div v-if="cartState[p.id] === 'added'" class="hay-product-card__added" role="status">
+          {{ t("product.addedToCart") }}
+        </div>
+      </template>
+      <!-- No in-page cart (or the store refused): the plain buy link, when there is one. -->
       <a
-        v-if="safeHttpUrl(p.topVariant?.buyUrl)"
+        v-else-if="safeHttpUrl(p.topVariant?.buyUrl)"
         :href="safeHttpUrl(p.topVariant?.buyUrl)"
         target="_blank"
         rel="noopener noreferrer"
@@ -46,14 +68,39 @@
 </template>
 
 <script setup lang="ts">
+import { inject, reactive } from "vue";
 import { safeHttpUrl } from "@/utils/markdown";
+import { addToCart, cartContextKey, cartFor } from "@/utils/cart";
 import { useI18n } from "@/i18n";
 import type { ProductClickType, RecommendedProduct } from "@/types";
 
 defineProps<{ products: RecommendedProduct[] }>();
-defineEmits<{ productClick: [productId: string, type: ProductClickType] }>();
+const emit = defineEmits<{ productClick: [productId: string, type: ProductClickType] }>();
 
 const t = useI18n();
+
+// Add to cart in the page, where the store's plugin described its cart (cart@1).
+const cartContext = inject(cartContextKey, null);
+const cartState = reactive<Record<string, "adding" | "added" | "failed">>({});
+
+const cartOf = (product: RecommendedProduct) =>
+  cartContext ? cartFor(cartContext.contributions, product) : null;
+
+const add = async (product: RecommendedProduct) => {
+  const cart = cartOf(product);
+  const cartItemId = product.topVariant?.cartItemId;
+  if (!cart || !cartItemId) return;
+  cartState[product.id] = "adding";
+  try {
+    await addToCart(cart, { cartItemId, conversationId: cartContext?.conversationId.value });
+    cartState[product.id] = "added";
+    emit("productClick", product.id, "cart_add");
+  } catch (error) {
+    // The card falls back to its buy link, which the shopper can still follow.
+    console.warn("[Hay Webchat] Could not add to cart:", error);
+    cartState[product.id] = "failed";
+  }
+};
 
 /** Options listed on a card; the rest are on the product page. */
 const MAX_OPTIONS = 2;
@@ -183,6 +230,24 @@ const formatPrice = (amount?: string | number, currency?: string): string => {
   font-weight: 600;
   text-align: center;
   text-decoration: none;
+}
+
+button.hay-product-card__buy {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.hay-product-card__buy:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.hay-product-card__added {
+  margin: -4px 8px 8px;
+  font-size: 10px;
+  text-align: center;
+  color: var(--color-neutral-500);
 }
 
 .hay-product-card__buy:hover {
