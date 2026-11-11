@@ -92,6 +92,10 @@
     "showing": "Showing {from} to {to} of {total}",
     "viewDetails": "View Details"
   },
+  "languageSelect": {
+    "placeholder": "Select a language",
+    "searchPlaceholder": "Search languages…"
+  },
   "unauthorized": {
     "pageTitle": "Access Denied",
     "pageDescription": "You don't have permission to access this page",

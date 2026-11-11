@@ -213,7 +213,7 @@ export const customerPrivacyRouter = t.router({
             organizationId: ctx.organizationId,
             subjectType: "customer",
           },
-          relations: ["job", "customer"],
+          relations: { job: true, customer: true },
         });
 
         if (!request) {
@@ -311,7 +311,7 @@ export const customerPrivacyRouter = t.router({
           order: { createdAt: "DESC" },
           skip: (input.page - 1) * input.limit,
           take: input.limit,
-          relations: ["customer", "job"],
+          relations: { customer: true, job: true },
         });
 
         return {

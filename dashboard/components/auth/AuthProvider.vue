@@ -30,7 +30,6 @@ import { isDefinitiveAuthFailure } from "@/utils/session-refresh";
 const authStore = useAuthStore();
 const route = useRoute();
 const router = useRouter();
-const { setLocaleFromBackend } = useLocale();
 const showRefreshMessage = ref(false);
 const refreshTimer = ref<number | null>(null);
 
@@ -73,16 +72,13 @@ const initializeAuth = async () => {
     try {
       await authStore.initializeAuth();
 
-      // Start heartbeat and sync locale after successful auth initialization
+      // Start heartbeat after successful auth initialization. The UI language
+      // comes from the user (stores/user.ts setUser), not the organization.
       if (authStore.isAuthenticated) {
         startHeartbeat();
 
-        // Sync dashboard locale with organization language setting
         try {
           const orgSettings = await Hay.organizations.getSettings.query();
-          if (orgSettings.defaultLanguage) {
-            await setLocaleFromBackend(orgSettings.defaultLanguage);
-          }
           // Initialize date/time formatting with org preferences
           const { setOrgDateTimeSettings } = useOrgDateTime();
           setOrgDateTimeSettings({
@@ -91,8 +87,8 @@ const initializeAuth = async () => {
             timezone: orgSettings.timezone,
           });
         } catch (e) {
-          // Non-critical: locale and date format stay at defaults if fetch fails
-          console.warn("[AuthProvider] Failed to sync locale from org settings:", e);
+          // Non-critical: date format stays at defaults if fetch fails
+          console.warn("[AuthProvider] Failed to load org date/time settings:", e);
         }
       }
     } catch (error) {

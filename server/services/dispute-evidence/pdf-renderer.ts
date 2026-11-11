@@ -323,6 +323,13 @@ export function renderEvidencePdf(model: EvidenceDocument): Promise<Buffer> {
       text(`${at(entry.at)} - ${copy.author[entry.author]}`);
       font("Helvetica");
       if (entry.text.trim()) text(entry.text);
+      if (entry.translation) {
+        doc.moveDown(0.2);
+        font("Helvetica-Oblique").fontSize(SMALL).fillColor(GREY);
+        text(copy.englishTranslation);
+        font("Helvetica").fontSize(BODY).fillColor("black");
+        text(entry.translation, { indent: 12 });
+      }
       if (entry.receipt) {
         doc.fillColor(GREY).fontSize(SMALL);
         text(

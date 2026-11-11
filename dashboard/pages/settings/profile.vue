@@ -92,6 +92,35 @@
       </CardContent>
     </Card>
 
+    <!-- Language -->
+    <Card>
+      <CardHeader>
+        <CardTitle>{{ $t("profile.language.title") }}</CardTitle>
+        <CardDescription>{{ $t("profile.language.description") }}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div class="grid gap-4 md:grid-cols-2">
+          <Input
+            id="interfaceLanguage"
+            :model-value="interfaceLanguage"
+            type="select"
+            :label="$t('profile.language.interfaceLanguage')"
+            :options="interfaceLanguageOptions"
+            :hint="$t('profile.language.interfaceLanguageHelper')"
+            @update:model-value="setInterfaceLanguage"
+          />
+          <LanguageSelect
+            :model-value="currentUser?.translationLanguage ?? null"
+            :label="$t('profile.language.translationLanguage')"
+            :helper-text="$t('profile.language.translationLanguageHelper')"
+            allow-none
+            :none-label="$t('profile.language.dontTranslate')"
+            @update:model-value="setTranslationLanguage"
+          />
+        </div>
+      </CardContent>
+    </Card>
+
     <!-- Email Management -->
     <Card>
       <CardHeader>
@@ -351,10 +380,12 @@
 import { logger } from "@/utils/logger";
 import { Save, Mail, Lock, Shield, Key, UserX, Trash2 } from "lucide-vue-next";
 import type { Icon as LucideIcon } from "lucide-vue-next";
-import type { RouterOutputs } from "@/types/trpc";
+import type { RouterInputs, RouterOutputs } from "@/types/trpc";
 import { Hay } from "@/utils/api";
 
 type SecurityEvent = RouterOutputs["auth"]["getRecentSecurityEvents"][number];
+type ProfileInput = RouterInputs["auth"]["updateProfile"];
+type InterfaceLanguage = NonNullable<ProfileInput["interfaceLanguage"]>;
 import { useToast } from "@/composables/useToast";
 import { useUserStore } from "@/stores/user";
 import { validateEmail as validateEmailUtil, validatePassword } from "@/lib/utils";
@@ -365,9 +396,10 @@ import MfaSettingsCard from "@/components/auth/MfaSettingsCard.vue";
 import SecurityKeysCard from "@/components/auth/SecurityKeysCard.vue";
 import Avatar from "@/components/ui/Avatar.vue";
 
-const { t } = useI18n();
+const { t, locale, locales } = useI18n();
 const toast = useToast();
 const userStore = useUserStore();
+const { applyInterfaceLanguage } = useLocale();
 const { formatDateTime } = useOrgDateTime();
 const currentUser = computed(() => userStore.user);
 
@@ -559,6 +591,47 @@ onMounted(async () => {
 
   await Promise.all([loadSecurityEvents(), loadSessions()]);
 });
+
+// Language preferences save as soon as they change.
+const interfaceLanguageOptions = computed(() =>
+  locales.value.map((entry) =>
+    typeof entry === "string"
+      ? { label: entry, value: entry }
+      : { label: entry.name ?? entry.code, value: entry.code },
+  ),
+);
+const interfaceLanguage = computed(
+  () => currentUser.value?.interfaceLanguage ?? (locale.value as string),
+);
+
+const saveLanguages = async (
+  input: Pick<ProfileInput, "interfaceLanguage" | "translationLanguage">,
+) => {
+  try {
+    await Hay.auth.updateProfile.mutate(input);
+    if (userStore.user) Object.assign(userStore.user, input);
+    toast.success(t("profile.language.saved"));
+    return true;
+  } catch (error) {
+    console.error("Failed to save language preferences:", error);
+    toast.error(t("profile.language.saveFailed"));
+    return false;
+  }
+};
+
+const setInterfaceLanguage = async (value: string | number | boolean) => {
+  const code = interfaceLanguageOptions.value.find((option) => option.value === value)?.value;
+  if (!code || code === currentUser.value?.interfaceLanguage) return;
+  if (await saveLanguages({ interfaceLanguage: code as InterfaceLanguage })) {
+    await applyInterfaceLanguage(code);
+  }
+};
+
+const setTranslationLanguage = (code: string | null) => {
+  if (code === (currentUser.value?.translationLanguage ?? null)) return;
+  // LanguageSelect only offers known codes; the server validates them again.
+  saveLanguages({ translationLanguage: code as ProfileInput["translationLanguage"] });
+};
 
 // Save profile changes
 const saveProfile = async () => {

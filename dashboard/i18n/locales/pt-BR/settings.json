@@ -37,7 +37,7 @@
     "title": "Configurações da Plataforma",
     "description": "Configure as preferências básicas da plataforma",
     "defaultLanguage": "Idioma Padrão",
-    "defaultLanguageHelper": "Idioma padrão para novas conversas e mensagens do sistema",
+    "defaultLanguageHelper": "O idioma que a IA usa com os clientes quando não consegue identificar o deles. Não muda o idioma do painel: cada pessoa escolhe o seu no perfil.",
     "timezone": "Fuso Horário",
     "timezoneHelper": "Usado para exibir horários e agendar relatórios",
     "dateFormat": "Formato de Data",
@@ -48,10 +48,6 @@
     "testModeDescription": "Quando ativado, as mensagens de IA precisam de aprovação antes de serem enviadas aos clientes.",
     "testModeCheckbox": "Exigir aprovação para mensagens de IA por padrão",
     "testModeNote": "Nota: Conversas no Playground sempre enviam automaticamente, independente desta configuração.",
-    "languages": {
-      "en": "Inglês",
-      "pt": "Português"
-    },
     "timeFormats": {
       "12h": "12 horas (AM/PM)",
       "24h": "24 horas"
@@ -325,6 +321,9 @@
     "showGreeting": "Mostrar mensagem de saudação ao abrir o chat",
     "greetingMessage": "Mensagem de Saudação",
     "greetingMessagePlaceholder": "Olá! Como podemos ajudá-lo hoje?",
+    "teaserMessage": "Mensagem de Chamada",
+    "teaserMessagePlaceholder": "Dúvidas? Fale com a gente!",
+    "teaserMessageDescription": "Aparece ao lado do botão do chat até o visitante abrir o chat ou dispensá-la. Deixe em branco para não mostrar nada.",
     "csat": "Satisfação do Cliente (CSAT)",
     "csatDescription": "Peça aos visitantes que avaliem a experiência ao encerrar a conversa",
     "csatEnabled": "Pedir uma avaliação de satisfação ao encerrar a conversa",
@@ -475,6 +474,17 @@
     }
   },
   "profile": {
+    "language": {
+      "title": "Idioma",
+      "description": "O idioma do painel e das conversas que você lê",
+      "interfaceLanguage": "Idioma da interface",
+      "interfaceLanguageHelper": "O idioma dos menus, botões e mensagens do painel.",
+      "translationLanguage": "Traduzir conversas para",
+      "translationLanguageHelper": "As mensagens dos clientes aparecem para você neste idioma, e suas respostas são traduzidas para o idioma do cliente antes do envio.",
+      "dontTranslate": "Não traduzir",
+      "saved": "Preferências de idioma salvas",
+      "saveFailed": "Não foi possível salvar suas preferências de idioma"
+    },
     "title": "Configurações do Perfil",
     "description": "Gerencie suas informações pessoais e segurança da conta",
     "profilePicture": "Foto de Perfil",

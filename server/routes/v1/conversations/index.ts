@@ -4,15 +4,19 @@ import { t, scopedProcedure } from "@server/trpc";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { auditLogService } from "@server/services/audit-log.service";
 import { conversationSecretService } from "../../../services/conversation-secret.service";
+import { randomUUID } from "crypto";
 import { z } from "zod";
 import {
   ConversationReferenceNotFoundError,
   ConversationService,
 } from "../../../services/conversation.service";
-import { MessageType } from "../../../database/entities/message.entity";
+import { Message, MessageType } from "../../../database/entities/message.entity";
 import { Conversation } from "../../../database/entities/conversation.entity";
 import { TRPCError } from "@trpc/server";
-import { generateConversationTitle } from "../../../orchestrator/conversation-utils";
+import {
+  customerLanguage,
+  generateConversationTitle,
+} from "../../../orchestrator/conversation-utils";
 import { conversationListInputSchema } from "@server/types/entity-list-inputs";
 import { createListProcedure } from "@server/trpc/procedures/list";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
@@ -39,6 +43,18 @@ import { isTestConversation } from "../../../services/close-classification/outco
 import { PlaybookService } from "../../../services/playbook.service";
 import { notSimulationSql } from "../../../services/simulation/simulation-kind";
 import { PLAYBOOK_VERSION_OVERRIDE_KEY } from "../../../services/playbook-version-override";
+import { translationService, type TranslatedText } from "../../../services/translation.service";
+import {
+  CONVERSATION_TEXT_FIELDS,
+  translateConversationTexts,
+} from "../../../services/conversation-translations.service";
+import {
+  LANGUAGE_CODES,
+  isLanguageCode,
+  normalizeLanguage,
+  shouldAdoptLanguage,
+  type LanguageCode,
+} from "../../../types/language.types";
 
 const logger = createLogger("conversations");
 const conversationExportService = new ConversationExportService();
@@ -175,6 +191,14 @@ const sendMessageSchema = z
     role: z.enum(["user", "assistant"]).optional().default("user"),
     /** D8-16: files from `uploadAttachment`, sent by a person who took over. */
     attachmentIds: z.array(z.string().uuid()).max(STAFF_ATTACHMENT_MAX_COUNT).optional(),
+    /**
+     * Multilingual inbox: a person with a translation language has their reply
+     * translated into the customer's language (default true). false sends the
+     * text as typed, e.g. "Send untranslated" after a failed translation.
+     */
+    translate: z.boolean().optional(),
+    /** Language to translate the reply into, instead of the customer's. */
+    targetLanguage: z.enum(LANGUAGE_CODES).optional(),
   })
   .refine((input) => input.content.trim() !== "" || (input.attachmentIds?.length ?? 0) > 0, {
     message: "A message needs text or a file",
@@ -182,6 +206,27 @@ const sendMessageSchema = z
   });
 
 const playbookService = new PlaybookService();
+
+/** Messages the multilingual inbox shows translated. */
+const TRANSLATABLE_MESSAGE_TYPES: readonly string[] = [
+  MessageType.CUSTOMER,
+  MessageType.BOT_AGENT,
+  MessageType.HUMAN_AGENT,
+];
+/** Earlier messages sent along so short replies ("yes, that one") translate right. */
+const TRANSLATION_CONTEXT_MESSAGES = 6;
+const TRANSLATION_CONTEXT_MAX_CHARS = 500;
+
+/** The messages before `first`, as "Customer: ..." lines. */
+function translationContext(messages: Message[], first: Message): string {
+  const before = messages.slice(0, messages.indexOf(first)).slice(-TRANSLATION_CONTEXT_MESSAGES);
+  return before
+    .map((message) => {
+      const speaker = message.type === MessageType.CUSTOMER ? "Customer" : "Support";
+      return `${speaker}: ${message.content.slice(0, TRANSLATION_CONTEXT_MAX_CHARS)}`;
+    })
+    .join("\n");
+}
 
 /** Base64 length of the largest conversation-media file, so zod refuses bigger bodies first. */
 const STAFF_ATTACHMENT_MAX_BASE64_LENGTH =
@@ -721,6 +766,131 @@ export const conversationsRouter = t.router({
       return messages;
     }),
 
+  /**
+   * Multilingual inbox: the conversation's customer, AI and team messages as
+   * the reader sees them in `language`. Stored translations are reused; the
+   * rest are translated together and stored on their message. `messageIds`
+   * limits the work to those messages (e.g. new arrivals).
+   */
+  translateMessages: scopedProcedure(RESOURCES.MESSAGES, ACTIONS.READ)
+    .input(
+      z.object({
+        conversationId: z.string().uuid(),
+        language: z.enum(LANGUAGE_CODES),
+        messageIds: z.array(z.string().uuid()).max(500).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findByIdAndOrganization(
+        input.conversationId,
+        ctx.organizationId!,
+      );
+      if (!conversation) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+      const { language } = input;
+
+      const messages = (conversation.messages ?? []).filter(
+        (message) => TRANSLATABLE_MESSAGE_TYPES.includes(message.type) && message.content?.trim(),
+      );
+      const wanted = input.messageIds ? new Set(input.messageIds) : null;
+      const selected = wanted ? messages.filter((message) => wanted.has(message.id)) : messages;
+      const untranslated = selected.filter(
+        (message) =>
+          !message.translations?.[language] &&
+          normalizeLanguage(message.detectedLanguage) !== language,
+      );
+
+      let translated = new Map<string, TranslatedText>();
+      if (untranslated.length) {
+        try {
+          translated = await translationService.translateTexts({
+            organizationId: conversation.organization_id,
+            items: untranslated.map((message) => ({ id: message.id, text: message.content })),
+            targetLanguage: language,
+            context: translationContext(messages, untranslated[0]),
+          });
+        } catch (error) {
+          logger.error(
+            { err: error, conversationId: conversation.id, language },
+            "Message translation failed",
+          );
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "TRANSLATION_FAILED" });
+        }
+
+        await Promise.all(
+          untranslated.map((message) => {
+            const result = translated.get(message.id)!;
+            return translationService.saveMessageTranslation({
+              messageId: message.id,
+              language,
+              text: result.text,
+              detectedLanguage: result.sourceLanguage,
+            });
+          }),
+        );
+
+        // The AI's language detection doesn't run while a person holds the
+        // conversation, so the newest customer message sets its language here.
+        const newestCustomer = untranslated.filter((m) => m.type === MessageType.CUSTOMER).pop();
+        const detected = newestCustomer && translated.get(newestCustomer.id)?.sourceLanguage;
+        if (
+          newestCustomer &&
+          shouldAdoptLanguage(newestCustomer.content, detected, conversation.language)
+        ) {
+          try {
+            await conversationRepository.update(conversation.id, conversation.organization_id, {
+              language: detected,
+            });
+          } catch (error) {
+            logger.warn(
+              { err: error, conversationId: conversation.id },
+              "Failed to update the conversation's language",
+            );
+          }
+        }
+      }
+
+      return selected.map((message) => {
+        const fresh = translated.get(message.id);
+        const stored = normalizeLanguage(message.detectedLanguage);
+        return {
+          messageId: message.id,
+          text: fresh?.text ?? message.translations?.[language] ?? message.content,
+          sourceLanguage: fresh?.sourceLanguage ?? stored,
+        };
+      });
+    }),
+
+  /**
+   * Titles and hand-off summaries of the conversations on screen in the
+   * reader's language, translated in one batch and cached per conversation.
+   */
+  translateTexts: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
+    .input(
+      z.object({
+        conversationIds: z.array(z.string().uuid()).min(1).max(100),
+        language: z.enum(LANGUAGE_CODES),
+        fields: z.array(z.enum(CONVERSATION_TEXT_FIELDS)).min(1).default(["title", "summary"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await translateConversationTexts({
+          organizationId: ctx.organizationId!,
+          conversationIds: [...new Set(input.conversationIds)],
+          language: input.language,
+          fields: [...new Set(input.fields)],
+        });
+      } catch (error) {
+        logger.error(
+          { err: error, language: input.language },
+          "Conversation title/summary translation failed",
+        );
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "TRANSLATION_FAILED" });
+      }
+    }),
+
   sendMessage: scopedProcedure(RESOURCES.MESSAGES, ACTIONS.CREATE)
     .input(sendMessageSchema)
     .mutation(async ({ input, ctx }) => {
@@ -761,14 +931,53 @@ export const conversationsRouter = t.router({
 
       // The widget shows a person's reply as "10:42 · Marina" (first name only)
       let senderFirstName: string | undefined;
+      let senderLanguage: LanguageCode | null = null;
       if (messageType === MessageType.HUMAN_AGENT) {
         const { userRepository } = await import("../../../repositories/user.repository");
-        senderFirstName = agentFirstName(await userRepository.findById(ctx.user!.id));
+        const sender = await userRepository.findById(ctx.user!.id);
+        senderFirstName = agentFirstName(sender);
+        if (isLanguageCode(sender?.translationLanguage)) {
+          senderLanguage = sender.translationLanguage;
+        }
+      }
+
+      // Multilingual inbox: the customer gets the reply in their language. The
+      // stored content is always what the customer sees (channel delivery sends
+      // it); the text as typed is kept as the sender's translation.
+      let content = input.content;
+      let translations: Message["translations"] = null;
+      let detectedLanguage: LanguageCode | null = null;
+      if (senderLanguage && input.content.trim()) {
+        translations = { [senderLanguage]: input.content };
+        const target =
+          input.targetLanguage ??
+          normalizeLanguage(customerLanguage(conversation.messages ?? [], conversation));
+        if (input.translate === false) {
+          // Sent as typed: its language is unknown, the reader's translation finds it.
+        } else if (target && target !== senderLanguage) {
+          try {
+            const result = await translationService.translateTexts({
+              organizationId: conversation.organization_id,
+              items: [{ id: randomUUID(), text: input.content }],
+              targetLanguage: target,
+            });
+            content = [...result.values()][0].text;
+            detectedLanguage = target;
+          } catch (error) {
+            logger.error(
+              { err: error, conversationId: conversation.id, target },
+              "Reply translation failed",
+            );
+            throw new TRPCError({ code: "UNPROCESSABLE_CONTENT", message: "TRANSLATION_FAILED" });
+          }
+        } else {
+          detectedLanguage = senderLanguage;
+        }
       }
 
       // The addMessage method now handles cooldown logic for Customer messages
       const message = await conversation.addMessage({
-        content: input.content,
+        content,
         type: messageType,
         ...(attachments.length ? { attachments } : {}),
         metadata: {
@@ -776,6 +985,8 @@ export const conversationsRouter = t.router({
           sentByUserId: ctx.user?.id,
           agentFirstName: senderFirstName,
         },
+        ...(translations ? { translations } : {}),
+        ...(detectedLanguage ? { detectedLanguage } : {}),
       });
 
       return message;
@@ -1216,6 +1427,11 @@ export const conversationsRouter = t.router({
         messageId: z.string().uuid(),
         // An empty edit would be delivered as an empty bubble; reject it here.
         editedContent: z.string().trim().min(1).max(MESSAGE_CONTENT_MAX_LENGTH).optional(),
+        /**
+         * Language the reviewer wrote `editedContent` in; when it isn't the
+         * customer's, the edit is translated before it is sent.
+         */
+        editedInLanguage: z.enum(LANGUAGE_CODES).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -1224,6 +1440,7 @@ export const conversationsRouter = t.router({
         organizationId: ctx.organizationId!,
         userId: ctx.user!.id,
         editedContent: input.editedContent,
+        editedInLanguage: input.editedInLanguage,
       });
     }),
 
@@ -1383,6 +1600,11 @@ export const conversationsRouter = t.router({
       z.object({
         conversationId: z.string().uuid(),
         format: z.enum(["pdf", "csv"]),
+        /**
+         * Adds each message in this language next to the original. Defaults to
+         * the requesting person's translation language; null turns it off.
+         */
+        translationLanguage: z.enum(LANGUAGE_CODES).nullable().optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -1422,25 +1644,41 @@ export const conversationsRouter = t.router({
         userAgent: ctx.userAgent,
       });
 
+      // Multilingual inbox: the content stays the record; a translation is added next to it.
+      let translationLanguage = input.translationLanguage ?? null;
+      if (input.translationLanguage === undefined && ctx.user) {
+        const { userRepository } = await import("../../../repositories/user.repository");
+        const requester = await userRepository.findById(ctx.user.id);
+        if (isLanguageCode(requester?.translationLanguage)) {
+          translationLanguage = requester.translationLanguage;
+        }
+      }
+      const { translation, complete: translationComplete } = translationLanguage
+        ? await conversationExportService.translate(conversation, translationLanguage)
+        : { translation: undefined, complete: true };
+
       if (input.format === "pdf") {
         const organization = await organizationRepository.findById(organizationId);
         const pdfBuffer = await conversationExportService.generatePdf(conversation, {
           storeName: organization?.name ?? "",
           timeZone: organization?.timezone ?? "UTC",
+          translation,
         });
         return {
           base64Data: pdfBuffer.toString("base64"),
           fileName: `${titleSlug}-${timestamp}.pdf`,
           mimeType: "application/pdf",
+          translationIncomplete: !translationComplete,
         };
       }
 
-      const csvContent = conversationExportService.generateCsv(conversation);
+      const csvContent = conversationExportService.generateCsv(conversation, translation);
       const csvBuffer = Buffer.from(csvContent, "utf-8");
       return {
         base64Data: csvBuffer.toString("base64"),
         fileName: `${titleSlug}-${timestamp}.csv`,
         mimeType: "text/csv",
+        translationIncomplete: !translationComplete,
       };
     }),
 });

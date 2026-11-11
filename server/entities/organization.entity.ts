@@ -6,7 +6,7 @@ import { Document } from "./document.entity";
 import { ApiKey } from "./apikey.entity";
 import { Job } from "./job.entity";
 import { Upload } from "./upload.entity";
-import { SupportedLanguage, DEFAULT_LANGUAGE } from "../types/language.types";
+import { type LanguageCode, DEFAULT_LANGUAGE } from "../types/language.types";
 import type { TiptapDoc } from "../types/tiptap.types";
 import type { HandoffTicketConfig } from "../types/handoff-ticket.types";
 import {
@@ -113,12 +113,8 @@ export class Organization extends BaseEntity {
   @Column({ type: "varchar", length: 255, nullable: true })
   contactEmail?: string;
 
-  @Column({
-    type: "enum",
-    enum: SupportedLanguage,
-    default: DEFAULT_LANGUAGE,
-  })
-  defaultLanguage!: SupportedLanguage;
+  @Column({ type: "varchar", length: 10, default: DEFAULT_LANGUAGE })
+  defaultLanguage!: LanguageCode;
 
   @Column({
     type: "enum",

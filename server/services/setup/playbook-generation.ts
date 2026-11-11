@@ -11,6 +11,7 @@
 
 import { LLMService } from "@server/services/core/llm.service";
 import { createLogger } from "@server/lib/logger";
+import { languageName } from "@server/types/language.types";
 import type { TiptapDocument } from "@server/database/entities/playbook.entity";
 import type { SetupPlaybookStep, SetupStepPart } from "@server/types/setup.types";
 
@@ -226,16 +227,6 @@ const defaultDeps: GenerationDeps = {
       organizationId,
     }),
 };
-
-/** Human name of a locale code, for the prompt. */
-export function languageName(language: string | null | undefined): string {
-  const code = language?.trim() || "en";
-  try {
-    return new Intl.DisplayNames(["en"], { type: "language" }).of(code) ?? code;
-  } catch {
-    return code;
-  }
-}
 
 /**
  * Plans one playbook. Never throws. Retries once when the answer cites a tool the organization

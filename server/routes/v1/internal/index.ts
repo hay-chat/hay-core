@@ -131,7 +131,7 @@ const internalOrganizationsRouter = router({
       }
       const owner = await AppDataSource.getRepository(UserOrganization).findOne({
         where: { organizationId: input.organizationId, role: "owner" },
-        relations: ["user"],
+        relations: { user: true },
         order: { createdAt: "ASC" },
       });
 

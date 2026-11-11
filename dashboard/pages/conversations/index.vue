@@ -190,7 +190,10 @@
                   <div class="flex items-center space-x-3">
                     <div>
                       <div class="font-medium">
-                        {{ conversation.title || $t("conversations.table.newConversation") }}
+                        {{
+                          titleFor(conversation, "title") ||
+                          $t("conversations.table.newConversation")
+                        }}
                       </div>
                       <div class="text-xs text-neutral-muted">
                         {{ conversation.id.slice(0, 8) }}...
@@ -308,6 +311,7 @@ import {
 } from "@/utils/conversation-filters";
 import { getEnabledChannelPlugins } from "@/utils/channel";
 import Avatar from "@/components/ui/Avatar.vue";
+import { useConversationTextTranslations } from "@/composables/useTextTranslations";
 import type { RouterOutputs } from "@/types/trpc";
 
 // i18n
@@ -519,6 +523,8 @@ const timeframeOptions = computed(() => [
 // Search, status and timeframe are applied by the server (see fetchConversations),
 // so the loaded page and its total always agree.
 const paginatedConversations = computed(() => conversations.value);
+// Titles of the rows on screen in the reader's translation language.
+const { textFor: titleFor } = useConversationTextTranslations(paginatedConversations, ["title"]);
 
 // Methods
 const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {

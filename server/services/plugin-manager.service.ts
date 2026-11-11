@@ -9,7 +9,11 @@ import {
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { PluginRegistry, PluginStatus } from "@server/entities/plugin-registry.entity";
-import type { HayPluginManifest, PluginLocale } from "@server/types/plugin.types";
+import {
+  MARKETPLACE_CATEGORIES,
+  type HayPluginManifest,
+  type PluginLocale,
+} from "@server/types/plugin.types";
 import { getPluginRunnerService } from "./plugin-runner.service";
 import type { WorkerInfo } from "@server/types/plugin-sdk.types";
 import { createLogger } from "@server/lib/logger";
@@ -54,6 +58,8 @@ interface HayPluginBlock {
   network?: HayPluginManifest["network"];
   /** When in-app setup should suggest this plugin, and what it can do for customers. */
   setup?: unknown;
+  /** Marketplace section the plugin is listed under. */
+  marketplaceCategory?: unknown;
 }
 
 /**
@@ -64,6 +70,7 @@ interface PluginPackageJson {
   version?: string;
   description?: string;
   author?: string;
+  homepage?: unknown;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   scripts?: Record<string, string>;
@@ -79,6 +86,16 @@ interface PluginPackageJson {
 type RegistryManifest = Omit<HayPluginManifest, "capabilities"> & {
   capabilities: string[];
 };
+
+/** A plugin's package.json `homepage`, kept only when it is an https URL (it is rendered as a link). */
+export function readHomepage(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  try {
+    return new URL(raw).protocol === "https:" ? raw : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** Whether an organization may see and use a registered plugin. */
 export function isPluginVisibleToOrganization(
@@ -299,6 +316,11 @@ export class PluginManagerService {
         oauthHosts: hayPlugin.oauthHosts || undefined, // Hosts a managed OAuth secret may reach
         network: hayPlugin.network || undefined, // Hosts the worker may reach through the egress proxy
         setup: readSetupHints(hayPlugin.setup), // In-app setup suggestions
+        // Plugins can come from organizations: an unknown section is dropped, not trusted.
+        marketplaceCategory: MARKETPLACE_CATEGORIES.find(
+          (category) => category === hayPlugin.marketplaceCategory,
+        ),
+        homepage: readHomepage(packageJson.homepage),
       };
 
       // Load i18n translations from plugin's i18n/ directory

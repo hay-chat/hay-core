@@ -1,6 +1,7 @@
 {
   "name": "Spacebring",
   "description": "Conecte seu coworking Spacebring para que o assistente reserve, remarque e cancele salas para os membros, convide visitantes, relate problemas à equipe e responda dúvidas sobre o espaço.",
+  "summary": "Reserve, remarque e cancele salas para os membros, convide visitantes e relate problemas.",
   "tools": {
     "spacebring_get_member": {
       "label": "Consultar Membro",

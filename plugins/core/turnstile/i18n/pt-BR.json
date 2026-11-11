@@ -1,6 +1,7 @@
 {
   "name": "Proteção contra bots (Cloudflare Turnstile)",
   "description": "Impede que bots abram conversas no webchat. O Hay.chat verifica cada visitante com o Cloudflare Turnstile antes de aceitar a primeira mensagem.",
+  "summary": "Impeça que bots abram conversas no webchat, com verificação antes de a conversa ser criada.",
   "config": {
     "mode": {
       "label": "Proteção",

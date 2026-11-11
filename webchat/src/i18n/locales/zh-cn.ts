@@ -4,6 +4,7 @@ export default {
   "widget.defaultGreeting": "您好！请问有什么可以帮您的吗？",
   "chat.close": "关闭聊天",
   "chat.open": "打开聊天",
+  "chat.dismissTeaser": "关闭消息",
   "chat.expand": "展开聊天",
   "chat.collapse": "收起聊天",
   "chat.conversationEnded": "此对话已结束",

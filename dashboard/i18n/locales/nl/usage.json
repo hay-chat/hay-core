@@ -1,0 +1,75 @@
+{
+  "usage": {
+    "headTitle": "Verbruik - Hay.chat",
+    "title": "Verbruik",
+    "description": "Resoluties die Hay.chat telt voor de facturatie, en het register achter dat getal.",
+    "refresh": "Vernieuwen",
+    "period": "Factuurperiode",
+    "loadFailed": "Kan verbruik niet laden",
+    "meter": {
+      "title": "Factureerbare resoluties",
+      "period": "{start} t/m {end}",
+      "periodNote": "Geteld over je factuurperiode, dezelfde data als op je factuur.",
+      "planNote": "De tegoeden van je abonnement en eventuele kosten voor extra resoluties staan op je facturatiepagina.",
+      "paused": "De AI-agent is gepauzeerd omdat de resoluties van het abonnement op zijn. Gesprekken wachten op je team.",
+      "calendarNote": "Geteld per kalendermaand (UTC). Je factuur kan andere periodedata gebruiken."
+    },
+    "breakdown": {
+      "title": "Uitsplitsing",
+      "billed": "Gefactureerd",
+      "pendingReview": "waarvan ter beoordeling naar Hay.chat gestuurd",
+      "reversed": "Teruggedraaid: shopper kwam binnen 72 u terug",
+      "excluded": "Uitgesloten door je team",
+      "notBilledTitle": "Niet gefactureerd",
+      "outcomes": {
+        "human": "Overgedragen, niet opgelost door de AI",
+        "unhappy": "Shopper vertrok ontevreden",
+        "abandoned": "Geen echte vraag of geen echt antwoord",
+        "test": "Tests en playground",
+        "spam": "Spam"
+      }
+    },
+    "ledger": {
+      "title": "Resolutieregister",
+      "description": "Elke resolutie die in deze periode is geteld, met de reden waarom.",
+      "export": "CSV exporteren",
+      "exportFailed": "Kan het register niet exporteren",
+      "exclusionsUsed": "Zelf uitgevoerde uitsluitingen deze periode: {used} van {allowance}",
+      "exclusionsClosed": "Resoluties uit deze periode kunnen hier niet meer worden uitgesloten.",
+      "empty": "Geen factureerbare resoluties in deze periode.",
+      "openConversation": "Gesprek openen",
+      "conversationDeleted": "Gesprek verwijderd",
+      "exclude": "Uitsluiten",
+      "reasonLabel": "Reden: {reason}",
+      "requestedBy": "Aangevraagd door {who} op {date}",
+      "excludedBy": "Uitgesloten door {who} op {date}",
+      "previous": "Vorige",
+      "next": "Volgende",
+      "pageOf": "Pagina {page} van {pages}",
+      "outcomes": {
+        "confirmed": "Shopper bevestigde dat het was opgelost",
+        "assumed": "AI antwoordde, shopper kwam niet terug"
+      },
+      "statuses": {
+        "billed": "Gefactureerd",
+        "reversed": "Teruggedraaid",
+        "excluded": "Uitgesloten",
+        "pending_review": "Ter beoordeling naar Hay.chat gestuurd",
+        "denied": "Gefactureerd: Hay.chat heeft de uitsluiting afgewezen"
+      }
+    },
+    "excludeDialog": {
+      "title": "Deze resolutie uitsluiten",
+      "instant": "Hij telt direct niet meer mee in deze periode. Hierna heb je deze periode nog {left} zelf uit te voeren uitsluitingen over.",
+      "review": "Je hebt de zelf uit te voeren uitsluitingen voor deze periode opgebruikt (5 % van de resoluties). Dit verzoek gaat ter beoordeling naar Hay.chat en de resolutie blijft tot dan meetellen.",
+      "reason": "Reden (verplicht)",
+      "reasonPlaceholder": "Bijvoorbeeld: dit was onze eigen test, of de shopper had een mens nodig",
+      "confirm": "Uitsluiten",
+      "confirmReview": "Ter beoordeling versturen",
+      "excluded": "Resolutie uitgesloten",
+      "sentForReview": "Ter beoordeling naar Hay.chat gestuurd",
+      "failed": "Kan de resolutie niet uitsluiten"
+    },
+    "manageBilling": "Facturatie beheren"
+  }
+}

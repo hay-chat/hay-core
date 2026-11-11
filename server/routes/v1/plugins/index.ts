@@ -1,6 +1,7 @@
 import { t } from "@server/trpc";
 import {
   getAllPlugins,
+  getConnectionStates,
   getPlugin,
   getPluginInstances,
   enablePlugin,
@@ -26,6 +27,7 @@ import { getSetupStatus } from "./setup-status.handler";
 
 export const pluginsRouter = t.router({
   getAll: getAllPlugins,
+  connectionStates: getConnectionStates,
   get: getPlugin,
   getInstances: getPluginInstances,
   enable: enablePlugin,

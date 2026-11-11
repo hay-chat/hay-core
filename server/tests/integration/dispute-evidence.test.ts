@@ -9,17 +9,33 @@ jest.mock("../../services/redis.service", () => ({
   redisService: { isConnected: () => false },
 }));
 
+const mockTranslateTexts = jest.fn(
+  async (input: { items: Array<{ id: string; text: string }> }) =>
+    new Map(
+      input.items.map((item) => [item.id, { sourceLanguage: "pt", text: `EN: ${item.text}` }]),
+    ),
+);
+const mockSaveMessageTranslation = jest.fn(async (_params: Record<string, unknown>) => undefined);
+jest.mock("../../services/translation.service", () => ({
+  translationService: {
+    translateTexts: mockTranslateTexts,
+    saveMessageTranslation: mockSaveMessageTranslation,
+  },
+}));
+
 import { AppDataSource } from "../../database/data-source";
 import { Organization } from "../../entities/organization.entity";
 import { Conversation } from "../../database/entities/conversation.entity";
 import { Message, MessageType } from "../../database/entities/message.entity";
 import { disputeEvidenceService } from "../../services/dispute-evidence/dispute-evidence.service";
 import { pdfText } from "../helpers/pdf-text";
+import type { LanguageCode } from "../../types/language.types";
 
 const orgId = "a1090000-0000-4000-8000-0000000000e2";
 const otherOrgId = "a1090000-0000-4000-8000-0000000000e3";
 let conversationId = "";
 let otherConversationId = "";
+let portugueseConversationId = "";
 
 describe("disputeEvidenceService.render", () => {
   beforeAll(async () => {
@@ -41,7 +57,7 @@ describe("disputeEvidenceService.render", () => {
       );
     }
     const conversations = AppDataSource.getRepository(Conversation);
-    const create = async (organization_id: string) =>
+    const create = async (organization_id: string, language: LanguageCode | null = null) =>
       (
         await conversations.save(
           conversations.create({
@@ -50,11 +66,13 @@ describe("disputeEvidenceService.render", () => {
             status: "open",
             metadata: {},
             channel: "web",
+            language,
           }),
         )
       ).id;
     conversationId = await create(orgId);
     otherConversationId = await create(otherOrgId);
+    portugueseConversationId = await create(orgId, "pt");
     const messages = AppDataSource.getRepository(Message);
     await messages.save([
       messages.create({
@@ -74,6 +92,19 @@ describe("disputeEvidenceService.render", () => {
         type: MessageType.BOT_AGENT,
         content: "It shipped yesterday.",
         created_at: new Date("2026-07-01T09:00:05Z"),
+      }),
+      messages.create({
+        conversation_id: portugueseConversationId,
+        type: MessageType.CUSTOMER,
+        content: "Cadê meu pedido?",
+        created_at: new Date("2026-07-02T09:00:00Z"),
+      }),
+      messages.create({
+        conversation_id: portugueseConversationId,
+        type: MessageType.BOT_AGENT,
+        content: "Foi enviado ontem.",
+        translations: { en: "It was sent yesterday." },
+        created_at: new Date("2026-07-02T09:00:05Z"),
       }),
       messages.create({
         conversation_id: otherConversationId,
@@ -99,6 +130,8 @@ describe("disputeEvidenceService.render", () => {
       template: "generic",
     });
     expect(result.conversationIds).toEqual([conversationId]);
+    // An English conversation (store default) needs no translation.
+    expect(mockTranslateTexts).not.toHaveBeenCalled();
     expect(result.storeName).toBe("Evidence Store");
     const text = pdfText(result.pdf);
     expect(text).toContain("Store: ");
@@ -108,5 +141,40 @@ describe("disputeEvidenceService.render", () => {
     expect(text).toContain("It shipped yesterday.");
     expect(text).not.toContain("SECRET SYSTEM PROMPT");
     expect(text).not.toContain("OTHER ORG MESSAGE");
+  });
+
+  it("adds a labelled English translation to a conversation in another language", async () => {
+    mockTranslateTexts.mockClear();
+    const result = await disputeEvidenceService.render({
+      organizationId: orgId,
+      conversationIds: [portugueseConversationId],
+      template: "generic",
+    });
+    // Only the message without a stored English translation is translated, then stored.
+    expect(mockTranslateTexts).toHaveBeenCalledTimes(1);
+    expect(mockTranslateTexts.mock.calls[0][0]).toMatchObject({
+      items: [{ text: "Cadê meu pedido?" }],
+      targetLanguage: "en",
+    });
+    expect(mockSaveMessageTranslation).toHaveBeenCalledWith(
+      expect.objectContaining({ language: "en", text: "EN: Cadê meu pedido?" }),
+    );
+    const text = pdfText(result.pdf);
+    expect(text).toContain("Cadê meu pedido?");
+    expect(text).toContain("EN: Cadê meu pedido?");
+    expect(text).toContain("It was sent yesterday.");
+    expect(text).toContain("Tradução para o inglês (English translation):");
+  });
+
+  it("still renders the originals when the translation fails", async () => {
+    mockTranslateTexts.mockRejectedValueOnce(new Error("LLM down"));
+    const result = await disputeEvidenceService.render({
+      organizationId: orgId,
+      conversationIds: [portugueseConversationId],
+      template: "generic",
+    });
+    const text = pdfText(result.pdf);
+    expect(text).toContain("Cadê meu pedido?");
+    expect(text).not.toContain("EN: Cadê meu pedido?");
   });
 });

@@ -57,6 +57,7 @@ import {
   type OrganizationSettings,
 } from "@server/types/organization-settings.types";
 import type { FormSchema } from "@hay/form-schema";
+import { languageName as languageNameOf } from "@server/types/language.types";
 import { formSchemaSchema } from "@hay/form-schema";
 
 function describeBadDate(date: BadDate): string {
@@ -403,23 +404,7 @@ export class ExecutionLayer {
         const shouldEnforceLanguage = customerMessages.length <= 3;
 
         if (shouldEnforceLanguage) {
-          const languageNames: Record<string, string> = {
-            en: "English",
-            pt: "Portuguese",
-            es: "Spanish",
-            de: "German",
-            fr: "French",
-            it: "Italian",
-            nl: "Dutch",
-            pl: "Polish",
-            ru: "Russian",
-            ja: "Japanese",
-            zh: "Chinese",
-            ko: "Korean",
-            ar: "Arabic",
-            hi: "Hindi",
-          };
-          const languageName = languageNames[customerLanguage] || customerLanguage.toUpperCase();
+          const languageName = languageNameOf(customerLanguage);
           const languageInstruction = `\n\nIMPORTANT LANGUAGE REQUIREMENT: The customer is communicating in ${languageName}. You MUST respond ONLY in ${languageName}, regardless of the language used in the prompts, instructions, or system messages. This is a critical requirement that overrides all other language-related instructions.`;
           finalPrompt = responsePrompt + languageInstruction;
         }
@@ -470,6 +455,7 @@ export class ExecutionLayer {
       log.debug("Invoking LLM for execution planning");
 
       const response = await this.llmService.invoke({
+        caller: "planner",
         history: [
           ...(pageToolsTurn ? [pageToolsTurn] : []),
           ...(referenceTurn ? [referenceTurn] : []),
@@ -1135,6 +1121,7 @@ export class ExecutionLayer {
     });
 
     let badLinks: BadLink[];
+    const startedAt = Date.now();
     try {
       const messages = await conversation.getMessages();
       const { website, siteUrls } = await this.getLinkContext(conversation);
@@ -1144,6 +1131,10 @@ export class ExecutionLayer {
         siteUrls,
         website,
       });
+      log.info(
+        { durationMs: Date.now() - startedAt, badLinks: badLinks.length },
+        "Link check completed",
+      );
     } catch (error) {
       // The check must never break a turn.
       log.warn({ error }, "Link check failed, sending the reply unchecked");
@@ -1946,6 +1937,7 @@ export class ExecutionLayer {
       });
 
       const composed = await this.llmService.invoke<string>({
+        caller: "contextual-fallback",
         prompt,
         temperature: 0.3,
         // Keeps the call on the org's provider and AI region (EU-only orgs).

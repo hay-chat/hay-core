@@ -9,6 +9,7 @@
     "entry": "./dist/index.js",
     "displayName": "Bot protection (Cloudflare Turnstile)",
     "category": "tool",
+    "marketplaceCategory": "security",
     "capabilities": [
       "config",
       "webchat"
@@ -34,6 +35,6 @@
   },
   "devDependencies": {
     "typescript": "^5.3.3",
-    "@types/node": "^20.10.0"
+    "@types/node": "^26.6.6"
   }
 }

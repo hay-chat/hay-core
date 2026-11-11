@@ -581,7 +581,7 @@ describe("WebSocket dashboard authentication", () => {
 
     expect(mockUserOrgFindOne).toHaveBeenCalledWith({
       where: { userId: "user-1", organizationId: ORG_ID, isActive: true },
-      relations: ["organization"],
+      relations: { organization: true },
     });
     expect(orgMembers(service).get(ORG_ID)?.has(clientId) ?? false).toBe(false);
     expect(ws.closedWith).toBe(1008);

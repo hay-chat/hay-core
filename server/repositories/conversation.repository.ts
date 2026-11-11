@@ -16,6 +16,13 @@ import { escapeLike } from "@server/lib/sql-like";
 
 const LOCK_DURATION_MS = 15_000;
 
+/** Messages the conversation search looks in: what the customer, the AI and the team wrote. */
+const SEARCHABLE_MESSAGE_TYPES = [
+  MessageType.CUSTOMER,
+  MessageType.BOT_AGENT,
+  MessageType.HUMAN_AGENT,
+];
+
 const logger = createLogger("conversation-repo");
 
 const HANDOFF_STATUSES: ReadonlyArray<Conversation["status"]> = [
@@ -446,7 +453,16 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   }
 
   /**
-   * Apply conversation-specific search functionality
+   * Conversation search: the named columns (title by default), the summary,
+   * cached title/summary translations, and the text of the conversation's
+   * customer, AI and team messages and their translations.
+   *
+   * Message text is matched through trigram indexes (idx_messages_*_trgm):
+   * `translations::text ILIKE` is the indexed prefilter, and the jsonpath
+   * check (values only, so language codes and keys never match) confirms it.
+   * Translations are matched with a jsonpath literal regex (flag "q") rather
+   * than a set-returning function per row, which the planner costs so high
+   * that it JIT-compiles every search.
    */
   protected override applySearch(
     queryBuilder: SelectQueryBuilder<Conversation>,
@@ -454,29 +470,46 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   ): void {
     if (!search?.query) return;
 
-    // Default search fields for conversations
     const searchFields = search.searchFields || ["title"];
+    const fieldConditions = searchFields.map((field) => {
+      assertSafeIdentifier(field, "search field");
+      return `entity.${field} ILIKE :searchQuery`;
+    });
+    // A jsonpath string literal has JSON's escaping; "iq" = case-insensitive, literal text.
+    const containsQuery = `@ like_regex ${JSON.stringify(search.query)} flag "iq"`;
 
-    const searchConditions = searchFields
-      .map((field, index) => {
-        assertSafeIdentifier(field, "search field");
-        return `entity.${field} ILIKE :searchQuery${index}`;
-      })
-      .join(" OR ");
-
-    if (searchConditions) {
-      const searchPattern = `%${escapeLike(search.query)}%`;
-      queryBuilder.andWhere(
-        `(${searchConditions})`,
-        searchFields.reduce(
-          (params, _, index) => {
-            params[`searchQuery${index}`] = searchPattern;
-            return params;
-          },
-          {} as Record<string, string>,
-        ),
-      );
-    }
+    queryBuilder.andWhere(
+      `(${[
+        ...fieldConditions,
+        "entity.summary ILIKE :searchQuery",
+        "jsonb_path_exists(entity.translations, CAST(:searchCachedPath AS jsonpath))",
+        `EXISTS (
+          SELECT 1
+            FROM messages search_message
+           WHERE search_message.conversation_id = entity.id
+             AND search_message.type IN (:...searchMessageTypes)
+             AND (
+               search_message.content ILIKE :searchQuery
+               OR (
+                 search_message.translations IS NOT NULL
+                 AND search_message.translations::text ILIKE :searchJsonQuery
+                 AND jsonb_path_exists(
+                   search_message.translations,
+                   CAST(:searchTranslationsPath AS jsonpath)
+                 )
+               )
+             )
+        )`,
+      ].join(" OR ")})`,
+      {
+        searchQuery: `%${escapeLike(search.query)}%`,
+        // jsonb::text escapes quotes, backslashes and control characters the way JSON does.
+        searchJsonQuery: `%${escapeLike(JSON.stringify(search.query).slice(1, -1))}%`,
+        searchCachedPath: `$.*.text.* ? (${containsQuery})`,
+        searchTranslationsPath: `$.* ? (${containsQuery})`,
+        searchMessageTypes: SEARCHABLE_MESSAGE_TYPES,
+      },
+    );
   }
 
   /**
@@ -661,7 +694,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   async getLastHumanMessage(conversationId: string): Promise<Message | null> {
     const conversation = await this.getRepository().findOne({
       where: { id: conversationId },
-      relations: ["messages"],
+      relations: { messages: true },
     });
 
     if (!conversation?.messages) return null;

@@ -256,6 +256,15 @@ If anything unexpected happens (test failures, build errors, behavior regression
 - Treat generated files carefully:
   - only commit them if the project expects it.
 
+### Keep hay-docs in sync
+
+Every PR that adds or changes a feature must be checked against the docs. `docs/` is the `hay-docs` git submodule (`git submodule update --init docs`).
+
+- Before opening the PR, find the pages that describe what changed: `docs/user-guide/` for anything a customer sees or configures, `docs/technical/` for plugin, API, architecture and self-hosting changes.
+- If a page is wrong or missing, open a PR on `hay-chat/hay-docs` with the fix and link it from the hay-core PR. A new plugin needs its own page in `docs/user-guide/integrations/` and an entry in `docs/user-guide/integrations.md`.
+- If nothing needs changing, say so in the hay-core PR description ("Docs: no change needed").
+- Refactors, tests and internal fixes with no visible behaviour change are exempt.
+
 ---
 
 ## Definition of Done (DoD)
@@ -266,6 +275,7 @@ A task is done when:
 - Tests/lint/typecheck/build (as relevant) pass or you have a documented reason they were not run.
 - Risky changes have a rollback/flag strategy (when applicable).
 - The code follows existing conventions and is readable.
+- For a feature change or addition, hay-docs was reviewed and updated, or the PR says no change was needed.
 - A short verification story exists: "what changed + how we know it works."
 
 ---

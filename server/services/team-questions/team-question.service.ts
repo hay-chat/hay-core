@@ -11,6 +11,10 @@ import { MessageType } from "@server/database/entities/message.entity";
 import { conversationRepository } from "@server/repositories/conversation.repository";
 import { createLogger } from "@server/lib/logger";
 import { resolveQuickCheckSettings } from "@server/types/organization-settings.types";
+import { languageName, normalizeLanguage, type LanguageCode } from "@server/types/language.types";
+import type { TeamQuestionTranslations } from "@server/types/translation-cache.types";
+import type { MessageTranslations } from "@server/database/entities/message.entity";
+import { translationService } from "../translation.service";
 import { CLOSED_STATUSES, isTestConversation } from "../close-classification/outcome-rules";
 import { aiRepliesHeldForReview } from "../ai-reply-review";
 import { getAvailability } from "../business-hours.service";
@@ -46,6 +50,25 @@ export type AskResult =
   /** Not allowed: the caller hands off as usual. */
   | { kind: "refused"; reason: QuickCheckRefusal };
 
+/** A team answer sent as written, translated into the shopper's language. */
+interface ShopperTranslation {
+  content: string;
+  /** The answer as the teammate wrote it, under its language. */
+  translations: MessageTranslations;
+  detectedLanguage: LanguageCode;
+}
+
+/** The texts of a question a reader can have translated. */
+export const TEAM_QUESTION_TEXT_FIELDS = ["question", "customerMessage"] as const;
+export type TeamQuestionTextField = (typeof TEAM_QUESTION_TEXT_FIELDS)[number];
+
+/** A question's texts in a reader's language (see `translateForReader`); null = not asked or empty. */
+export interface TeamQuestionTranslationView {
+  questionId: string;
+  question: { source: string; text: string } | null;
+  customerMessage: { source: string; text: string } | null;
+}
+
 /** What the dashboard shows for a question waiting on the team. */
 export interface TeamQuestionView {
   id: string;
@@ -67,21 +90,6 @@ function languagesOf(conversation: Conversation, language?: string | null) {
 function contactEmailOf(conversation: Conversation): string | null {
   const contact = conversation.metadata?.contactEmail;
   return (typeof contact === "string" && contact) || conversation.customer?.email || null;
-}
-
-const LANGUAGE_NAMES: Record<string, string> = {
-  en: "English",
-  pt: "Brazilian Portuguese",
-  es: "Spanish",
-  fr: "French",
-  de: "German",
-  it: "Italian",
-  nl: "Dutch",
-};
-
-function languageName(language: string | null | undefined): string {
-  const base = (language ?? "en").toLowerCase().split(/[-_]/)[0];
-  return LANGUAGE_NAMES[base] ?? language ?? "English";
 }
 
 function clip(text: string, max: number): string {
@@ -314,29 +322,36 @@ class TeamQuestionService {
     const late = !!question.timedOutAt;
     const answer = question.answer ?? "";
     const blocker = await recheckAiReply(conversation.id);
+    if (blocker === "conversation_missing") return false;
 
     let content = answer;
+    let translation: ShopperTranslation | null = null;
     if (!blocker && question.relayMode === "rephrase") {
       content = (await this.rephrase(conversation, question, late)) ?? answer;
+    } else {
+      // Sent as written: still in the shopper's language, like any team reply.
+      translation = await this.translateForShopper(conversation, question, answer, userId);
+      if (translation) content = translation.content;
     }
 
     // The AI may not speak (paused, or someone holds the chat): the
-    // teammate's words go out as theirs, as written.
+    // teammate's words go out as theirs, as written (translated as above).
     let type: MessageType = MessageType.BOT_AGENT;
     let sender: string | undefined;
     if (blocker) {
-      if (blocker === "conversation_missing") return false;
       const { userRepository } = await import("@server/repositories/user.repository");
       const user = await userRepository.findById(userId);
       type = MessageType.HUMAN_AGENT;
       sender = user?.getFullName() || undefined;
-      content = answer;
     }
 
     await conversation.addMessage({
       content,
       type,
       sender,
+      ...(translation
+        ? { translations: translation.translations, detectedLanguage: translation.detectedLanguage }
+        : {}),
       metadata: {
         isTeamAnswer: true,
         teamQuestionId: question.id,
@@ -403,6 +418,7 @@ class TeamQuestionService {
         { conversationId: conversation.id, organizationId: conversation.organization_id },
       );
       const text = await new LLMService().invoke({
+        caller: "team-question",
         prompt,
         history: "Write the message now.",
         tier: "easy",
@@ -413,6 +429,49 @@ class TeamQuestionService {
       return trimmed;
     } catch (error) {
       logger.warn({ err: error, questionId: question.id }, "Rephrase failed, sending as written");
+      return null;
+    }
+  }
+
+  /**
+   * An answer relayed as written goes out in the shopper's language, like a
+   * team member's reply in the Inbox (conversations.sendMessage): when the
+   * teammate reads in another translation language than the shopper's, the
+   * answer is translated and kept, as written, under the teammate's
+   * language. Null when there is nothing to translate, or the translation
+   * failed (it is sent as written).
+   */
+  private async translateForShopper(
+    conversation: Conversation,
+    question: TeamQuestion,
+    answer: string,
+    userId: string,
+  ): Promise<ShopperTranslation | null> {
+    const target = normalizeLanguage(
+      question.language || conversation.language || conversation.organization?.defaultLanguage,
+    );
+    if (!target) return null;
+    const { userRepository } = await import("@server/repositories/user.repository");
+    const teammate = await userRepository.findById(userId);
+    const teammateLanguage = normalizeLanguage(teammate?.translationLanguage);
+    if (!teammateLanguage || teammateLanguage === target) return null;
+    try {
+      const id = `team-answer:${question.id}`;
+      const result = await translationService.translateTexts({
+        organizationId: conversation.organization_id,
+        items: [{ id, text: answer }],
+        targetLanguage: target,
+      });
+      return {
+        content: result.get(id)!.text,
+        translations: { [teammateLanguage]: answer },
+        detectedLanguage: target,
+      };
+    } catch (error) {
+      logger.warn(
+        { err: error, questionId: question.id },
+        "Team answer translation failed, sending as written",
+      );
       return null;
     }
   }
@@ -554,6 +613,80 @@ class TeamQuestionService {
       customerName: row.customer_name,
       conversationTitle: row.title,
     }));
+  }
+
+  /**
+   * Questions (and the customer messages behind them) in a reader's
+   * language, for teammates who read in another language. Cached per question
+   * in `team_questions.translations`; only the missing ones go to the LLM, in
+   * one batch. Throws when the translation fails.
+   */
+  async translateForReader(params: {
+    organizationId: string;
+    questionIds: string[];
+    language: LanguageCode;
+    fields?: readonly TeamQuestionTextField[];
+  }): Promise<TeamQuestionTranslationView[]> {
+    const { organizationId, questionIds, language, fields = TEAM_QUESTION_TEXT_FIELDS } = params;
+    if (!questionIds.length) return [];
+    const rows: Array<{
+      id: string;
+      question: string;
+      customer_message: string | null;
+      language: string | null;
+      translations: TeamQuestionTranslations | null;
+    }> = await AppDataSource.query(
+      `SELECT id, question, customer_message, language, translations
+         FROM team_questions
+        WHERE organization_id = $1 AND id = ANY($2::uuid[])`,
+      [organizationId, questionIds],
+    );
+
+    const textOf = (row: (typeof rows)[number], field: TeamQuestionTextField) =>
+      field === "question" ? row.question : row.customer_message;
+    const results = await translationService.translateCachedTexts({
+      organizationId,
+      targetLanguage: language,
+      items: rows.flatMap((row) =>
+        fields
+          .filter((field) => textOf(row, field)?.trim())
+          .map((field) => ({
+            id: `${row.id}:${field}`,
+            text: textOf(row, field)!,
+            cached: row.translations?.[field] ?? null,
+            // The shopper's message is in the language the question was asked in.
+            sourceLanguage: field === "customerMessage" ? normalizeLanguage(row.language) : null,
+          })),
+      ),
+    });
+
+    const patches: Record<string, TeamQuestionTranslations> = {};
+    for (const [key, result] of results) {
+      if (!result.changed) continue;
+      const [id, field] = key.split(":") as [string, TeamQuestionTextField];
+      (patches[id] ??= {})[field] = result.cache;
+    }
+    if (Object.keys(patches).length) {
+      await AppDataSource.query(
+        `UPDATE team_questions q
+            SET translations = COALESCE(q.translations, '{}'::jsonb) || p.patch
+           FROM jsonb_each($2::jsonb) AS p(id, patch)
+          WHERE q.id = p.id::uuid AND q.organization_id = $1`,
+        [organizationId, JSON.stringify(patches)],
+      );
+    }
+
+    return rows.map((row) => {
+      const view = (field: TeamQuestionTextField) => {
+        const result = results.get(`${row.id}:${field}`);
+        return result ? { source: textOf(row, field)!, text: result.text } : null;
+      };
+      return {
+        questionId: row.id,
+        question: view("question"),
+        customerMessage: view("customerMessage"),
+      };
+    });
   }
 
   async findAnswerable(questionId: string, organizationId: string): Promise<TeamQuestion | null> {

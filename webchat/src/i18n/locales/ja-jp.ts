@@ -4,6 +4,7 @@ export default {
   "widget.defaultGreeting": "こんにちは！本日はどのようなご用件でしょうか？",
   "chat.close": "チャットを閉じる",
   "chat.open": "チャットを開く",
+  "chat.dismissTeaser": "メッセージを閉じる",
   "chat.expand": "チャットを拡大",
   "chat.collapse": "チャットを縮小",
   "chat.conversationEnded": "この会話は終了しました",
