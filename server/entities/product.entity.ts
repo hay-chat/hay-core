@@ -14,6 +14,8 @@ export type { ProductCategoryRef, ProductImage, ProductOptionDef } from "./produ
 @Index("idx_products_external_id", ["externalId"])
 @Index("idx_products_price_min", ["priceMin"])
 @Index("idx_products_available", ["available"])
+// GIN index over `search_vector`, created by migration only (see the note on searchText).
+@Index("idx_products_search_vector_gin", { synchronize: false })
 @Index("idx_products_source_external_id", ["organizationId", "source", "externalId"], {
   unique: true,
 })
@@ -72,6 +74,13 @@ export class Product extends OrganizationScopedEntity {
   @Column({ type: "boolean", default: false })
   available!: boolean;
 
+  // The table also has `search_vector`, a tsvector Postgres generates from the
+  // title and this column (migration AddProductSearchVector). It is deliberately
+  // not mapped: TypeORM must never read or write it, so catalog sync works
+  // whether or not that migration has run. Only raw SQL in
+  // product-keyword-search.service.ts reads it.
+  // TODO: map it (select/insert/update: false) once the migration has run
+  // everywhere, so migration:generate stops proposing to drop it.
   @Column({ type: "text", nullable: true })
   searchText?: string;
 
