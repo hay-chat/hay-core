@@ -740,7 +740,7 @@ export const invitationsRouter = t.router({
       const inviterEmail = inviter?.email || "";
       const invitee = await AppDataSource.getRepository(User).findOne({
         where: { email: invitation.email.toLowerCase() },
-        select: ["id", "interfaceLanguage"],
+        select: { id: true, interfaceLanguage: true },
       });
 
       await sendInvitationEmail(
