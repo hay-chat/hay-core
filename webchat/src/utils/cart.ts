@@ -61,8 +61,7 @@ function fillBody(template: string, values: Record<string, string | number>): st
 async function cartToken(cart: CartContribution): Promise<Record<string, string>> {
   const { tokenPath, tokenResponseHeader, tokenRequestHeader } = cart.props;
   if (!tokenPath || !tokenResponseHeader || !tokenRequestHeader) return {};
-  if (!SAME_ORIGIN_PATH.test(tokenPath)) throw new Error("Invalid cart token path");
-  const response = await fetch(tokenPath, { credentials: "same-origin" });
+  const response = await fetch(storePath(cart, tokenPath), { credentials: "same-origin" });
   const token = response.headers.get(tokenResponseHeader);
   if (!token) throw new Error("The store gave no cart token");
   return { [tokenRequestHeader]: token };
@@ -90,7 +89,7 @@ export async function addToCart(
   });
   JSON.parse(body); // a template that does not fill to JSON is never sent
 
-  const response = await fetch(cart.props.addPath, {
+  const response = await fetch(storePath(cart, cart.props.addPath), {
     method: "POST",
     credentials: "same-origin",
     headers: {
@@ -108,20 +107,58 @@ export async function addToCart(
 export const CART_UPDATED_EVENT = "hay:cart-updated";
 const EVENT_NAME = /^[A-Za-z0-9_:.-]{1,64}$/;
 
+interface CartEvent {
+  name: string;
+  target?: "body" | "window";
+  detail?: Record<string, string | number | boolean>;
+}
+
+/** The plugin's events (a JSON array as text), keeping only well-formed ones. */
+function pluginEvents(text: string | undefined): CartEvent[] {
+  if (!text) return [];
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (event): event is CartEvent =>
+        !!event && typeof event.name === "string" && EVENT_NAME.test(event.name),
+    );
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Tell the store's page its cart changed: the events the plugin listed for its
  * platform's themes, then our own. A theme that listens redraws its cart count
  * or drawer; one that does not is simply not updated until the next page.
  */
 function announceCartChange(cart: CartContribution): void {
-  const names = (cart.props.afterAddEvents ?? "").split(",").filter((n) => EVENT_NAME.test(n));
-  for (const name of [...names, CART_UPDATED_EVENT]) {
+  for (const event of [...pluginEvents(cart.props.afterAddEvents), { name: CART_UPDATED_EVENT }]) {
     try {
-      document.body.dispatchEvent(new CustomEvent(name, { bubbles: true, cancelable: true }));
+      const target = event.target === "window" ? window : document.body;
+      target.dispatchEvent(
+        new CustomEvent(event.name, { bubbles: true, cancelable: true, detail: event.detail }),
+      );
     } catch (error) {
-      console.warn(`[Hay Webchat] A "${name}" listener on the page failed:`, error);
+      console.warn(`[Hay Webchat] A "${event.name}" listener on the page failed:`, error);
     }
   }
+}
+
+/**
+ * A cart path under the storefront's root. Stores served from a locale folder
+ * say where in a page global the plugin names; anything that is not a plain
+ * same-origin path is ignored and the path is used as declared.
+ */
+export function storePath(cart: CartContribution, path: string): string {
+  if (!SAME_ORIGIN_PATH.test(path)) throw new Error("Invalid cart path");
+  let root: unknown = window;
+  for (const key of (cart.props.rootPathGlobal ?? "").split(".").filter(Boolean)) {
+    root = root && typeof root === "object" ? (root as Record<string, unknown>)[key] : undefined;
+  }
+  if (root === window || typeof root !== "string" || !SAME_ORIGIN_PATH.test(root)) return path;
+  return root.replace(/\/+$/, "") + path;
 }
 
 /** How long the assistant's reply has to arrive before the page changes. */
@@ -152,9 +189,9 @@ export async function runStoreAction(
     return "Added to the cart.";
   }
   if (name === "go_to_checkout") {
-    if (!SAME_ORIGIN_PATH.test(cart.props.checkoutPath)) throw new Error("Invalid checkout path");
+    const checkout = storePath(cart, cart.props.checkoutPath);
     // Answer first: the reply is on its way while the page changes.
-    setTimeout(() => page.assign(cart.props.checkoutPath), CHECKOUT_DELAY_MS);
+    setTimeout(() => page.assign(checkout), CHECKOUT_DELAY_MS);
     return "Opening the checkout page.";
   }
   throw new Error(`Unknown store action "${name}"`);

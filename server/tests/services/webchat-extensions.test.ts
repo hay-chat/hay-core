@@ -135,6 +135,30 @@ describe("webchat contributions", () => {
       expect(await served()).toEqual([]);
     });
 
+    it("accepts theme events and a storefront root, and refuses malformed ones", async () => {
+      const afterAddEvents = JSON.stringify([
+        { name: "cart:refresh" },
+        { name: "store:sync", target: "window", detail: { type: "from_data" } },
+      ]);
+      const extras = { afterAddEvents, rootPathGlobal: "Store.routes.root" };
+      findEnabledByOrganization.mockResolvedValue([
+        instance("store", {}, cart({ ...valid, ...extras })),
+      ]);
+      expect((await served())[0].props).toMatchObject(extras);
+
+      for (const bad of [
+        { afterAddEvents: "cart:refresh,other" },
+        { afterAddEvents: JSON.stringify([{ name: "x", target: "document.cookie" }]) },
+        { afterAddEvents: JSON.stringify([{ name: "x", detail: { nested: { a: 1 } } }]) },
+        { rootPathGlobal: "document.cookie;alert(1)" },
+      ]) {
+        findEnabledByOrganization.mockResolvedValue([
+          instance("store", {}, cart({ ...valid, ...bad })),
+        ]);
+        expect(await served()).toEqual([]);
+      }
+    });
+
     it("is not sent to a widget that cannot use it", async () => {
       findEnabledByOrganization.mockResolvedValue([instance("store", {}, cart(valid))]);
       expect(

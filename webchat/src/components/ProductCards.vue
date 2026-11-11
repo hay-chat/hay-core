@@ -34,7 +34,7 @@
       <template v-if="cartOf(p) && cartState[p.id] !== 'failed'">
         <a
           v-if="cartState[p.id] === 'added'"
-          :href="cartOf(p)!.props.checkoutPath"
+          :href="storePath(cartOf(p)!, cartOf(p)!.props.checkoutPath)"
           class="hay-product-card__buy"
         >
           {{ t("product.checkout") }}
@@ -70,7 +70,7 @@
 <script setup lang="ts">
 import { inject, reactive } from "vue";
 import { safeHttpUrl } from "@/utils/markdown";
-import { addToCart, cartContextKey, cartFor } from "@/utils/cart";
+import { addToCart, cartContextKey, cartFor, storePath } from "@/utils/cart";
 import { useI18n } from "@/i18n";
 import type { ProductClickType, RecommendedProduct } from "@/types";
 

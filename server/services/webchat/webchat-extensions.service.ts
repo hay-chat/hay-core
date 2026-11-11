@@ -85,6 +85,25 @@ function isValidCartBody(template: string): boolean {
   }
 }
 
+/** One DOM event of `afterAddEvents`: where it is fired and the flat `detail` it carries. */
+const cartEventSchema = z
+  .object({
+    name: z.string().regex(/^[A-Za-z0-9_:.-]{1,64}$/),
+    target: z.enum(["body", "window"]).optional(),
+    detail: z
+      .record(z.string().max(40), z.union([z.string().max(200), z.number(), z.boolean()]))
+      .optional(),
+  })
+  .strict();
+
+function isValidCartEvents(text: string): boolean {
+  try {
+    return z.array(cartEventSchema).max(8).safeParse(JSON.parse(text)).success;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * `cart@1`: how to put a product in the cart of the store the widget is on.
  * The plugin describes the store platform's cart requests; the widget sends
@@ -110,12 +129,18 @@ export const cartV1Schema = z
     tokenResponseHeader: headerName.optional(),
     tokenRequestHeader: headerName.optional(),
     /**
-     * DOM events the widget fires on `document.body` after a successful add, so
-     * the store's theme refreshes its cart (comma-separated event names).
+     * DOM events the widget fires after a successful add, so the store's theme
+     * refreshes its cart: a JSON array of `{ name, target?, detail? }` as text.
      */
-    afterAddEvents: z
+    afterAddEvents: z.string().max(2000).refine(isValidCartEvents, "invalid events").optional(),
+    /**
+     * A global of the store's page holding the path its storefront lives under
+     * (a locale folder such as "/en-ca/"): dotted name, read by the widget and
+     * put in front of every cart path.
+     */
+    rootPathGlobal: z
       .string()
-      .regex(/^[A-Za-z0-9_:.-]{1,64}(,[A-Za-z0-9_:.-]{1,64}){0,7}$/)
+      .regex(/^[A-Za-z_$][\w$]{0,40}(\.[A-Za-z_$][\w$]{0,40}){0,4}$/)
       .optional(),
   })
   .refine(

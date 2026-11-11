@@ -71,11 +71,22 @@ export interface WebchatCartV1Props {
   tokenResponseHeader?: string;
   tokenRequestHeader?: string;
   /**
-   * DOM events the widget fires on `document.body` (bubbling) after a successful
-   * add, so the store's theme refreshes its cart count or drawer. Comma-separated
-   * event names, at most 8. The widget always fires `hay:cart-updated` as well.
+   * DOM events the widget fires after a successful add, so the store's theme
+   * refreshes its cart count or drawer. A JSON array as text, at most 8 events:
+   * `[{ "name": "cart:refresh" }, { "name": "x", "target": "window", "detail": { "type": "y" } }]`.
+   * `target` is `"body"` (default, bubbling) or `"window"`; `detail` is a flat
+   * object of strings, numbers and booleans. The widget always fires
+   * `hay:cart-updated` on the body as well.
    */
   afterAddEvents?: string;
+  /**
+   * Dotted name of a global on the store's page that holds the path the
+   * storefront lives under, for stores served from a locale folder (e.g.
+   * `"Shopify.routes.root"` holding `"/en-ca/"`). The widget puts it in front
+   * of `addPath`, `checkoutPath` and `tokenPath`. Ignored when the global is
+   * missing or is not a path.
+   */
+  rootPathGlobal?: string;
 }
 
 /** A contribution prop is either a literal or a reference to a config field. */
