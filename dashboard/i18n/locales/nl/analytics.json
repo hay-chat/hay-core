@@ -1,0 +1,187 @@
+{
+  "analytics": {
+    "page": {
+      "title": "Analyses",
+      "description": "Hoe de AI het doet: wat hij oplost, wat hij aan je team overdraagt en hoe klanten hem beoordelen.",
+      "seoTitle": "Analyses - Hay.chat"
+    },
+    "actions": {
+      "refresh": "Vernieuwen",
+      "export": "CSV exporteren"
+    },
+    "tabs": {
+      "overview": "Overzicht",
+      "csat": "CSAT",
+      "handoffs": "Overdrachten",
+      "topics": "Onderwerpen",
+      "playbooks": "Playbooks"
+    },
+    "comparisonNote": "Geteld op de dag waarop een gesprek is afgesloten. Veranderingen vergelijken met de even lange periode direct ervoor.",
+    "vsPrevious": "t.o.v. vorige periode",
+    "noPrevious": "Niets om mee te vergelijken",
+    "loadFailed": "Dit rapport kon niet worden geladen.",
+    "retry": "Opnieuw proberen",
+    "exportFailed": "De export is mislukt",
+    "empty": {
+      "title": "Geen afgesloten gesprekken in deze periode",
+      "description": "Kies een langere periode of kom terug zodra er gesprekken zijn afgesloten."
+    },
+    "table": {
+      "closes": "Afgesloten",
+      "aiResolutionRate": "AI-oplossingspercentage",
+      "handoffRate": "Overdrachtspercentage",
+      "csat": "CSAT"
+    },
+    "overview": {
+      "aiResolutionRate": "AI-oplossingspercentage",
+      "aiResolved": "Opgelost door AI",
+      "closes": "Afgesloten gesprekken",
+      "handoffRate": "Overdrachtspercentage",
+      "trendTitle": "AI-oplossingspercentage per dag",
+      "trendDescription": "Deel van de afgesloten gesprekken van elke dag dat de AI heeft opgelost",
+      "outcomesTitle": "Hoe gesprekken eindigden",
+      "outcomesDescription": "Elk afgesloten gesprek krijgt één uitkomst",
+      "definition": "Het AI-oplossingspercentage is het aantal gesprekken dat de AI heeft opgelost, gedeeld door alle afgesloten gesprekken. Tests en spam tellen niet mee. Een resolutie telt niet meer als de klant binnen 72 uur terugkomt of als je team haar uitsluit, dus dit komt overeen met de resoluties op je pagina Verbruik."
+    },
+    "outcomes": {
+      "confirmed": {
+        "label": "Bevestigd",
+        "description": "De AI loste het op en de klant bevestigde dat."
+      },
+      "assumed": {
+        "label": "Aangenomen",
+        "description": "De AI antwoordde en de klant kwam niet terug."
+      },
+      "assisted": {
+        "label": "Geplande overdracht",
+        "description": "Een playbook liet de AI het aan je team overdragen."
+      },
+      "human": {
+        "label": "Opgelost door je team",
+        "description": "De AI kon het niet oplossen en een medewerker wel."
+      },
+      "unhappy": {
+        "label": "Ontevreden",
+        "description": "De klant zei dat het antwoord niet hielp."
+      },
+      "abandoned": {
+        "label": "Afgebroken",
+        "description": "Geen echte vraag, of geëindigd zonder echt antwoord."
+      }
+    },
+    "csat": {
+      "average": "Gemiddelde beoordeling",
+      "responseRate": "Responspercentage",
+      "aiAverage": "Alleen AI",
+      "humanAverage": "Met je team",
+      "ratings": "{count} beoordelingen",
+      "trendTitle": "Gemiddelde beoordeling per dag",
+      "trendDescription": "Op de dag waarop de klant beoordeelde",
+      "distributionTitle": "Beoordelingen per score",
+      "lowScoresTitle": "Lage beoordelingen",
+      "lowScoresDescription": "Gesprekken met een 1 of 2, laagste eerst",
+      "noLowScores": "Geen enkel gesprek kreeg in deze periode een 1 of 2.",
+      "untitled": "Gesprek zonder titel",
+      "ai": "Alleen AI",
+      "human": "Met je team",
+      "columns": {
+        "conversation": "Gesprek",
+        "rating": "Beoordeling",
+        "handledBy": "Afgehandeld door",
+        "ratedAt": "Beoordeeld"
+      },
+      "emptyTitle": "Geen beoordelingen in deze periode",
+      "emptyDescription": "Er zijn {count} webchatgesprekken afgesloten en geen enkel is beoordeeld. Controleer of de beoordelingsvraag aanstaat bij Instellingen, Webchat.",
+      "definition": "Beoordelingen komen van de vraag die de webwidget stelt wanneer een gesprek eindigt, van 1 tot 5. Andere kanalen vragen dit nog niet. Het responspercentage is het aantal beoordeelde gesprekken gedeeld door de afgesloten webchatgesprekken."
+    },
+    "handoffs": {
+      "title": "Overdrachten",
+      "rate": "Overdrachtspercentage",
+      "reasonsTitle": "Waarom de AI overdroeg",
+      "reasonsDescription": "Meest voorkomende eerst",
+      "trendTitle": "Overdrachten per dag",
+      "trendDescription": "Afgesloten gesprekken die bij je team terechtkwamen",
+      "columns": {
+        "reason": "Reden",
+        "category": "Type",
+        "count": "Overdrachten",
+        "share": "Aandeel"
+      },
+      "categories": {
+        "planned": { "label": "Gepland" },
+        "customer_asked": { "label": "Klant vroeg erom" },
+        "fallback": { "label": "Terugval" },
+        "not_recorded": { "label": "Niet vastgelegd" }
+      },
+      "reasons": {
+        "playbook": {
+          "label": "Playbookstap",
+          "description": "Het playbook zegt dit aan een medewerker over te dragen."
+        },
+        "customer_request": {
+          "label": "Klant vroeg om een medewerker",
+          "description": "De klant vroeg om met iemand te praten."
+        },
+        "low_confidence": {
+          "label": "Niet zeker van het antwoord",
+          "description": "De AI kon het antwoord niet onderbouwen met je kennis."
+        },
+        "company_interest": {
+          "label": "Bescherming van je bedrijf",
+          "description": "Het antwoord had tegen je belangen in kunnen gaan."
+        },
+        "action_claim": {
+          "label": "Actie niet uitgevoerd",
+          "description": "Het antwoord noemde een actie die de AI niet had gedaan."
+        },
+        "broken_link": {
+          "label": "Kapotte link",
+          "description": "Het antwoord linkte naar een pagina die niet bestaat."
+        },
+        "unverified_date": {
+          "label": "Datum niet bevestigd",
+          "description": "Het antwoord gaf een datum die de AI niet kon bevestigen."
+        },
+        "unanswered_fact": {
+          "label": "Ontbrekend feit",
+          "description": "De AI had een feit nodig dat hij niet heeft."
+        },
+        "ai_unavailable": {
+          "label": "AI niet beschikbaar",
+          "description": "De AI-provider lag eruit of het dagbudget was op."
+        },
+        "planning_exhausted": {
+          "label": "Te veel stappen",
+          "description": "De AI kon het antwoord niet afmaken binnen de toegestane stappen."
+        },
+        "ai_decision": {
+          "label": "AI koos voor overdracht",
+          "description": "De AI besloot dat een medewerker het moest overnemen."
+        },
+        "not_recorded": {
+          "label": "Niet vastgelegd",
+          "description": "Van voordat redenen werden bewaard, of een collega nam het over."
+        }
+      },
+      "notRecordedNote": "{count} overdrachten hebben geen reden: ze gebeurden voordat redenen werden vastgelegd, of een collega nam het gesprek over.",
+      "emptyTitle": "Geen overdrachten in deze periode",
+      "emptyDescription": "Geen enkel afgesloten gesprek kwam bij je team terecht."
+    },
+    "topics": {
+      "title": "Onderwerpen",
+      "column": "Onderwerp",
+      "coverage": "{labelled} van de {closes} afgesloten gesprekken hebben een onderwerp",
+      "emptyTitle": "Geen onderwerpen in deze periode",
+      "emptyDescription": "Onderwerpen komen uit de beoordeling die de AI schrijft wanneer een gesprek wordt afgesloten.",
+      "definition": "Het onderwerp is de één of twee woorden die de afsluitbeoordeling aan elk gesprek geeft. Vergelijkbare termen worden nog niet samengevoegd, dus \"verzending\" en \"levering\" verschijnen als twee onderwerpen. CSAT is de gemiddelde beoordeling, met het aantal beoordelingen tussen haakjes."
+    },
+    "playbooks": {
+      "title": "Playbooks",
+      "description": "Hoe gesprekken eindigden, per playbook dat ze afhandelde",
+      "column": "Playbook",
+      "none": "Geen playbook",
+      "deleted": "Verwijderd playbook",
+      "definition": "Een gesprek telt voor het playbook waarop het stond toen het werd afgesloten. CSAT is de gemiddelde beoordeling, met het aantal beoordelingen tussen haakjes."
+    }
+  }
+}

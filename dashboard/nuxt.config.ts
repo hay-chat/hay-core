@@ -174,6 +174,7 @@ export default defineNuxtConfig({
           "nl/insights.json",
           "nl/actions.json",
           "nl/usage.json",
+          "nl/analytics.json",
           "nl/evidence.json",
           "nl/tests.json",
           "nl/setup.json",

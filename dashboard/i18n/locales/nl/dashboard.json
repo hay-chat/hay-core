@@ -12,15 +12,23 @@
     },
     "metrics": {
       "totalConversations": "Totaal aantal gesprekken",
-      "resolved": "opgelost",
-      "resolutionRate": "Oplossingspercentage",
-      "ofConversations": "van de gesprekken",
+      "resolved": "opgelost door AI",
+      "resolutionRate": "AI-oplossingspercentage",
       "avgMessages": "Gem. aantal berichten",
       "messagesPer": "berichten per",
       "conversation": "gesprek",
       "avgResponseTime": "Gem. reactietijd",
       "medianResponseTime": "mediaan {value}",
       "noRepliesYet": "Geen antwoorden in deze periode"
+    },
+    "quota": {
+      "title": "Resoluties in deze factuurperiode",
+      "period": "{start} t/m {end}",
+      "viewUsage": "Verbruik",
+      "ofIncluded": "van {included} inbegrepen",
+      "daysLeft": "nog {count} dag | nog {count} dagen",
+      "projected": "op koers voor {count}",
+      "noQuota": "De inbegrepen resoluties van je abonnement staan op je facturatiepagina."
     },
     "activity": {
       "title": "Gespreksactiviteit",
