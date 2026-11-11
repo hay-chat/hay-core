@@ -13,6 +13,10 @@
  * no sitemap exists we fall back to a single bounded crawl (maxPages cap) with
  * no per-page freshness — every sync refetches those pages.
  *
+ * Scope (optional, from config): `pathPrefix` keeps only pages under that path
+ * (e.g. "/docs" for example.com/docs), and `maxPages` caps the page count,
+ * keeping the sitemap's highest-priority pages. Both are set at creation.
+ *
  * Statelessness: the contract is called many times per run (cursor pagination)
  * but a fresh importer is constructed per sync run. We enumerate once and cache
  * for the lifetime of the instance; the cursor is a numeric offset into the
@@ -50,11 +54,36 @@ export function isWebsiteSource(source: Pick<DocumentSource, "pluginId">): boole
 
 /**
  * How many pages to return per discover()/listChanges() call. The sync's resume cursor only moves
- * between batches, so one batch must fit well inside its 50-second budget (pages take about 2s).
+ * between batches, so one batch must fit well inside its 50-second budget. Pages take about 2 s
+ * and the sync fetches website pages 4 at a time, so a batch of 20 takes about 10 s.
  */
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 type EnumeratedPage = { url: string; lastmod?: string; title?: string };
+
+/** Optional crawl scope stored on a website source's config. */
+export type WebsiteScope = { pathPrefix?: string; maxPages?: number };
+
+/**
+ * Normalize a URL path to a scope prefix: no trailing slash, and undefined for
+ * the site root (no scoping). "/docs/" -> "/docs", "/" -> undefined.
+ */
+export function toPathPrefix(pathname: string): string | undefined {
+  const trimmed = pathname.replace(/\/+$/, "");
+  return trimmed === "" ? undefined : trimmed;
+}
+
+/** True when `url` is the prefix path itself or below it ("/docs" matches "/docs/a", not "/docsx"). */
+export function isUnderPathPrefix(url: string, pathPrefix: string | undefined): boolean {
+  if (!pathPrefix) return true;
+  let pathname: string;
+  try {
+    pathname = new URL(url).pathname.replace(/\/+$/, "");
+  } catch {
+    return false;
+  }
+  return pathname === pathPrefix || pathname.startsWith(pathPrefix + "/");
+}
 
 export class WebsiteImporter implements DocumentImporterContract {
   private readonly scraper = new WebScraperService();
@@ -71,6 +100,14 @@ export class WebsiteImporter implements DocumentImporterContract {
       throw new Error(`Website source ${this.source.id} has no url in config or externalRootId`);
     }
     return url;
+  }
+
+  private scope(): WebsiteScope {
+    const { pathPrefix, maxPages } = (this.source.config ?? {}) as Record<string, unknown>;
+    return {
+      pathPrefix: typeof pathPrefix === "string" ? toPathPrefix(pathPrefix) : undefined,
+      maxPages: typeof maxPages === "number" && maxPages > 0 ? maxPages : undefined,
+    };
   }
 
   /**
@@ -178,29 +215,39 @@ export class WebsiteImporter implements DocumentImporterContract {
 
   /**
    * Enumerate the site's pages once, cached for this importer's lifetime.
-   * Sitemap-first (carries lastmod); bounded crawl fallback otherwise.
+   * Sitemap-first (carries lastmod); bounded crawl fallback otherwise. Then
+   * scoped to pathPrefix, deduplicated, and capped at maxPages.
    */
   private async enumerate(): Promise<EnumeratedPage[]> {
     if (this.enumeration) return this.enumeration;
     const base = this.baseUrl();
+    const { pathPrefix, maxPages } = this.scope();
+    const inScope = (page: EnumeratedPage) => isUnderPathPrefix(page.url, pathPrefix);
 
-    const sitemap = await this.scraper.getSitemapEntries(base);
-    if (sitemap.length > 0) {
-      this.enumeration = sitemap.map((e) => ({ url: e.url, lastmod: e.lastmod }));
-      logger.info(
-        { sourceId: this.source.id, count: this.enumeration.length },
-        "Enumerated pages from sitemap",
-      );
-      return this.enumeration;
+    // The sitemap comes back ordered by priority (scoreUrl), so capping keeps the best pages.
+    let pages: EnumeratedPage[] = (await this.scraper.getSitemapEntries(base))
+      .map((e) => ({ url: e.url, lastmod: e.lastmod }))
+      .filter(inScope);
+    let from = "sitemap";
+
+    if (pages.length === 0) {
+      // No sitemap (or nothing in it under the prefix): bounded single-pass crawl
+      // from the scoped path. No per-page lastmod, so every sync refetches these.
+      const start = pathPrefix ? new URL(pathPrefix, base).href : base;
+      const crawled = await this.scraper.discoverUrls(start);
+      pages = crawled.map((p) => ({ url: p.url, title: p.title })).filter(inScope);
+      from = "crawl";
     }
 
-    // No sitemap: bounded single-pass crawl. No per-page lastmod available, so
-    // every sync will refetch these pages.
-    const crawled = await this.scraper.discoverUrls(base);
-    this.enumeration = crawled.map((p) => ({ url: p.url, title: p.title }));
+    const seen = new Set<string>();
+    pages = pages.filter((p) => !seen.has(p.url) && seen.add(p.url));
+    const found = pages.length;
+    if (maxPages) pages = pages.slice(0, maxPages);
+
+    this.enumeration = pages;
     logger.info(
-      { sourceId: this.source.id, count: this.enumeration.length },
-      "No sitemap found — enumerated pages via bounded crawl (no per-page freshness)",
+      { sourceId: this.source.id, from, found, kept: pages.length, pathPrefix, maxPages },
+      "Enumerated website pages",
     );
     return this.enumeration;
   }

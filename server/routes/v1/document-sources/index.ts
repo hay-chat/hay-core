@@ -233,12 +233,18 @@ export const documentSourcesRouter = t.router({
         url: z.string().url(),
         displayName: z.string().min(1).max(255).optional(),
         syncIntervalMs: syncIntervalMsSchema.nullable().optional(),
+        /** Only import pages under the URL's path (example.com/docs -> /docs/...). */
+        limitToPath: z.boolean().optional(),
+        /** Import at most this many pages (highest sitemap priority first). */
+        maxPages: z.number().int().min(1).max(1500).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const { source: created, jobId } = await createWebsiteSource(ctx.organizationId!, input.url, {
         displayName: input.displayName,
         syncIntervalMs: input.syncIntervalMs,
+        limitToPath: input.limitToPath,
+        maxPages: input.maxPages,
       });
 
       return { ...serialize(created), jobId };
