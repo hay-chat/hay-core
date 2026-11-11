@@ -20,9 +20,11 @@ export interface Launcher extends LauncherBridge {
   setBusy(busy: boolean): void;
   /**
    * Show a message next to the button, until the visitor opens the chat or
-   * dismisses it. Does nothing once either has happened.
+   * dismisses it. Does nothing once either has happened, unless `force` (the
+   * page asked for it): then only an open chat keeps it away. An empty text
+   * removes the message.
    */
-  showTeaser(text: string): void;
+  showTeaser(text: string, force?: boolean): void;
   hideTeaser(): void;
   remove(): void;
 }
@@ -83,10 +85,13 @@ export function createLauncher(config: HayChatConfig, labels: LauncherLabels): L
       if (busy) button.setAttribute("aria-busy", "true");
       else button.removeAttribute("aria-busy");
     },
-    showTeaser(text) {
-      const message = text.trim();
-      if (teaserDone || !message) return;
+    showTeaser(text, force = false) {
+      if (force) teaserDone = false;
+      if (teaserDone) return;
       teaser?.remove();
+      teaser = null;
+      const message = text.trim();
+      if (!message || button.getAttribute("aria-expanded") === "true") return;
 
       teaser = document.createElement("div");
       teaser.className =

@@ -37,6 +37,7 @@ declare global {
       registerTool?: (tool: HayPageTool) => void;
       unregisterTool?: (name: string) => void;
       highlight?: (target: Element | string | null, label?: string) => boolean;
+      setTeaserMessage?: (message: string) => void;
     };
   }
   interface Navigator {

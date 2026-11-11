@@ -248,6 +248,38 @@ describe("widget loader", () => {
       expect(teaser()).toBeNull();
     });
 
+    it("HayChat.setTeaserMessage shows, replaces and removes the message", async () => {
+      mockPublicConfig({ enabled: true, teaserMessage: "From the dashboard" });
+      boot(config, fakeChunk().loadChat);
+
+      window.HayChat!.setTeaserMessage!("Still deciding?");
+      await vi.advanceTimersByTimeAsync(0); // the settings arrive and do not replace it
+      expect(teaserMessage()!.textContent).toBe("Still deciding?");
+
+      window.HayChat!.setTeaserMessage!("10% off today");
+      expect(document.querySelectorAll(".hay-chat-teaser")).toHaveLength(1);
+      expect(teaserMessage()!.textContent).toBe("10% off today");
+
+      window.HayChat!.setTeaserMessage!("");
+      expect(teaser()).toBeNull();
+    });
+
+    it("HayChat.setTeaserMessage shows again after a dismissal, but not over an open chat", async () => {
+      mockPublicConfig({ enabled: true });
+      const chunk = fakeChunk();
+      const loader = boot({ ...config, teaserMessage: "Need a hand?" }, chunk.loadChat);
+
+      document.querySelector<HTMLButtonElement>(".hay-chat-teaser__dismiss")!.click();
+      window.HayChat!.setTeaserMessage!("Still deciding?");
+      expect(teaserMessage()!.textContent).toBe("Still deciding?");
+
+      await vi.advanceTimersByTimeAsync(3000);
+      await loader.chatReady();
+      chunk.mountChat.mock.calls[0][0].launcher.setOpen(true);
+      window.HayChat!.setTeaserMessage!("Anyone there?");
+      expect(teaser()).toBeNull();
+    });
+
     it("is not shown to a visitor who already has a conversation in this tab", async () => {
       sessionStorage.setItem("hay-conversation-id", "conv-1");
       mockPublicConfig({ enabled: true, teaserMessage: "From the dashboard" });

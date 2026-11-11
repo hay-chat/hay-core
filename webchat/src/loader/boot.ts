@@ -50,12 +50,18 @@ export function boot(
   // in this tab is not shown it. The page's own message (even an empty one)
   // wins over the one from the settings.
   const wantsTeaser = !hasConversationInTab();
+  let pageSetTeaser = config.teaserMessage !== undefined;
   if (wantsTeaser && config.teaserMessage) launcher.showTeaser(config.teaserMessage);
+  // Asked for by the page just now, so it shows whatever happened before.
+  (window.HayChat ??= {}).setTeaserMessage = (message) => {
+    pageSetTeaser = true;
+    launcher.showTeaser(String(message ?? ""), true);
+  };
 
   let publicConfig: Promise<PublicConfig | null> | null = null;
   const getPublicConfig = () =>
     (publicConfig ??= fetchPublicConfig(config).then((settings) => {
-      if (wantsTeaser && config.teaserMessage === undefined && settings?.teaserMessage) {
+      if (wantsTeaser && !pageSetTeaser && settings?.teaserMessage) {
         launcher.showTeaser(settings.teaserMessage);
       }
       return settings;
