@@ -123,6 +123,22 @@
     "returnInstructions": {
       "label": "How to return",
       "description": "Your return process, in your words: where to send items, any link or form, and deadlines. Hay.chat relays it as written when a customer asks how to return something. Leave empty and Hay.chat hands those questions to your team."
+    },
+    "cartActions": {
+      "label": "Add to cart from chat",
+      "description": "Show an Add to cart button on the products Hay.chat recommends, when the chat is open on your store. The product goes into the shopper's own cart. Turn off to show only the link to the product."
+    },
+    "checkoutPath": {
+      "label": "Checkout page path",
+      "description": "Where the Checkout link goes after a product is added. Change it if your checkout page is not at /checkout/ (for example /finalizar-compra/ or /shop/checkout/)."
+    },
+    "cartAddPath": {
+      "label": "Cart API path: add item",
+      "description": "Only change this if WordPress is installed in a folder or uses plain permalinks. Folder example: /shop/wp-json/wc/store/v1/cart/add-item. Plain permalinks: /?rest_route=/wc/store/v1/cart/add-item."
+    },
+    "cartTokenPath": {
+      "label": "Cart API path: cart",
+      "description": "Only change this together with the path above. Folder example: /shop/wp-json/wc/store/v1/cart. Plain permalinks: /?rest_route=/wc/store/v1/cart."
     }
   },
   "ui": {

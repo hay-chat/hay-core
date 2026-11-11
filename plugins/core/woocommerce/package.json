@@ -11,7 +11,8 @@
     "category": "integration",
     "capabilities": [
       "mcp",
-      "products"
+      "products",
+      "webchat"
     ],
     "setup": {
       "businessTypes": [

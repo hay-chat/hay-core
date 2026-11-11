@@ -1,4 +1,5 @@
 import { defineHayPlugin } from "@hay/plugin-sdk";
+import { cartConfigFields, cartContribution } from "./cart.js";
 import { bulkSync, createWooGet } from "./catalog.js";
 import {
   WcAuthError,
@@ -40,6 +41,9 @@ function sendWcAuthError(res: any, error: unknown): void {
  * With the `products` capability, `onStart` also mirrors the catalog (products
  * and variations) into core via `ctx.productSource` so `recommend_products`
  * works, and re-syncs every few hours while the worker runs (./catalog.ts).
+ *
+ * With the `webchat` capability, it contributes a `cart@1` so the widget can
+ * add a recommended product to the shopper's cart on the storefront (./cart.ts).
  */
 /** D6-13 "How to return" owner text → MCP env (unset = the agent hands off). */
 function returnInstructionsEnv(config: {
@@ -179,7 +183,11 @@ export default defineHayPlugin((globalCtx) => ({
           "deadlines. Hay.chat relays it as written when a customer asks how to return " +
           "something. Leave empty and Hay.chat hands those questions to your team.",
       },
+      ...cartConfigFields,
     });
+
+    // Add to cart from chat product cards (see ./cart.ts).
+    ctx.register.webchat.contribution(cartContribution((name) => ctx.config.field(name)));
 
     ctx.register.auth.apiKey({
       id: "woocommerce-apikey",
