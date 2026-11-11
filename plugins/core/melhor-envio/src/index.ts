@@ -3,49 +3,75 @@
  *
  * Connects a Melhor Envio account (Brazilian shipping-label aggregator) so the
  * agent can answer "where is my order" questions. Spawns a local Node MCP server
- * (./mcp/index.js) that reads shipments from the Melhor Envio REST API with an
- * access token the merchant generates in their Melhor Envio panel.
+ * (./mcp/index.js) that reads shipments from the Melhor Envio REST API.
  *
- * TODO: OAuth2 app flow (the documented path for platforms; tokens last 30 days
- * and need refreshing) once Hay has a Melhor Envio app registered. Quoting,
- * buying/generating/cancelling labels and webhooks are out of scope.
+ * Two connection modes (`authMode`, see ./connection.ts):
+ *
+ * - `oauth` (default when the server sets MELHOR_ENVIO_OAUTH_CLIENT_ID): Hay.chat's
+ *   own Melhor Envio app, registered in the panel under Integrações → Área Dev.
+ *   Core runs the flow, stores the tokens and refreshes them.
+ * - `token`: a token the merchant generates in their Melhor Envio panel.
+ *
+ * Quoting, buying/generating/cancelling labels and webhooks are out of scope.
+ *
+ * @see https://docs.melhorenvio.com.br/reference/fluxo-de-autorização
  */
 
 import { defineHayPlugin } from "@hay/plugin-sdk";
+import { defaultAuthMode, getAuthMode, isEmail, readAccessToken, userAgent } from "./connection.js";
 
 const API_BASE_URL = "https://melhorenvio.com.br";
 const VALIDATE_TIMEOUT_MS = 15000;
 
-/** A pasted token, without the "Bearer " prefix people sometimes copy with it. */
-function cleanToken(value: string | undefined): string {
-  return (value ?? "").trim().replace(/^Bearer\s+/i, "");
-}
-
-/**
- * Melhor Envio requires a User-Agent naming the application and a technical
- * contact email on every request, e.g. "Aplicação (email para contato técnico)".
- */
-function userAgent(contactEmail: string): string {
-  return `Hay (${contactEmail.trim()})`;
-}
-
-function isEmail(value: string | undefined): value is string {
-  return /^[^\s@()]+@[^\s@()]+\.[^\s@()]+$/.test((value ?? "").trim());
-}
+// Only what the tools read: the account's shipping labels (GET /me/orders…).
+const OAUTH_SCOPES = ["orders-read"];
 
 export default defineHayPlugin((globalCtx) => ({
   name: "Melhor Envio",
 
   onInitialize(ctx) {
     ctx.register.config({
+      authMode: {
+        type: "string",
+        label: "Connection mode",
+        description:
+          "Connect with Melhor Envio: approve Hay.chat in your account in one click. " +
+          "Access token: paste a token you generated in your Melhor Envio panel.",
+        options: [
+          { label: "Connect with Melhor Envio (recommended)", value: "oauth" },
+          { label: "Access token", value: "token" },
+        ],
+        default: defaultAuthMode(),
+      },
+      clientId: {
+        type: "string",
+        label: "OAuth client ID",
+        description: "Set by the Hay.chat server (MELHOR_ENVIO_OAUTH_CLIENT_ID). Leave empty.",
+        required: false,
+        serverOnly: true,
+        env: "MELHOR_ENVIO_OAUTH_CLIENT_ID",
+        showWhen: { field: "authMode", equals: "oauth" },
+      },
+      clientSecret: {
+        type: "string",
+        label: "OAuth client secret",
+        description: "Set by the Hay.chat server (MELHOR_ENVIO_OAUTH_CLIENT_SECRET). Leave empty.",
+        required: false,
+        encrypted: true,
+        serverOnly: true,
+        env: "MELHOR_ENVIO_OAUTH_CLIENT_SECRET",
+        showWhen: { field: "authMode", equals: "oauth" },
+      },
       accessToken: {
         type: "string",
         label: "Access token",
         description:
           "Token generated in your Melhor Envio panel (Integrações → Permissões de acesso) " +
           "with permission to view shipping labels.",
-        required: true,
+        // Required in token mode only; onValidateAuth enforces it there.
+        required: false,
         encrypted: true,
+        showWhen: { field: "authMode", equals: "token" },
       },
       contactEmail: {
         type: "string",
@@ -53,8 +79,10 @@ export default defineHayPlugin((globalCtx) => ({
         description:
           "Technical contact email. Melhor Envio requires one on every API request so they " +
           "can reach whoever runs the integration.",
-        required: true,
+        // Required in token mode only; onValidateAuth enforces it there.
+        required: false,
         env: "MELHOR_ENVIO_CONTACT_EMAIL",
+        showWhen: { field: "authMode", equals: "token" },
       },
       staleTrackingDays: {
         type: "number",
@@ -64,6 +92,18 @@ export default defineHayPlugin((globalCtx) => ({
           "this many days.",
         default: 5,
       },
+    });
+
+    // Hay.chat's Melhor Envio app: core resolves id/secret from the
+    // MELHOR_ENVIO_OAUTH_CLIENT_* server env and sends the registered callback.
+    ctx.register.auth.oauth2({
+      id: "melhor-envio-oauth",
+      label: "Connect with Melhor Envio",
+      authorizationUrl: `${API_BASE_URL}/oauth/authorize`,
+      tokenUrl: `${API_BASE_URL}/oauth/token`,
+      scopes: OAUTH_SCOPES,
+      clientId: ctx.config.field("clientId"),
+      clientSecret: ctx.config.field("clientSecret"),
     });
 
     ctx.register.auth.apiKey({
@@ -80,10 +120,16 @@ export default defineHayPlugin((globalCtx) => ({
    * need (a token without it would pass an account check and then fail every call).
    */
   async onValidateAuth(ctx) {
-    const token = cleanToken(ctx.config.getOptional<string>("accessToken"));
+    const mode = getAuthMode(ctx.config);
+    const token = readAccessToken(ctx.config);
     const contactEmail = ctx.config.getOptional<string>("contactEmail");
-    if (!token) throw new Error("The Melhor Envio access token is required");
-    if (!isEmail(contactEmail)) throw new Error("A valid contact email is required");
+    if (mode === "oauth") {
+      // Before the OAuth flow finishes there is no token yet; nothing to check.
+      if (!token) return true;
+    } else {
+      if (!token) throw new Error("The Melhor Envio access token is required");
+      if (!isEmail(contactEmail)) throw new Error("A valid contact email is required");
+    }
 
     let response: Response;
     try {
@@ -102,6 +148,9 @@ export default defineHayPlugin((globalCtx) => ({
 
     if (response.ok) return true;
     ctx.logger.warn("Melhor Envio token validation failed", { status: response.status });
+    if (response.status === 401 && mode === "oauth") {
+      throw new Error("Melhor Envio rejected the connection. Connect again.");
+    }
     if (response.status === 401) {
       throw new Error(
         "Melhor Envio rejected the token. Check that you copied the whole token, that it has " +
@@ -118,12 +167,14 @@ export default defineHayPlugin((globalCtx) => ({
   },
 
   async onStart(ctx) {
-    const token = cleanToken(ctx.config.getOptional<string>("accessToken"));
+    const mode = getAuthMode(ctx.config);
+    const token = readAccessToken(ctx.config);
     const contactEmail = ctx.config.getOptional<string>("contactEmail");
-    if (!token || !isEmail(contactEmail)) {
+    if (!token || (mode === "token" && !isEmail(contactEmail))) {
       ctx.logger.info(
-        "Melhor Envio access token or contact email not configured: plugin is enabled but " +
-          "MCP tools are not available.",
+        mode === "oauth"
+          ? "Melhor Envio: not connected yet. Click Connect in the plugin settings. MCP not started."
+          : "Melhor Envio: access token or contact email not configured, MCP not started.",
       );
       return;
     }

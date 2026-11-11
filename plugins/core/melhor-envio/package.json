@@ -17,12 +17,11 @@
       "businessTypes": [
         "store"
       ],
-      "group": "commerce",
-      "handles": [
-        "orders"
-      ]
+      "group": "shipping"
     },
     "env": [
+      "MELHOR_ENVIO_OAUTH_CLIENT_ID",
+      "MELHOR_ENVIO_OAUTH_CLIENT_SECRET",
       "MELHOR_ENVIO_CONTACT_EMAIL"
     ],
     "network": {

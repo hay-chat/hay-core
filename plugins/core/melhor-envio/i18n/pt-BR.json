@@ -12,6 +12,22 @@
     }
   },
   "config": {
+    "authMode": {
+      "label": "Forma de conexão",
+      "description": "Conectar com o Melhor Envio: aprove o Hay.chat na sua conta com um clique. Token de acesso: cole um token gerado no seu painel do Melhor Envio.",
+      "options": {
+        "oauth": "Conectar com o Melhor Envio (recomendado)",
+        "token": "Token de acesso"
+      }
+    },
+    "clientId": {
+      "label": "ID do cliente OAuth",
+      "description": "Definido pelo servidor do Hay.chat. Deixe em branco."
+    },
+    "clientSecret": {
+      "label": "Segredo do cliente OAuth",
+      "description": "Definido pelo servidor do Hay.chat. Deixe em branco."
+    },
     "accessToken": {
       "label": "Token de acesso",
       "description": "Token gerado no painel do Melhor Envio (Integrações → Permissões de acesso) com permissão para visualizar etiquetas."

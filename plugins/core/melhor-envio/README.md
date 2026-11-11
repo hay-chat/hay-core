@@ -8,28 +8,40 @@ Read-only. Quoting freight, buying, generating or cancelling labels, and webhook
 
 ## How it connects
 
-| Setting                   | What it is                                                                                                                                                               |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Access token**          | A token the merchant generates in the Melhor Envio panel (Integrações → Permissões de acesso) with permission to view shipping labels (`orders-read`). Stored encrypted. |
-| **Contact email**         | Melhor Envio requires a `User-Agent` with the application name and a technical contact email on every request; the plugin sends `Hay (<contact email>)`.                 |
-| **Stale tracking (days)** | A posted shipment not delivered after more than this many days is flagged as stuck. Default 5.                                                                           |
+Two connection modes, chosen with **Connection mode**:
 
-Self-hosters can set the contact email for every organisation with the `MELHOR_ENVIO_CONTACT_EMAIL`
-environment variable.
+- **Connect with Melhor Envio** (OAuth, the default when the server has the app): the merchant
+  clicks Connect and approves Hay.chat in their Melhor Envio account. Hay requests only the
+  `orders-read` permission. Core stores the tokens and refreshes them (access tokens last 30 days,
+  refresh tokens 45).
+- **Access token**: the merchant pastes a token generated in the Melhor Envio panel (Integrações →
+  Permissões de acesso) with permission to view shipping labels (`orders-read`), plus a technical
+  contact email. Stored encrypted.
 
-On save Hay lists the account's shipments (`GET /api/v2/me/orders`) to check the token: the same
-permission the tools use, so a token that passes the check can also track.
+Melhor Envio requires a `User-Agent` with the application name and a technical contact on every
+request. The plugin sends `Hay (<contact email>)`, or `Hay (https://hay.chat)` when there is no
+contact email (OAuth mode).
+
+**Stale tracking (days)**: a posted shipment not delivered after more than this many days is flagged
+as stuck. Default 5.
+
+On save in token mode Hay lists the account's shipments (`GET /api/v2/me/orders`) to check the
+token: the same permission the tools use, so a token that passes the check can also track.
 
 Production only (`https://melhorenvio.com.br`). The sandbox is a separate account with its own
 tokens and is not supported.
 
-### Why a pasted token and not OAuth
+### Server setup for OAuth
 
-Melhor Envio's documented path for platforms is an OAuth2 app (access token valid 30 days, refresh
-token 45 days). That needs a Hay app registered with Melhor Envio and a callback URL, which do not
-exist yet. A token the merchant generates themselves needs neither, so it is the first slice.
-`TODO:` add `register.auth.oauth2` once Hay has an app (scopes `orders-read`, and
-`shipping-tracking` if the tracking endpoint is ever used).
+Register one app for the whole Hay server in the Melhor Envio panel (Integrações → Área Dev. →
+Cadastrar aplicativo). The callback URL must be exactly `${API_URL}/oauth/callback`; Melhor Envio
+answers `Client invalid` when it differs. Then set:
+
+| Variable                           | Value                                                            |
+| ---------------------------------- | ---------------------------------------------------------------- |
+| `MELHOR_ENVIO_OAUTH_CLIENT_ID`     | The app's Client ID. Unset = only the access-token mode is used. |
+| `MELHOR_ENVIO_OAUTH_CLIENT_SECRET` | The app's Secret.                                                |
+| `MELHOR_ENVIO_CONTACT_EMAIL`       | Optional technical contact email sent in the `User-Agent`.       |
 
 Melhor Envio also hosts its own MCP server (`https://melhorenvio.com.br/mcp`, OAuth with dynamic
 client registration). It exposes buying and cancelling labels as well and returns raw API objects,

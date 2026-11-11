@@ -12,6 +12,22 @@
     }
   },
   "config": {
+    "authMode": {
+      "label": "Connection mode",
+      "description": "Connect with Melhor Envio: approve Hay.chat in your account in one click. Access token: paste a token you generated in your Melhor Envio panel.",
+      "options": {
+        "oauth": "Connect with Melhor Envio (recommended)",
+        "token": "Access token"
+      }
+    },
+    "clientId": {
+      "label": "OAuth client ID",
+      "description": "Set by the Hay.chat server. Leave empty."
+    },
+    "clientSecret": {
+      "label": "OAuth client secret",
+      "description": "Set by the Hay.chat server. Leave empty."
+    },
     "accessToken": {
       "label": "Access token",
       "description": "Token generated in your Melhor Envio panel (Integrações → Permissões de acesso) with permission to view shipping labels."
