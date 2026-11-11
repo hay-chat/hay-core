@@ -145,6 +145,7 @@ export class CompanyInterestGuardrailService {
       };
 
       const result = await this.llmService.invoke<string>({
+        caller: "guardrail-company-interest",
         prompt: evaluationPrompt,
         jsonSchema: schema,
         temperature: 0.2, // Low temperature for consistent evaluation

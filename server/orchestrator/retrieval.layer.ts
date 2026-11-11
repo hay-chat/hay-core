@@ -84,6 +84,7 @@ export class RetrievalLayer {
     log.debug("Invoking LLM for playbook selection");
 
     const result = await this.llmService.invoke({
+      caller: "playbook-selection",
       prompt: candidatePrompt,
       jsonSchema: candidateSchema,
       // Scoring pre-fetched playbooks against a strict schema. The 0.7 threshold

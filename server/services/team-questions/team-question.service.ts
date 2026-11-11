@@ -403,6 +403,7 @@ class TeamQuestionService {
         { conversationId: conversation.id, organizationId: conversation.organization_id },
       );
       const text = await new LLMService().invoke({
+        caller: "team-question",
         prompt,
         history: "Write the message now.",
         tier: "easy",

@@ -85,6 +85,7 @@ export class PerceptionLayer {
     log.debug("Invoking LLM for perception analysis");
 
     const perception = await this.llmService.invoke({
+      caller: "perception",
       prompt: perceptionPrompt,
       jsonSchema: perceptionSchema,
       // Intent/sentiment/language classification against a strict schema. Medium
