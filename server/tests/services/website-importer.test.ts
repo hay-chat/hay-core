@@ -73,7 +73,7 @@ beforeEach(() => {
 
 describe("WebsiteImporter.discover", () => {
   it("paginates sitemap entries with an offset cursor and maps lastmod to externalUpdatedAt", async () => {
-    const entries = Array.from({ length: 15 }, (_, i) => ({
+    const entries = Array.from({ length: 25 }, (_, i) => ({
       url: `https://docs.example.com/page-${i}`,
       lastmod: "2026-01-15T10:00:00.000Z",
     }));
@@ -82,9 +82,9 @@ describe("WebsiteImporter.discover", () => {
     const importer = new WebsiteImporter(makeSource());
 
     const first = await importer.discover({ cursor: undefined });
-    expect(first.pages).toHaveLength(10);
-    expect(first.nextCursor).toBe("10");
-    expect(first.total).toBe(15); // full enumeration count, for "X of Y" progress
+    expect(first.pages).toHaveLength(20);
+    expect(first.nextCursor).toBe("20");
+    expect(first.total).toBe(25); // full enumeration count, for "X of Y" progress
     expect(first.pages[0]).toMatchObject({
       externalId: "https://docs.example.com/page-0",
       externalUrl: "https://docs.example.com/page-0",
@@ -114,6 +114,63 @@ describe("WebsiteImporter.discover", () => {
     expect(result.pages[0]).toMatchObject({ externalId: "https://docs.example.com/a", title: "A" });
     // No lastmod available from a crawl, so externalUpdatedAt is a valid ISO timestamp.
     expect(() => new Date(result.pages[0].externalUpdatedAt).toISOString()).not.toThrow();
+  });
+});
+
+describe("WebsiteImporter scope", () => {
+  const scoped = (config: Record<string, unknown>) =>
+    new WebsiteImporter({
+      ...makeSource("https://example.com"),
+      config: { url: "https://example.com", ...config },
+    } as unknown as DocumentSource);
+
+  it("keeps only sitemap pages under pathPrefix", async () => {
+    mockGetSitemapEntries.mockResolvedValue([
+      { url: "https://example.com/" },
+      { url: "https://example.com/docs" },
+      { url: "https://example.com/docs/setup" },
+      { url: "https://example.com/docsearch" },
+      { url: "https://example.com/pricing" },
+    ]);
+
+    const result = await scoped({ pathPrefix: "/docs" }).discover({});
+
+    expect(result.pages.map((p) => p.externalId)).toEqual([
+      "https://example.com/docs",
+      "https://example.com/docs/setup",
+    ]);
+    expect(result.total).toBe(2);
+  });
+
+  it("crawls from the prefix when the sitemap has nothing under it", async () => {
+    mockGetSitemapEntries.mockResolvedValue([{ url: "https://example.com/pricing" }]);
+    mockDiscoverUrls.mockResolvedValue([
+      { url: "https://example.com/docs/a", title: "A" },
+      { url: "https://example.com/blog/b", title: "B" },
+    ]);
+
+    const result = await scoped({ pathPrefix: "/docs" }).discover({});
+
+    expect(mockDiscoverUrls).toHaveBeenCalledWith("https://example.com/docs");
+    expect(result.pages.map((p) => p.externalId)).toEqual(["https://example.com/docs/a"]);
+  });
+
+  it("caps at maxPages, keeping the sitemap order, and drops duplicate URLs", async () => {
+    mockGetSitemapEntries.mockResolvedValue([
+      { url: "https://example.com/a" },
+      { url: "https://example.com/a" },
+      { url: "https://example.com/b" },
+      { url: "https://example.com/c" },
+    ]);
+
+    const result = await scoped({ maxPages: 2 }).discover({});
+
+    expect(result.pages.map((p) => p.externalId)).toEqual([
+      "https://example.com/a",
+      "https://example.com/b",
+    ]);
+    expect(result.total).toBe(2);
+    expect(result.nextCursor).toBeUndefined();
   });
 });
 

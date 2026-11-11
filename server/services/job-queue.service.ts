@@ -242,11 +242,23 @@ export class JobQueueService {
       switch (type) {
         case "document_source_sync": {
           const { documentSourceSyncService } = await import("./document-source-sync.service");
-          await documentSourceSyncService.processSyncJob(job);
+          const { continueNow } = await documentSourceSyncService.processSyncJob(job);
           // processSyncJob is responsible for setting the terminal status
           // (success/partial/failed) via the document-source repository. We
           // mark the Job row complete here so the queue doesn't re-claim it.
           await this.completeJob(job.id, job.organizationId, { ok: true });
+          // A run that hit its time budget with work left continues right away
+          // (picked up on the next queue tick, ~5 s) instead of waiting up to
+          // 60 s for the dispatcher. Once complete, the job is no longer "in
+          // flight", so enqueueSync creates the follow-up instead of reusing it.
+          const documentSourceId = job.data?.documentSourceId as string | undefined;
+          if (continueNow && documentSourceId) {
+            await documentSourceSyncService
+              .enqueueSync(documentSourceId)
+              .catch((err) =>
+                logger.error({ err, documentSourceId }, "Failed to queue sync continuation"),
+              );
+          }
           return;
         }
         case "organization_export": {
