@@ -73,26 +73,26 @@
           <Label for="showGreeting">{{ $t("webchat.showGreeting") }}</Label>
         </div>
 
-        <Textarea
+        <Input
           v-if="settingsForm.showGreeting"
           id="greetingMessage"
           v-model="settingsForm.greetingMessage"
+          type="textarea"
           :label="$t('webchat.greetingMessage')"
           :placeholder="$t('webchat.greetingMessagePlaceholder')"
           :rows="3"
         />
 
-        <div class="space-y-2">
-          <Label for="teaserMessage">{{ $t("webchat.teaserMessage") }}</Label>
-          <Textarea
-            id="teaserMessage"
-            v-model="settingsForm.teaserMessage"
-            :placeholder="$t('webchat.teaserMessagePlaceholder')"
-            :rows="2"
-            :maxlength="200"
-          />
-          <p class="text-sm text-neutral-muted">{{ $t("webchat.teaserMessageDescription") }}</p>
-        </div>
+        <Input
+          id="teaserMessage"
+          v-model="settingsForm.teaserMessage"
+          type="textarea"
+          :label="$t('webchat.teaserMessage')"
+          :placeholder="$t('webchat.teaserMessagePlaceholder')"
+          :hint="$t('webchat.teaserMessageDescription')"
+          :rows="2"
+          :maxlength="200"
+        />
       </CardContent>
     </Card>
 
@@ -108,13 +108,14 @@
           <Label for="csatEnabled">{{ $t("webchat.csatEnabled") }}</Label>
         </div>
 
-        <Textarea
+        <Input
           v-if="settingsForm.csatEnabled"
           id="csatQuestion"
           v-model="settingsForm.csatQuestion"
+          type="textarea"
           :label="$t('webchat.csatQuestion')"
           :placeholder="$t('webchat.csatQuestionPlaceholder')"
-          :description="$t('webchat.csatQuestionDescription')"
+          :hint="$t('webchat.csatQuestionDescription')"
           :rows="2"
         />
       </CardContent>
