@@ -117,6 +117,7 @@ export class ActionClaimGuardrailService {
       };
 
       const result = await this.llmService.invoke<string>({
+        caller: "guardrail-action-claim",
         prompt: evaluationPrompt,
         jsonSchema: schema,
         temperature: 0.2, // Low temperature for consistent evaluation

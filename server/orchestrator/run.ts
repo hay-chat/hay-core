@@ -696,6 +696,7 @@ export const runConversation = async (conversationId: string) => {
         );
 
         closingMessage = await llmService.invoke({
+          caller: "closing-message",
           history: messages,
           prompt,
           // Short closing line; falls back to a hardcoded string on error.

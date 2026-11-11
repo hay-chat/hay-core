@@ -77,6 +77,7 @@ async function classify(
     { organizationId: conversation.organization_id },
   );
   const result = await llm.invokeWithMeta<string>({
+    caller: "spam-check",
     prompt,
     jsonSchema: CLASSIFIER_SCHEMA,
     tier: "easy",

@@ -467,6 +467,7 @@ export class ExecutionLayer {
       log.debug("Invoking LLM for execution planning");
 
       const response = await this.llmService.invoke({
+        caller: "planner",
         history: [
           ...(pageToolsTurn ? [pageToolsTurn] : []),
           ...(referenceTurn ? [referenceTurn] : []),
@@ -1126,6 +1127,7 @@ export class ExecutionLayer {
     });
 
     let badLinks: BadLink[];
+    const startedAt = Date.now();
     try {
       const messages = await conversation.getMessages();
       const { website, siteUrls } = await this.getLinkContext(conversation);
@@ -1135,6 +1137,10 @@ export class ExecutionLayer {
         siteUrls,
         website,
       });
+      log.info(
+        { durationMs: Date.now() - startedAt, badLinks: badLinks.length },
+        "Link check completed",
+      );
     } catch (error) {
       // The check must never break a turn.
       log.warn({ error }, "Link check failed, sending the reply unchecked");
@@ -1935,6 +1941,7 @@ export class ExecutionLayer {
       });
 
       const composed = await this.llmService.invoke<string>({
+        caller: "contextual-fallback",
         prompt,
         temperature: 0.3,
         // Keeps the call on the org's provider and AI region (EU-only orgs).

@@ -89,11 +89,13 @@ export class OrchestratorWorker {
       async (msg) => {
         const data = rabbitmqService.parseMessage<OrchestratorMessage>(msg);
 
-        logger.debug(
+        // Info level on purpose: queue wait is part of the customer's wait.
+        logger.info(
           {
             conversationId: data.conversationId,
             trigger: data.trigger,
             attempt: data.attempt,
+            queueWaitMs: Date.now() - Date.parse(data.timestamp),
           },
           "Processing conversation from queue",
         );
