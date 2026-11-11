@@ -423,3 +423,9 @@
 - **Failure mode**: Resetting section-edit state on close also cleared the compose draft, so closing a "missing" card lost the half-written answer.
 - **Detection signal**: The existing "draft survives closing and a board poll" test failed after the rewrite.
 - **Prevention**: Keep "a section being edited" state separate from "an answer being written"; only the first ends when the card closes.
+
+### `npm install` keeps stale nested lock entries after a package.json bump
+
+- **Failure mode**: After bumping versions in a workspace `package.json`, `npm install` reported "up to date" but left `server/node_modules/<pkg>` lock entries at the old version (`linkedom`, `openai`), and kept an old hoisted `pinia` beside a new nested one, so `pinia-plugin-persistedstate` resolved the wrong copy and every store's getters/actions lost their types. Tests ran green against the old versions.
+- **Detection signal**: `npm ls` printed `invalid: <pkg>@<old>`; 193 dashboard type errors of the form `Property 'x' does not exist on type 'Store<..., {}, {}>'`.
+- **Prevention**: After any dependency bump, `npm ls` must report no `invalid` entries, and the final check is a clean `npm ci`. If an entry is stuck, delete that package's entries from `package-lock.json` and reinstall rather than trusting "up to date".
