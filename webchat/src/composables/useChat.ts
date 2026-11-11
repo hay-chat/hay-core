@@ -20,7 +20,7 @@ import type {
   Message,
   ProductClickType,
   SendFailure,
-  WidgetContribution,
+  ChallengeContribution,
 } from "@/types";
 import { useChallenge } from "./useChallenge";
 import { insertMessage, parseServerTime } from "@/utils/messageOrder";
@@ -35,7 +35,7 @@ import { findMissingRequiredFields } from "@hay/form-schema";
 
 export interface UseChatOptions {
   /** The org's challenge@1 contribution, when a bot check is on. */
-  challenge?: WidgetContribution | null;
+  challenge?: ChallengeContribution | null;
   /** The org's pre-chat form, asked before the first message when set. */
   preChatForm?: FormSchema | null;
 }

@@ -11,6 +11,7 @@ import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { createLogger } from "@server/lib/logger";
 import type { CanonicalProduct } from "@server/types/canonical-product";
 import { escapeLike } from "@server/lib/sql-like";
+import { CART_ITEM_ID_PATTERN } from "@server/lib/shopping-links";
 
 const logger = createLogger("products-router");
 
@@ -38,6 +39,7 @@ const variantSchema = z.object({
   weightUnit: z.string().optional(),
   imageSrc: z.string().url().optional(),
   buyUrl: z.string().url().max(2048).optional(),
+  cartItemId: z.string().regex(CART_ITEM_ID_PATTERN).optional(),
   attributes: z.record(z.string(), z.unknown()).optional(),
 });
 

@@ -1,6 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { defineComponent, h } from "vue";
-import { mount } from "@vue/test-utils";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { defineComponent, h, provide, ref } from "vue";
+import { flushPromises, mount } from "@vue/test-utils";
+import { cartContextKey } from "@/utils/cart";
+import type { CartContribution } from "@/types";
 import ProductCards from "../ProductCards.vue";
 import { provideI18n } from "@/i18n";
 import type { RecommendedProduct } from "@/types";
@@ -27,11 +29,14 @@ const coat: RecommendedProduct = {
   topVariant: { price: "120.00", compareAtPrice: "120.00", currency: "USD" },
 };
 
-function mountCards(products: RecommendedProduct[]) {
+function mountCards(products: RecommendedProduct[], cart?: CartContribution) {
   const clicks: unknown[][] = [];
   const Root = defineComponent({
     setup() {
       provideI18n();
+      if (cart) {
+        provide(cartContextKey, { contributions: [cart], conversationId: ref("conv-1") });
+      }
       return () =>
         h(ProductCards, { products, onProductClick: (...args: unknown[]) => clicks.push(args) });
     },
@@ -75,5 +80,62 @@ describe("ProductCards", () => {
     ]);
     expect(wrapper.find(".hay-product-card__link").attributes("href")).toBe("#");
     expect(wrapper.find(".hay-product-card__buy").exists()).toBe(false);
+  });
+});
+
+describe("ProductCards: add to cart in the page", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  // jsdom serves the tests from localhost, so that is "the store" here.
+  const inStore: RecommendedProduct = {
+    ...shirt,
+    source: "store",
+    sourceUrl: "http://localhost/product/linen-shirt",
+    topVariant: { ...shirt.topVariant, cartItemId: "44" },
+  };
+  const cart: CartContribution = {
+    id: "store.cart",
+    type: "cart@1",
+    source: "store",
+    props: {
+      addPath: "/cart/add.js",
+      addBody: '{"id":{{cartItemId}},"quantity":{{quantity}}}',
+      checkoutPath: "/checkout",
+    },
+  };
+
+  it("adds the product to the store's cart and then offers checkout", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+    const { wrapper, clicks } = mountCards([inStore], cart);
+
+    await wrapper.find("button.hay-product-card__buy").trigger("click");
+    await flushPromises();
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/cart/add.js");
+    expect(wrapper.find("a.hay-product-card__buy").attributes("href")).toBe("/checkout");
+    expect(wrapper.find(".hay-product-card__added").exists()).toBe(true);
+    expect(clicks).toEqual([["p1", "cart_add"]]);
+  });
+
+  it("falls back to the buy link when the store refuses", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 422 }));
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { wrapper, clicks } = mountCards([inStore], cart);
+
+    await wrapper.find("button.hay-product-card__buy").trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find("a.hay-product-card__buy").attributes("href")).toBe(
+      "https://shop.test/cart/44:1",
+    );
+    expect(clicks).toEqual([]);
+  });
+
+  it("keeps the plain buy link on a page that is not the store", () => {
+    const elsewhere = { ...inStore, sourceUrl: "https://shop.test/product/linen-shirt" };
+    const { wrapper } = mountCards([elsewhere], cart);
+    expect(wrapper.find("button.hay-product-card__buy").exists()).toBe(false);
+    expect(wrapper.find("a.hay-product-card__buy").exists()).toBe(true);
   });
 });

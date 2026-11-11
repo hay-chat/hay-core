@@ -92,10 +92,28 @@ export interface PublicConfig {
 }
 
 /** A declarative plugin contribution, rendered by the widget's own code. */
-export interface WidgetContribution {
+export type WidgetContribution = ChallengeContribution | CartContribution;
+
+export interface ChallengeContribution {
   id: string;
   type: "challenge@1";
   props: { provider: string; mode: "invisible" | "challenge_all" };
+}
+
+/** How to add a product to the cart of the store the widget is on. */
+export interface CartContribution {
+  id: string;
+  type: "cart@1";
+  /** The catalog source these requests are for (a product's `source`). */
+  source: string;
+  props: {
+    addPath: string;
+    addBody: string;
+    checkoutPath: string;
+    tokenPath?: string;
+    tokenResponseHeader?: string;
+    tokenRequestHeader?: string;
+  };
 }
 
 /** The loader's button, driven by the chat once it is mounted. */
@@ -183,6 +201,8 @@ export interface Message {
 /** A product card as the server sends it (a `recommend_products` result item). */
 export interface RecommendedProduct {
   id: string;
+  /** The catalog the product came from. */
+  source?: string;
   title: string;
   sourceUrl?: string;
   imageUrl?: string;
@@ -193,11 +213,13 @@ export interface RecommendedProduct {
     compareAtPrice?: string | number;
     currency?: string;
     buyUrl?: string;
+    /** The store cart's id for this variant, when it can be added from the chat. */
+    cartItemId?: string;
   };
 }
 
 /** What the shopper clicked on a product card. */
-export type ProductClickType = "card_click" | "buy_click";
+export type ProductClickType = "card_click" | "buy_click" | "cart_add";
 
 /** Shown under the input when the server refuses a message; `text` goes back into the input. */
 export interface SendFailure {

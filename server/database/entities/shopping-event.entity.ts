@@ -1,12 +1,13 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index } from "typeorm";
 
 /** What the shopper did with a recommended product. */
-export const SHOPPING_EVENT_TYPES = ["card_click", "buy_click"] as const;
+export const SHOPPING_EVENT_TYPES = ["card_click", "buy_click", "cart_add"] as const;
 export type ShoppingEventType = (typeof SHOPPING_EVENT_TYPES)[number];
 
 /**
  * One step of the shopping funnel after a recommendation was shown: the
- * shopper opened a product card or followed its buy link. Recommendations
+ * shopper opened a product card, followed its buy link, or added the product
+ * to the store's cart from the chat. Recommendations
  * shown are not stored here: they are the ProductRecommendation messages.
  */
 @Entity("shopping_events")

@@ -68,7 +68,7 @@ const variant = (
   price: "20.00",
   availability: "in_stock",
   selectedOptions: Object.entries(options).map(([name, value]) => ({ name, value })),
-  attributes: { buyUrl: `https://shop.test/cart/${id}:1` },
+  attributes: { buyUrl: `https://shop.test/cart/${id}:1`, cartItemId: `cart-${id}` },
   ...extra,
 });
 
@@ -79,7 +79,13 @@ interface ToolResult {
     id: string;
     similarity: number;
     matchingVariantCount?: number;
-    topVariant?: { id: string; externalId: string; buyUrl?: string; selectedOptions?: unknown };
+    topVariant?: {
+      id: string;
+      externalId: string;
+      buyUrl?: string;
+      cartItemId?: string;
+      selectedOptions?: unknown;
+    };
   }>;
   filtersApplied: Record<string, unknown>;
 }
@@ -166,6 +172,7 @@ describe("recommend_products option filters", () => {
     expect(top?.externalId).toBe("ext-ox-m");
     expect(top?.selectedOptions).toEqual([{ name: "Size", value: "M" }]);
     expect(new URL(top?.buyUrl as string).pathname).toBe("/cart/ox-m:1");
+    expect(top?.cartItemId).toBe("cart-ox-m");
     expect(result.products[0].matchingVariantCount).toBe(1);
     expect(result.filtersApplied.options).toEqual(sizeM.options);
   });
@@ -197,6 +204,7 @@ describe("recommend_products option filters", () => {
 
     expect(result.products[0].matchingVariantCount).toBe(2);
     expect(result.products[0].topVariant?.buyUrl).toBeUndefined();
+    expect(result.products[0].topVariant?.cartItemId).toBeUndefined();
   });
 
   it("searches a wider pool and fills the limit from further down the ranking", async () => {

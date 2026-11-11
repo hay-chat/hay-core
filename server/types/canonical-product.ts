@@ -62,6 +62,13 @@ export interface CanonicalVariant {
    * platform has no such link.
    */
   buyUrl?: string;
+  /**
+   * The id the store's own cart takes for this variant, used by the plugin's
+   * `cart@1` webchat contribution to add it to the shopper's cart from the
+   * chat. Letters, digits, `_` and `-`, up to 64 characters. Omit when the
+   * variant cannot be added on its own.
+   */
+  cartItemId?: string;
   attributes?: Record<string, unknown>;
 }
 

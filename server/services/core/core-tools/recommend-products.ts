@@ -21,7 +21,11 @@ import { productKeywordSearchService } from "@server/services/product-keyword-se
 import { createLogger } from "@server/lib/logger";
 import { chooseVariant, type OptionFilter } from "@server/lib/product-options";
 import { reciprocalRankFusion } from "@server/lib/rank-fusion";
-import { variantBuyUrl, withShoppingAttribution } from "@server/lib/shopping-links";
+import {
+  variantBuyUrl,
+  variantCartItemId,
+  withShoppingAttribution,
+} from "@server/lib/shopping-links";
 import type { CoreToolDefinition } from "./index";
 import { READ_RISK } from "../tool-risk";
 
@@ -82,6 +86,8 @@ interface ProductRecommendation {
      * We never pick a size or colour for the shopper.
      */
     buyUrl?: string;
+    /** The store cart's id for this variant, under the same rule as `buyUrl`. */
+    cartItemId?: string;
   };
 }
 
@@ -309,6 +315,7 @@ export const recommendProductsTool: CoreToolDefinition = {
               buyUrl: canBuyDirectly
                 ? withShoppingAttribution(variantBuyUrl(topVariant.attributes), conversation.id)
                 : undefined,
+              cartItemId: canBuyDirectly ? variantCartItemId(topVariant.attributes) : undefined,
             }
           : undefined,
       };
