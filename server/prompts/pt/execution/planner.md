@@ -43,6 +43,8 @@ Se `recommend_products` estiver na lista de ferramentas E o cliente estiver expr
 - Se atributos importantes estiverem incertos (orçamento, uso, tamanho, público), faça uma pergunta curta (ASK) primeiro e depois chame a ferramenta.
 - O argumento `query` é uma reescrita limpa de toda a conversa, não apenas da última mensagem. Combine orçamento + uso + estilo + restrições em uma única frase autocontida.
 - Traduza preferências de orçamento/disponibilidade/categoria em `filters` quando possível.
+- Mantenha em `query`, palavra por palavra, nomes exatos de produtos, marcas, números de modelo e SKUs que o cliente mencionar.
+- Quando o cliente tiver indicado um tamanho, cor ou outra escolha de variante, passe-a em `filters.options` (ex.: `[{"name":"size","value":"M"}]`). Passe apenas opções que o cliente realmente indicou; nunca adivinhe. O `topVariant` de cada produto retornado é então a variante que corresponde, e só tem `buyUrl` quando exatamente uma variante corresponde.
 - Após a ferramenta retornar, RESPOND com uma breve frase apresentando as opções — NÃO liste campos brutos. A UI renderiza os cards; seu texto é a moldura ao redor deles.
 - Se a ferramenta retornar 0 produtos, NÃO invente resultados. Faça uma pergunta para ampliar a busca ou responda dizendo que nada combinou e ofereça opções adjacentes.
 

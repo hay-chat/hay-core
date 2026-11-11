@@ -5,6 +5,9 @@
  * returns ranked Product+top-variant payloads pulled from the org's
  * mirrored catalog. The orchestrator feeds the result back to the planner
  * which then RESPONDs with a product_recommendation card.
+ *
+ * Retrieval is hybrid: a vector search (what the shopper means) and a keyword
+ * search (exact names, brands, model numbers, SKUs) are fused by rank.
  */
 
 import { In } from "typeorm";
@@ -12,8 +15,12 @@ import type { Conversation } from "@server/database/entities/conversation.entity
 import { AppDataSource } from "@server/database/data-source";
 import { Product, ProductStatus } from "@server/entities/product.entity";
 import { ProductVariant, VariantAvailability } from "@server/entities/product-variant.entity";
+import type { VariantSelectedOption } from "@server/entities/product-variant.entity";
 import { productVectorStoreService } from "@server/services/product-vector-store.service";
+import { productKeywordSearchService } from "@server/services/product-keyword-search.service";
 import { createLogger } from "@server/lib/logger";
+import { chooseVariant, type OptionFilter } from "@server/lib/product-options";
+import { reciprocalRankFusion } from "@server/lib/rank-fusion";
 import { variantBuyUrl, withShoppingAttribution } from "@server/lib/shopping-links";
 import type { CoreToolDefinition } from "./index";
 import { READ_RISK } from "../tool-risk";
@@ -29,6 +36,7 @@ interface RecommendArgs {
     categorySlug?: string;
     productType?: string;
     tags?: string[];
+    options?: OptionFilter[];
   };
   limit?: number;
 }
@@ -51,6 +59,12 @@ interface ProductRecommendation {
   variantCount: number;
   /** What the shopper can choose (size, colour, ...), capped for display. */
   options?: Array<{ name: string; values: string[] }>;
+  /** With option filters: how many variants fit them. More than one means a choice is still open. */
+  matchingVariantCount?: number;
+  /**
+   * With option filters, a variant that fits them (the cheapest in stock);
+   * otherwise the cheapest in-stock variant.
+   */
   topVariant?: {
     id: string;
     externalId: string;
@@ -60,10 +74,12 @@ interface ProductRecommendation {
     currency?: string;
     sku?: string;
     availability: VariantAvailability;
+    selectedOptions?: VariantSelectedOption[];
     /**
      * Adds this variant to the cart or opens checkout. Only set when the
-     * product has a single, in-stock variant: we never pick a size or colour
-     * for the shopper.
+     * variant is in stock and is the only one the shopper could mean: the
+     * product has a single variant, or the option filters fit exactly one.
+     * We never pick a size or colour for the shopper.
      */
     buyUrl?: string;
   };
@@ -72,6 +88,9 @@ interface ProductRecommendation {
 /** Option values shown per option on a card ("S, M, L, XL +2"). */
 const MAX_OPTION_VALUES = 8;
 
+/** A product still in the running, with its vector similarity to the query. */
+type Candidate = { product: Product; similarity: number };
+
 export const recommendProductsTool: CoreToolDefinition = {
   name: "recommend_products",
   description:
@@ -79,7 +98,10 @@ export const recommendProductsTool: CoreToolDefinition = {
     "Use ONLY when the customer is expressing a shopping intent (looking for a " +
     "product, asking for recommendations, comparing options). DO NOT use on " +
     "support, billing, returns, or status questions. If important attributes are " +
-    "missing (budget, use-case, size), ASK first, then call this tool.",
+    "missing (budget, use-case, size), ASK first, then call this tool. Exact product " +
+    "names, brands, model numbers and SKUs the shopper mentions belong in `query` " +
+    "verbatim. A size, colour or other variant choice the shopper has stated belongs " +
+    "in `filters.options`.",
   risk: READ_RISK,
   inputSchema: {
     type: "object",
@@ -106,6 +128,26 @@ export const recommendProductsTool: CoreToolDefinition = {
           categorySlug: { type: "string" },
           productType: { type: "string" },
           tags: { type: "array", items: { type: "string" } },
+          options: {
+            type: "array",
+            description:
+              "Variant options the shopper has explicitly chosen, e.g. " +
+              '[{"name":"size","value":"M"},{"name":"color","value":"blue"}]. Only products ' +
+              "with a matching variant are returned (in stock, unless inStockOnly is false), " +
+              "and `topVariant` is that variant. Use the generic names `size` and `color`, or " +
+              "the option name exactly as a previous result's `options` listed it. Write the " +
+              "value as the shopper or the store wrote it. Never pass an option the shopper " +
+              "has not stated.",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["name", "value"],
+              properties: {
+                name: { type: "string" },
+                value: { type: "string" },
+              },
+            },
+          },
         },
       },
       limit: {
@@ -133,35 +175,56 @@ export const recommendProductsTool: CoreToolDefinition = {
     }
     const limit = Math.min(Math.max(parsed.limit ?? 4, 1), 10);
     // In-stock only unless the model asks otherwise: a sold-out card is a dead end.
-    const filters = { ...parsed.filters, inStockOnly: parsed.filters?.inStockOnly !== false };
+    const optionFilters = parseOptionFilters(parsed.filters?.options);
+    const filters = {
+      ...parsed.filters,
+      inStockOnly: parsed.filters?.inStockOnly !== false,
+      options: optionFilters.length ? optionFilters : undefined,
+    };
 
     if (!productVectorStoreService.initialized) {
       await productVectorStoreService.initialize();
     }
 
-    // Over-fetch from the vector store so structured filters can narrow
-    // without immediately starving us of candidates.
-    const candidatePool = Math.max(limit * 4, 20);
-    const hits = await productVectorStoreService.search(organizationId, query, candidatePool);
+    // Over-fetch so structured filters can narrow without immediately starving
+    // us of candidates. Option filters cut much deeper, so they get a wider pool.
+    const candidatePool = optionFilters.length ? Math.max(limit * 10, 50) : Math.max(limit * 4, 20);
 
-    if (!hits.length) {
+    // The keyword half is an addition: if it fails, recommend on vectors alone.
+    const keywordIds = await productKeywordSearchService
+      .search(organizationId, query, candidatePool)
+      .catch((err) => {
+        logger.warn({ err, organizationId }, "Keyword product search failed; using vectors only");
+        return [] as string[];
+      });
+    const hits = await productVectorStoreService.search(
+      organizationId,
+      query,
+      candidatePool,
+      keywordIds,
+    );
+    const similarityById = new Map(hits.map((h) => [h.productId, h.similarity]));
+    const vectorIds = hits.slice(0, candidatePool).map((h) => h.productId);
+    const rankedIds = reciprocalRankFusion([vectorIds, keywordIds]);
+
+    if (!rankedIds.length) {
       return { products: [], query, filtersApplied: filters };
     }
 
-    const productIds = hits.map((h) => h.productId);
     const products = await AppDataSource.getRepository(Product).find({
       where: {
         organizationId,
-        id: In(productIds),
+        id: In(rankedIds),
         status: ProductStatus.ACTIVE,
       },
     });
     const byId = new Map(products.map((p) => [p.id, p]));
 
     // Apply structured filters server-side.
-    const filtered = hits
-      .map((h) => ({ hit: h, product: byId.get(h.productId) }))
-      .filter((row): row is { hit: (typeof hits)[number]; product: Product } => !!row.product)
+    const candidates: Candidate[] = rankedIds
+      // 0 only for a keyword match whose embedding is missing (not yet embedded).
+      .map((id) => ({ product: byId.get(id), similarity: similarityById.get(id) ?? 0 }))
+      .filter((row): row is Candidate => !!row.product)
       .filter(({ product }) => {
         const f = filters;
         if (f.inStockOnly && !product.available) return false;
@@ -181,20 +244,16 @@ export const recommendProductsTool: CoreToolDefinition = {
           if (!slugs.includes(f.categorySlug)) return false;
         }
         return true;
-      })
-      .slice(0, limit);
+      });
 
-    if (!filtered.length) {
-      logger.debug({ organizationId, query }, "No products matched after filters");
-      return { products: [], query, filtersApplied: filters };
-    }
-
-    // Pull the cheapest in-stock variant (fall back to first by position) for each finalist.
-    const finalIds = filtered.map((r) => r.product.id);
-    const variants = await AppDataSource.getRepository(ProductVariant).find({
-      where: { organizationId, productId: In(finalIds) },
-      order: { position: "ASC" },
-    });
+    // Option filters are decided per variant, so variants are loaded for every
+    // candidate still standing, not only for the finalists.
+    const variants = candidates.length
+      ? await AppDataSource.getRepository(ProductVariant).find({
+          where: { organizationId, productId: In(candidates.map((c) => c.product.id)) },
+          order: { position: "ASC" },
+        })
+      : [];
     const variantsByProduct = new Map<string, ProductVariant[]>();
     for (const v of variants) {
       const arr = variantsByProduct.get(v.productId) ?? [];
@@ -202,11 +261,23 @@ export const recommendProductsTool: CoreToolDefinition = {
       variantsByProduct.set(v.productId, arr);
     }
 
-    const recs: ProductRecommendation[] = filtered.map(({ product, hit }) => {
-      const candidateVariants = variantsByProduct.get(product.id) ?? [];
-      const topVariant = pickTopVariant(candidateVariants);
-      const canBuyDirectly =
-        candidateVariants.length === 1 && topVariant?.availability === VariantAvailability.IN_STOCK;
+    const finalists = candidates
+      .map((candidate) => {
+        const candidateVariants = variantsByProduct.get(candidate.product.id) ?? [];
+        const choice = chooseVariant(candidateVariants, optionFilters, filters.inStockOnly);
+        return choice ? { ...candidate, candidateVariants, choice } : undefined;
+      })
+      .filter((row) => row !== undefined)
+      .slice(0, limit);
+
+    if (!finalists.length) {
+      logger.debug({ organizationId, query }, "No products matched after filters");
+      return { products: [], query, filtersApplied: filters };
+    }
+
+    const recs: ProductRecommendation[] = finalists.map((finalist) => {
+      const { product, similarity, candidateVariants } = finalist;
+      const { topVariant, canBuyDirectly, matchingVariantCount } = finalist.choice;
       return {
         id: product.id,
         externalId: product.externalId,
@@ -220,9 +291,10 @@ export const recommendProductsTool: CoreToolDefinition = {
         tags: product.tags,
         imageUrl: product.images?.[0]?.src,
         available: product.available,
-        similarity: hit.similarity,
+        similarity,
         variantCount: candidateVariants.length,
         options: displayOptions(product),
+        matchingVariantCount,
         topVariant: topVariant
           ? {
               id: topVariant.id,
@@ -233,6 +305,7 @@ export const recommendProductsTool: CoreToolDefinition = {
               currency: topVariant.currency ?? product.currency,
               sku: topVariant.sku,
               availability: topVariant.availability,
+              selectedOptions: topVariant.selectedOptions,
               buyUrl: canBuyDirectly
                 ? withShoppingAttribution(variantBuyUrl(topVariant.attributes), conversation.id)
                 : undefined,
@@ -253,15 +326,14 @@ function displayOptions(product: Product): ProductRecommendation["options"] {
   return options.length ? options : undefined;
 }
 
-function pickTopVariant(variants: ProductVariant[]): ProductVariant | undefined {
-  if (!variants.length) return undefined;
-  // Prefer the cheapest in-stock variant. Fall back to first available, or
-  // the first one period.
-  const inStock = variants.filter((v) => v.availability === VariantAvailability.IN_STOCK);
-  const pool = inStock.length ? inStock : variants;
-  return [...pool].sort((a, b) => {
-    const pa = a.price !== undefined ? parseFloat(a.price) : Number.POSITIVE_INFINITY;
-    const pb = b.price !== undefined ? parseFloat(b.price) : Number.POSITIVE_INFINITY;
-    return pa - pb;
-  })[0];
+/** Keep only well-formed option filters: the arguments come from a model. */
+function parseOptionFilters(raw: unknown): OptionFilter[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (option): option is OptionFilter =>
+        typeof option?.name === "string" && typeof option?.value === "string",
+    )
+    .map((option) => ({ name: option.name.trim(), value: option.value.trim() }))
+    .filter((option) => option.name && option.value);
 }
