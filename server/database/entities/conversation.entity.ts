@@ -14,7 +14,12 @@ import { Organization } from "../../entities/organization.entity";
 import { User } from "../../entities/user.entity";
 import { Message } from "./message.entity";
 import { Customer } from "./customer.entity";
-import { MessageType, MessageStatus, type MessageAttachment } from "./message.entity";
+import {
+  MessageType,
+  MessageStatus,
+  type MessageAttachment,
+  type MessageTranslations,
+} from "./message.entity";
 import { DeliveryState } from "../../types/message-feedback.types";
 import type { TiptapDoc } from "../../types/tiptap.types";
 import { analyzeTiptapInstructions } from "../../utils/tiptap-formatter";
@@ -23,7 +28,8 @@ import type { PlaybookInstructions } from "./playbook.entity";
 import { documentRepository } from "../../repositories/document.repository";
 import { signDocumentImageUrls } from "../../services/media-url.service";
 import { createLogger } from "@server/lib/logger";
-import { SupportedLanguage } from "../../types/language.types";
+import type { LanguageCode } from "../../types/language.types";
+import type { ConversationTranslations } from "../../types/translation-cache.types";
 
 const logger = createLogger("conversation-entity");
 
@@ -86,6 +92,12 @@ export class Conversation {
   // and why it handed off. Populated when status flips to pending-human.
   @Column({ type: "text", nullable: true })
   summary!: string | null;
+
+  // Title and summary in team members' translation languages (multilingual
+  // inbox). Read and written only with raw SQL (conversation-translations
+  // service), so entity loads don't depend on the column.
+  @Column({ type: "jsonb", nullable: true, select: false, insert: false, update: false })
+  translations?: ConversationTranslations | null;
 
   // Channel identifier — a loose string so new channel plugins can register
   // without a schema migration. Validation happens at plugin registration and
@@ -249,7 +261,7 @@ export class Conversation {
   previous_status!: string | null;
 
   @Column({ type: "varchar", length: 10, nullable: true })
-  language!: SupportedLanguage | null;
+  language!: LanguageCode | null;
 
   // Data retention fields
   @Column({ type: "timestamptz", nullable: true })
@@ -933,6 +945,10 @@ The following tools are available for you to use. You MUST return only valid JSO
     attachments?: MessageAttachment[];
     /** Channel provider's message id (e.g. Meta wamid) for inbound messages. */
     providerMessageId?: string;
+    /** Team-facing text by language (a translated reply keeps what was typed here). */
+    translations?: MessageTranslations;
+    /** Language of `content`, when already known. */
+    detectedLanguage?: LanguageCode | null;
   }): Promise<Message> {
     const { messageRepository } = await import("../../repositories/message.repository");
     const { conversationRepository } = await import("../../repositories/conversation.repository");
@@ -1032,6 +1048,8 @@ The following tools are available for you to use. You MUST return only valid JSO
       sender: messageData.sender,
       attachments,
       providerMessageId: messageData.providerMessageId ?? null,
+      ...(messageData.translations ? { translations: messageData.translations } : {}),
+      ...(messageData.detectedLanguage ? { detectedLanguage: messageData.detectedLanguage } : {}),
       status: messageStatus,
       reviewRequired,
       deliveryState,
@@ -1202,7 +1220,7 @@ The following tools are available for you to use. You MUST return only valid JSO
    */
   private async generateLocalizedGreeting(
     greeting: string,
-    targetLanguage: SupportedLanguage,
+    targetLanguage: LanguageCode,
   ): Promise<string> {
     const { LLMService } = await import("../../services/core/llm.service");
     const llmService = new LLMService();

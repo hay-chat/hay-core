@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // D20: the plugin settings page, config form and OAuth card read every string
-// from integrations.json `pluginSettings`. Both locales carry the same keys, and
+// from integrations.json `pluginSettings`. Every locale carries the same keys, and
 // merchant copy never names a server environment variable.
 const read = (locale: string) =>
   JSON.parse(
@@ -24,12 +24,12 @@ function strings(value: unknown): string[] {
 }
 
 describe("plugin settings locales", () => {
-  it("en and pt-BR have the same pluginSettings keys", () => {
-    expect(keys(read("pt-BR")).sort()).toEqual(keys(read("en")).sort());
+  it.each(["pt-BR", "nl"])("en and %s have the same pluginSettings keys", (locale) => {
+    expect(keys(read(locale)).sort()).toEqual(keys(read("en")).sort());
   });
 
   it("names no environment variable", () => {
-    for (const locale of ["en", "pt-BR"]) {
+    for (const locale of ["en", "pt-BR", "nl"]) {
       expect(strings(read(locale)).join("\n")).not.toMatch(/\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b/);
     }
   });

@@ -1,6 +1,7 @@
 {
   "name": "Wix Stores",
   "description": "Connect your Wix Stores site so the agent can look up a customer's orders, track shipments, cancel or re-route undispatched orders, issue refunds, and answer product questions.",
+  "summary": "Find orders, track shipments, cancel or re-route, refund, and answer product questions.",
   "tools": {
     "wix_find_customer": {
       "label": "Find Customer",

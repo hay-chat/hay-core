@@ -1,6 +1,7 @@
 {
   "name": "Stripe",
   "description": "Connect your Stripe account to manage payments, customers, subscriptions, and more",
+  "summary": "Look up payments, customers and subscriptions, and keep on top of disputes.",
   "tools": {
     "get_stripe_account_info": {
       "label": "Get account info",

@@ -25,6 +25,7 @@
       "statusOpen": "O cliente foi avisado de que terá um retorno aqui em poucos minutos.",
       "statusTimedOut": "Na sua fila. O cliente foi avisado de que a equipe vai responder.",
       "customerSaid": "O cliente escreveu: {message}",
+      "translated": "Traduzido para o seu idioma",
       "answerLabel": "Sua resposta",
       "answerPlaceholder": "Ex.: Sim, o vaso de 40 cm vai em caixa de presente.",
       "sendAsWritten": "Enviar como está escrito",

@@ -19,7 +19,7 @@
           </span>
         </span>
         <span class="mt-0.5 line-clamp-2 block text-sm text-neutral-600">
-          {{ conversation.summary || $t("home.row.noSummary") }}
+          {{ textFor(conversation, "summary") || $t("home.row.noSummary") }}
         </span>
         <span class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs tabular-nums">
           <span v-if="mode === 'pending'" :class="waitClass" class="font-medium">
@@ -62,6 +62,7 @@ import { computed } from "vue";
 import { UserCheck, ChevronRight } from "lucide-vue-next";
 import { formatWaitTime, getHandoffWaitClass } from "@/utils/conversation";
 import { useNow } from "@/composables/useNow";
+import { useConversationTextTranslations } from "@/composables/useTextTranslations";
 // getChannelIcon / getChannelLabel are auto-imported from @/utils/channel.
 
 /** One row of `conversations.attention` (server/routes/v1/conversations). */
@@ -88,9 +89,19 @@ const emit = defineEmits<{ open: [id: string]; takeover: [id: string] }>();
 const { t } = useI18n();
 const now = useNow();
 
+// The summary (and the title, when it names the row) in the reader's translation
+// language; rows on screen together share one request.
+const { textFor } = useConversationTextTranslations(() => [props.conversation], ["summary"]);
+useConversationTextTranslations(
+  () => (props.conversation.customerName ? [] : [props.conversation]),
+  ["title"],
+);
+
 const displayName = computed(
   () =>
-    props.conversation.customerName || props.conversation.title || t("home.row.unknownCustomer"),
+    props.conversation.customerName ||
+    textFor(props.conversation, "title") ||
+    t("home.row.unknownCustomer"),
 );
 
 const waitSeconds = computed(() => {

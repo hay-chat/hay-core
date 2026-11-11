@@ -49,7 +49,7 @@ describe("analytics: response time", () => {
   async function cleanup() {
     const conversations = await AppDataSource.getRepository(Conversation).find({
       where: { organization_id: orgId },
-      select: ["id"],
+      select: { id: true },
     });
     for (const { id } of conversations) {
       await AppDataSource.getRepository(Message).delete({ conversation_id: id });

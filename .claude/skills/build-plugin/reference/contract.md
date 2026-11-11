@@ -61,13 +61,14 @@ to it over loopback HTTP, authenticated with a per-worker secret: `/health`, `/m
   "entry": "./dist/index.js",        // compiled entry (required)
   "displayName": "Zendesk",          // human name (required)
   "category": "integration",         // see below (required)
+  "marketplaceCategory": "crm",      // marketplace section: channels | commerce | payments | crm | knowledge | security
   "capabilities": ["mcp", "auth"],   // see below (required)
   "env": ["ZENDESK_API_TOKEN"]       // allow-list for config-field env fallback (optional)
 }
 ```
 
 **`setup`** (optional) — `{ "businessTypes": ["store"], "group": "commerce", "handles": ["orders"] }`.
-Lets in-app setup suggest the plugin. `group`: `commerce | payments | crm | helpdesk | marketing |
+Lets in-app setup suggest the plugin. `group`: `commerce | shipping | payments | crm | helpdesk | marketing |
 knowledge | booking`. `handles` (what customer requests the tools really fulfil): `orders | refunds |
 order_changes | billing | subscriptions | bookings`. Declare a handle only if a tool does it: a
 refund tool that just records a request and hands off does not handle `refunds`.
@@ -137,12 +138,12 @@ components, Verify (if MCP).
 ```ts
 ctx.register.setup({
   steps: [
-    { id: "store", kind: "fields", fields: ["shopDomain"] },        // config fields
-    { id: "connect", kind: "connect" },                              // the OAuth method
+    { id: "store", kind: "fields", fields: ["shopDomain"] }, // config fields
+    { id: "connect", kind: "connect" }, // the OAuth method
     { id: "webhooks", kind: "component", component: "AfterSettings" }, // a ui.page component
     { id: "app", kind: "external", url: "https://partners.example.com" },
     { id: "notify", kind: "fields", fields: ["recipients"], optional: true },
-    { id: "verify", kind: "verify" },                                // connection test (MCP)
+    { id: "verify", kind: "verify" }, // connection test (MCP)
   ],
   // Optional: report your own status (core calls POST /setup/status with config + auth, 5 s timeout)
   async status({ auth, config }) {
@@ -150,7 +151,7 @@ ctx.register.setup({
     return {
       state: connected ? "connected" : "needs_action", // not_set_up | needs_action | connected | error
       account: config.getOptional<string>("shopDomain"), // shown as "Connected as …"
-      steps: { connect: { done: connected } },          // steps you leave out are judged by core
+      steps: { connect: { done: connected } }, // steps you leave out are judged by core
     };
   },
 });

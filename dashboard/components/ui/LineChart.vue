@@ -41,9 +41,12 @@ interface Props {
   showLegend?: boolean;
   theme?: keyof typeof CHART_COLORS;
   formatValue?: (value: number) => string;
+  /** Name of the series, shown in the tooltip. */
+  label?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  label: "Conversations",
   height: 300,
   colors: undefined,
   showLegend: false,
@@ -63,7 +66,7 @@ const chartData = computed<ChartData<"line">>(() => ({
   ),
   datasets: [
     {
-      label: "Conversations",
+      label: props.label,
       data: props.data.map((item) => item.count),
       borderColor: chartColors.value[0],
       backgroundColor: chartColors.value[0] + "20",

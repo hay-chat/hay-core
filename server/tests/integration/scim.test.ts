@@ -147,7 +147,7 @@ async function createUser(
 async function ownerCtx(user: User, organizationId: string): Promise<Context> {
   const userOrganization = await AppDataSource.getRepository(UserOrganization).findOneOrFail({
     where: { userId: user.id, organizationId },
-    relations: ["organization"],
+    relations: { organization: true },
   });
   return {
     user: new AuthUser(user, "jwt", { sessionId: "s", organizationId, userOrganization }),
@@ -1011,7 +1011,7 @@ describe("SCIM", () => {
       );
       const membershipA = await AppDataSource.getRepository(UserOrganization).findOneOrFail({
         where: { userId: user.id, organizationId: ORG_A },
-        relations: ["organization"],
+        relations: { organization: true },
       });
       const { code } = await authRouter
         .createCaller({

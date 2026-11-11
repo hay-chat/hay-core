@@ -26,7 +26,6 @@ async function mountOn(meta: Record<string, unknown>) {
 describe("AuthProvider when signed out with auth already initialized", () => {
   beforeEach(() => {
     stubNuxtGlobals();
-    vi.stubGlobal("useLocale", () => ({ setLocaleFromBackend: vi.fn() }));
     Object.entries({ computed, nextTick, onMounted, onUnmounted, ref, watch }).forEach(
       ([name, value]) => vi.stubGlobal(name, value),
     );

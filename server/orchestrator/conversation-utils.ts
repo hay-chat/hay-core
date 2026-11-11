@@ -9,7 +9,8 @@ import { createLogger } from "@server/lib/logger";
 import { getAiReplyBlocker, recheckAiReply } from "./reply-guard";
 import { closureCopy } from "./closure-copy";
 import type { Conversation } from "@server/database/entities/conversation.entity";
-import { languageName } from "@server/services/setup/playbook-generation";
+import { DEFAULT_LANGUAGE, languageName, normalizeLanguage } from "@server/types/language.types";
+import { resetSummaryTranslations } from "@server/services/conversation-translations.service";
 
 const logger = createLogger("conversation-utils");
 
@@ -60,6 +61,7 @@ export async function generateConversationTitle(
     );
 
     const response = await llmService.invoke({
+      caller: "title",
       prompt,
       // Title generation is a short summarisation with no downstream decision.
       tier: "easy",
@@ -147,13 +149,22 @@ export async function generateHandoffSummary(
       .map(handoffTranscriptLine)
       .join("\n");
 
+    // Written for the team, so in the organization's language rather than
+    // the customer's: readers with another translation language get it
+    // translated (conversations.translateTexts).
+    const summaryLanguage =
+      normalizeLanguage(conversation.organization?.defaultLanguage) ?? DEFAULT_LANGUAGE;
     const prompt = await promptService.getPrompt(
       "conversation/handoff-summary",
-      { conversationContext },
-      { conversationId, organizationId },
+      {
+        conversationContext,
+        languageName: languageName(summaryLanguage, summaryLanguage.startsWith("pt") ? "pt" : "en"),
+      },
+      { conversationId, organizationId, language: summaryLanguage },
     );
 
     const response = await llmService.invoke({
+      caller: "handoff-summary",
       prompt,
       // Summarising a transcript for a human agent — no tool use, no planning.
       tier: "medium",
@@ -165,6 +176,12 @@ export async function generateHandoffSummary(
     await conversationRepository.update(conversationId, organizationId, {
       summary,
     });
+    await resetSummaryTranslations({
+      conversationId,
+      organizationId,
+      summary,
+      language: summaryLanguage,
+    }).catch((error) => log.warn({ err: error }, "Could not reset summary translations"));
 
     log.debug({ summary }, "Generated handoff summary");
   } catch (error) {
@@ -174,7 +191,10 @@ export async function generateHandoffSummary(
 }
 
 /** The language the customer last wrote in, then the conversation's, then the organization's. */
-function customerLanguage(messages: Message[], conversation: Conversation): string | undefined {
+export function customerLanguage(
+  messages: Message[],
+  conversation: Conversation,
+): string | undefined {
   const detected = messages.filter((m) => m.type === MessageType.CUSTOMER && m.detectedLanguage);
   return (
     detected[detected.length - 1]?.detectedLanguage ||
@@ -229,6 +249,7 @@ export async function sendInactivityWarning(
     );
 
     const response = await llmService.invoke({
+      caller: "inactivity-warning",
       prompt,
       // Short inactivity nudge from the last 5 messages.
       tier: "easy",
@@ -326,6 +347,7 @@ export async function closeInactiveConversation(
         );
 
         closureMessage = await llmService.invoke({
+          caller: "inactivity-closure",
           prompt,
           // One-line sign-off; the alternative branch is a hardcoded string.
           tier: "easy",
@@ -440,6 +462,7 @@ export async function validateConversationClosure(
     );
 
     const response = await llmService.invoke({
+      caller: "closure-validation",
       prompt: validationPrompt,
       // A shouldClose boolean over a transcript. Medium rather than easy: getting
       // this wrong closes a live conversation.

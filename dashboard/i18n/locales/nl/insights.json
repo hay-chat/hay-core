@@ -1,0 +1,204 @@
+{
+  "insights": {
+    "feedback": {
+      "title": "Feedback",
+      "description": "Beoordelingen die je team aan AI-antwoorden gaf. Open een beoordeling om het antwoord in het gesprek te zien.",
+      "seoTitle": "Feedback - Hay.chat",
+      "refresh": "Vernieuwen",
+      "exportCsv": "CSV exporteren",
+      "unknownSource": "Onbekend",
+      "stats": {
+        "total": "Totale feedback",
+        "positive": "Positief",
+        "negative": "Negatief",
+        "positiveRate": "Percentage positief"
+      },
+      "ratings": {
+        "good": "Goed",
+        "bad": "Slecht",
+        "neutral": "Neutraal"
+      },
+      "filters": {
+        "title": "Filters",
+        "rating": "Beoordeling",
+        "allRatings": "Alle beoordelingen",
+        "source": "Bron",
+        "allSources": "Alle bronnen",
+        "startDate": "Startdatum",
+        "endDate": "Einddatum"
+      },
+      "list": {
+        "title": "Feedbackgeschiedenis",
+        "count": "{count} feedbackitem | {count} feedbackitems",
+        "loading": "Feedback laden...",
+        "empty": "Geen feedback die aan deze filters voldoet",
+        "reviewer": "Beoordeeld door {email}",
+        "openConversation": "Gesprek openen",
+        "showing": "{from}-{to} van {total} getoond",
+        "previous": "Vorige",
+        "next": "Volgende"
+      }
+    },
+    "page": {
+      "title": "Inzichten",
+      "description": "Patronen in je gesprekken en de beoordelingen van je team: wat de AI fout doet, wat werkt en wat je moet veranderen. Elke nacht bijgewerkt.",
+      "seoTitle": "Inzichten - Hay.chat",
+      "refresh": "Vernieuwen",
+      "settings": "Instellingen",
+      "counts": {
+        "open": "Open",
+        "new": "Nieuw",
+        "positive": "Positief",
+        "addressed": "Afgehandeld",
+        "fixedRate": "Opgelost na afhandeling",
+        "fixedRateValue": "{fixed} van {measured}",
+        "fixedRateNone": "Nog niet gemeten"
+      },
+      "filters": {
+        "polarity": "Polariteit",
+        "state": "Status",
+        "actionType": "Voorgestelde actie",
+        "window": "Periode",
+        "minSize": "Minimum aantal gesprekken",
+        "all": "Alle",
+        "open": "Open (nieuw, bevestigd, in behandeling)",
+        "allStates": "Alle statussen",
+        "days": "Afgelopen {days} dagen"
+      },
+      "polarity": {
+        "negative": "Probleem",
+        "positive": "Werkt goed",
+        "neutral": "Neutraal"
+      },
+      "states": {
+        "new": "Nieuw",
+        "acknowledged": "Bevestigd",
+        "in_progress": "In behandeling",
+        "addressed": "Afgehandeld",
+        "rejected": "Afgewezen",
+        "archived": "Gearchiveerd"
+      },
+      "actionTypes": {
+        "playbook_edit": "Een playbook bewerken",
+        "new_playbook": "Nieuw playbook",
+        "knowledge_edit": "Kennis corrigeren",
+        "knowledge_add": "Kennis toevoegen",
+        "setup": "Configuratie",
+        "policy_ambiguity": "Onduidelijk beleid",
+        "product_bug": "Productbug",
+        "ux_confusion": "Verwarring op de site",
+        "support_training": "Teamtraining",
+        "none": "Geen actie"
+      },
+      "sources": {
+        "ai_review": "Gespreksreview",
+        "user_feedback": "Teambeoordeling",
+        "docs_audit": "Documentaudit"
+      },
+      "list": {
+        "count": "{count} inzicht | {count} inzichten",
+        "empty": "Geen inzichten die aan deze filters voldoen",
+        "emptyDescription": "Inzichten verschijnen na de nachtelijke analyse zodra een patroon in minstens {min} gesprekken voorkomt. Positieve patronen verschijnen hier ook.",
+        "periodSize": "{count} in deze periode",
+        "conversations": "{count} gesprekken",
+        "lastSeen": "Laatst gezien {date}",
+        "untitled": "Naamloos patroon",
+        "recurring": "Teruggekomen",
+        "archiveSuggested": "Al 45 dagen geen nieuwe gesprekken",
+        "docsAudit": "Documentaudit",
+        "backfilling": "We bekijken je gesprekken van de afgelopen 30 dagen. Nieuwe inzichten verschijnen hier na de analyse.",
+        "loadError": "Kan inzichten niet laden"
+      },
+      "detail": {
+        "back": "Alle inzichten",
+        "loadError": "Kan dit inzicht niet laden",
+        "hypothesis": "Waarschijnlijke oorzaak",
+        "stats": {
+          "periodSize": "In de afgelopen 30 dagen",
+          "total": "Altijd",
+          "conversations": "Gesprekken",
+          "takeovers": "Overgedragen aan het team",
+          "firstSeen": "Eerst gezien",
+          "lastSeen": "Laatst gezien"
+        },
+        "breakdown": {
+          "channels": "Kanalen",
+          "sources": "Bronnen",
+          "polarity": "Sentiment"
+        },
+        "evidence": "Bewijs",
+        "evidenceHint": "Korte fragmenten waaruit persoonsgegevens zijn verwijderd. Links openen het gesprek zolang het nog wordt bewaard.",
+        "paraphrases": "Wat shoppers vroegen, in andere woorden",
+        "openConversation": "Gesprek openen",
+        "conversationGone": "Gesprek wordt niet meer bewaard",
+        "recent": "Recente gesprekken",
+        "untitledConversation": "Gesprek",
+        "audit": "Geschiedenis",
+        "auditEmpty": "Nog geen wijzigingen",
+        "auditSystem": "Hay.chat",
+        "auditRecurred": "Het patroon kwam terug nadat het was afgehandeld",
+        "auditMerged": "Samengevoegd met een vergelijkbaar inzicht",
+        "lifecycle": "Status",
+        "suggestedAction": "Voorgestelde actie",
+        "actions": {
+          "acknowledged": "Bevestigen",
+          "in_progress": "Starten",
+          "addressed": "Markeren als afgehandeld",
+          "rejected": "Afwijzen",
+          "archived": "Archiveren",
+          "new": "Heropenen"
+        },
+        "stateChanged": "Inzicht bijgewerkt",
+        "stateError": "Kan dit inzicht niet bijwerken",
+        "rejectTitle": "Dit inzicht afwijzen?",
+        "rejectDescription": "Vertel ons waarom, zodat de reden in de geschiedenis blijft staan. Er verandert niets aan je AI.",
+        "rejectReason": "Reden (optioneel)",
+        "rejectConfirm": "Afwijzen",
+        "fixed": {
+          "title": "Na afhandeling",
+          "watching": "In de gaten houden: we vergelijken de komende {days} dagen met de 30 dagen ervoor.",
+          "fixed": "Opgelost: nu {after} per week, was {before}.",
+          "improved": "Verbeterd: nu {after} per week, was {before}.",
+          "notFixed": "Nog niet opgelost: nu {after} per week, eerder {before}."
+        },
+        "archiveSuggestion": "Al 45 dagen geen nieuwe gesprekken. Je kunt dit inzicht archiveren.",
+        "approve": {
+          "playbook_edit": "Een playbookwijziging voorstellen",
+          "knowledge": "Een kenniscorrectie voorstellen",
+          "task": "Een taak aanmaken",
+          "hintPlaybook": "Opent een voorgestelde wijziging van het playbook die je kunt beoordelen. Opslaan maakt een concept aan; dat bereikt pas nieuwe gesprekken nadat je het publiceert.",
+          "hintKnowledge": "Opent een voorgestelde wijziging van je kennis die je kunt beoordelen voordat er iets wordt opgeslagen.",
+          "hintTask": "Dit vraagt om een wijziging buiten de AI. We bewaren het hier als taak zodat je het kunt volgen.",
+          "error": "Kan het voorstel niet voorbereiden",
+          "draftSaved": "Concept opgeslagen. Publiceer het playbook om het in nieuwe gesprekken te gebruiken.",
+          "openPlaybook": "Playbook openen",
+          "knowledgeSaved": "Kennis opgeslagen en inzicht gemarkeerd als afgehandeld",
+          "taskTitle": "Taak",
+          "taskDescription": "Kopieer dit naar je takenlijst of bewaar het hier. Markeer het inzicht als afgehandeld wanneer het klaar is.",
+          "copy": "Kopiëren",
+          "copied": "Gekopieerd",
+          "newPlaybook": "Een playbook aanmaken"
+        },
+        "auditApproved": "Goedgekeurd; er is een voorstel geopend ter beoordeling"
+      },
+      "settingsDialog": {
+        "title": "Instellingen voor inzichten",
+        "description": "De standaardwaarden werken voor de meeste winkels. Wijzigingen gelden vanaf de volgende nachtelijke analyse.",
+        "minClusterSize": "Minimum aantal gesprekken voordat een inzicht verschijnt",
+        "digestEnabled": "Wekelijkse samenvatting per e-mail aan eigenaren en beheerders",
+        "advanced": "Geavanceerd: gelijkenis",
+        "joinThreshold": "Gelijkenis voor toevoegen (0,70 tot 0,98)",
+        "mergeThreshold": "Gelijkenis voor samenvoegen (0,75 tot 0,99)",
+        "tuning": "In de afgelopen 30 dagen: {issues} beoordeelde gesprekken en beoordelingen, {clusters} patronen, {promoted} getoond, {singletons} maar één keer gezien.",
+        "save": "Opslaan",
+        "saved": "Instellingen voor inzichten opgeslagen",
+        "error": "Kan de instellingen niet opslaan"
+      },
+      "fixedBadge": {
+        "fixed": "Opgelost",
+        "improved": "Verbeterd",
+        "not_fixed": "Niet opgelost"
+      }
+    }
+  }
+}

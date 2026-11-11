@@ -1,6 +1,7 @@
 {
   "name": "Klaviyo",
   "description": "Conecte sua conta Klaviyo para gerenciar perfis, listas, segmentos, campanhas, fluxos, eventos e templates",
+  "summary": "Trabalhe com perfis, listas, segmentos, campanhas e fluxos.",
   "tools": {},
   "config": {
     "apiKey": {

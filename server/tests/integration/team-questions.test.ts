@@ -1,5 +1,14 @@
 import "reflect-metadata";
-import { describe, it, expect, beforeAll, afterAll, beforeEach, jest } from "@jest/globals";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+  afterEach,
+  jest,
+} from "@jest/globals";
 import { AppDataSource } from "../../database/data-source";
 import { Organization } from "../../entities/organization.entity";
 import { User } from "../../entities/user.entity";
@@ -420,5 +429,104 @@ describe("quick check with the team", () => {
     await expect(
       teamQuestionService.dismiss(result.question.id, orgId, memberId),
     ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  describe("multilingual inbox", () => {
+    /** The LLM translates every item as `[target] text`, written in `source`. */
+    function llmTranslates(source: string) {
+      mockLlm.mockImplementation(async (options) => {
+        const target = /\(([a-zA-Z-]+)\)/.exec(String(options.prompt))![1];
+        const items = JSON.parse(String(options.history)).items as Array<{
+          id: string;
+          text: string;
+        }>;
+        return JSON.stringify({
+          translations: items.map((item) => ({
+            id: item.id,
+            sourceLanguage: source,
+            text: `[${target}] ${item.text}`,
+          })),
+        });
+      });
+    }
+
+    afterEach(async () => {
+      await AppDataSource.getRepository(User).update(
+        { id: memberId },
+        { translationLanguage: null },
+      );
+    });
+
+    it("translates an answer sent as written into the shopper's language, keeping the original", async () => {
+      await AppDataSource.getRepository(User).update(
+        { id: memberId },
+        { translationLanguage: "nl" },
+      );
+      llmTranslates("nl");
+      const conversation = await chat();
+      const result = await ask(conversation);
+      if (result.kind !== "asked") throw new Error("expected asked");
+
+      await teamQuestionService.answer({
+        questionId: result.question.id,
+        organizationId: orgId,
+        userId: memberId,
+        answer: "Ja, met cadeaudoos.",
+        relayMode: "verbatim",
+        saveToKnowledge: false,
+      });
+
+      const [line] = await botLines(conversation.id);
+      expect(line.content).toBe("[en] Ja, met cadeaudoos.");
+      expect(line.translations).toEqual({ nl: "Ja, met cadeaudoos." });
+      expect(line.detectedLanguage).toBe("en");
+    });
+
+    it("shows questions in the reader's language, translated once and cached", async () => {
+      llmTranslates("en");
+      const conversation = await chat();
+      const result = await ask(conversation);
+      if (result.kind !== "asked") throw new Error("expected asked");
+      const read = () =>
+        teamQuestionService.translateForReader({
+          organizationId: orgId,
+          questionIds: [result.question.id],
+          language: "nl",
+        });
+
+      const [first] = await read();
+      expect(first).toEqual({
+        questionId: result.question.id,
+        question: {
+          source: "Does the 40 cm vase ship in a gift box?",
+          text: "[nl] Does the 40 cm vase ship in a gift box?",
+        },
+        customerMessage: {
+          source: "Does the 40 cm vase ship in a gift box?",
+          text: "[nl] Does the 40 cm vase ship in a gift box?",
+        },
+      });
+      expect(mockLlm).toHaveBeenCalledTimes(1);
+
+      expect(await read()).toEqual([first]);
+      expect(mockLlm).toHaveBeenCalledTimes(1);
+
+      // Another organization sees nothing.
+      expect(
+        await teamQuestionService.translateForReader({
+          organizationId: "d1900000-0000-4000-8000-0000000000ff",
+          questionIds: [result.question.id],
+          language: "nl",
+        }),
+      ).toEqual([]);
+
+      // The shopper's message is known to be English: an English reader costs nothing.
+      const [english] = await teamQuestionService.translateForReader({
+        organizationId: orgId,
+        questionIds: [result.question.id],
+        language: "en",
+      });
+      expect(english.customerMessage?.text).toBe("Does the 40 cm vase ship in a gift box?");
+    });
   });
 });

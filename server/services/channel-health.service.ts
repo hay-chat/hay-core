@@ -3,7 +3,11 @@ import type { ChannelHealth, ChannelHealthReason } from "@server/entities/plugin
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { getDashboardUrl } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
-import { organizationNotificationLocale, type NotificationLocale } from "./notification-locale";
+import {
+  organizationNotificationLocale,
+  recipientNotificationLocale,
+  type NotificationLocale,
+} from "./notification-locale";
 import { orgDashboardPath } from "@server/lib/dashboard-links";
 
 /**
@@ -94,17 +98,33 @@ const COPY: Record<NotificationLocale, Copy> = {
     button: "Abrir la configuración del canal",
     footer: "Enviado a todos los propietarios y administradores de esta organización.",
   },
+  nl: {
+    subject: (channel) => `${channel} werkt niet goed op Hay.chat`,
+    title: (channel) => `${channel} heeft aandacht nodig`,
+    reasons: {
+      delivery_failures: () =>
+        "Het afgelopen uur konden meerdere antwoorden aan klanten niet worden afgeleverd. Klanten op dit kanaal krijgen mogelijk geen antwoord.",
+      token_revoked: () =>
+        "De koppeling is ingetrokken of verlopen. Hay.chat kan op dit kanaal geen berichten ontvangen of versturen tot je het opnieuw koppelt.",
+      quality_drop: () =>
+        "De provider heeft de kwaliteitsbeoordeling van dit kanaal verlaagd. Als die blijft dalen, kunnen de berichtlimieten omlaag gaan.",
+    },
+    detailLabel: "Detail",
+    button: "Kanaalinstellingen openen",
+    footer: "Verzonden naar alle eigenaren en beheerders van deze organisatie.",
+  },
 };
 
 interface Recipient {
   id: string;
   email: string;
   first_name: string | null;
+  interface_language: string | null;
 }
 
 async function adminRecipients(organizationId: string): Promise<Recipient[]> {
   return AppDataSource.query(
-    `SELECT u.id, u.email, u.first_name
+    `SELECT u.id, u.email, u.first_name, u.interface_language
        FROM user_organizations uo
        JOIN users u ON u.id = uo.user_id
       WHERE uo.organization_id = $1
@@ -212,21 +232,25 @@ export const channelHealthService = {
     channelName: string,
     health: ChannelHealth,
   ): Promise<void> {
-    const locale = await organizationNotificationLocale(organizationId);
-    const copy = COPY[locale];
+    const organizationLocale = await organizationNotificationLocale(organizationId);
     const reason = health.reason ?? "delivery_failures";
     const path = orgDashboardPath(
       organizationId,
       `/integrations/plugins/${encodeURIComponent(pluginId)}`,
     );
-    const message = copy.reasons[reason](health.detail ?? "");
+    const message = (copy: Copy) => copy.reasons[reason](health.detail ?? "");
 
     try {
       const { emailService } = await import("./email.service");
       const recipients = await adminRecipients(organizationId);
       await Promise.all(
-        recipients.map((recipient) =>
-          emailService
+        recipients.map((recipient) => {
+          const locale = recipientNotificationLocale(
+            recipient.interface_language,
+            organizationLocale,
+          );
+          const copy = COPY[locale];
+          return emailService
             .sendTemplateEmail({
               to: recipient.email,
               subject: copy.subject(channelName),
@@ -236,7 +260,7 @@ export const channelHealthService = {
                 companyName: "Hay.chat",
                 userName: recipient.first_name || undefined,
                 notificationTitle: copy.title(channelName),
-                notificationMessage: message,
+                notificationMessage: message(copy),
                 details:
                   health.detail && reason !== "delivery_failures"
                     ? [{ label: copy.detailLabel, value: health.detail }]
@@ -247,8 +271,8 @@ export const channelHealthService = {
             })
             .catch((error: unknown) => {
               logger.error({ err: error, organizationId }, "Channel failing email failed");
-            }),
-        ),
+            });
+        }),
       );
     } catch (error) {
       logger.error({ err: error, organizationId }, "Channel failing emails failed");
@@ -258,8 +282,7 @@ export const channelHealthService = {
       const { pushNotificationService } = await import("./push-notification.service");
       await pushNotificationService.onChannelFailing({
         organizationId,
-        title: copy.title(channelName),
-        body: message,
+        copy: (locale) => ({ title: COPY[locale].title(channelName), body: message(COPY[locale]) }),
         url: path,
         tag: `channel-failing:${pluginId}`,
       });

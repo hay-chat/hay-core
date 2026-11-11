@@ -19,6 +19,9 @@ export const roleProtectedRoutes: Record<string, string[]> = {
   // In-app setup
   "/setup": ["owner", "admin"],
 
+  // Analytics needs the analytics scope, which the agent role lacks
+  "/analytics": ["owner", "admin", "contributor", "member", "viewer"],
+
   // Insights - all except agent
   "/insights": ["owner", "admin", "contributor", "member", "viewer"],
 

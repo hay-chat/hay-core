@@ -17,6 +17,7 @@ export interface WebchatSettingsUpdateDTO {
   theme?: WebchatTheme;
   showGreeting?: boolean;
   greetingMessage?: string | null;
+  teaserMessage?: string | null;
   csatEnabled?: boolean;
   csatQuestion?: string | null;
   allowedDomains?: string[];
@@ -66,6 +67,7 @@ export class WebchatSettingsService {
     theme: WebchatTheme;
     showGreeting: boolean;
     greetingMessage: string | null;
+    teaserMessage: string | null;
     csatEnabled: boolean;
     csatQuestion: string | null;
     agentName: string | null;
@@ -96,6 +98,7 @@ export class WebchatSettingsService {
       theme: settings.theme,
       showGreeting: settings.showGreeting,
       greetingMessage: settings.greetingMessage,
+      teaserMessage: settings.teaserMessage,
       csatEnabled: settings.csatEnabled,
       csatQuestion: settings.csatQuestion,
       agentName,

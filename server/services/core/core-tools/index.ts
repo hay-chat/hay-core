@@ -14,6 +14,7 @@ import type { Conversation } from "@server/database/entities/conversation.entity
 import { createLogger } from "@server/lib/logger";
 import type { ToolRisk } from "../tool-risk";
 import { calculateDateTool } from "./calculate-date";
+import { addToCartTool, goToCheckoutTool } from "./store-cart";
 import { completeProductCaseTool } from "./complete-product-case";
 import { createTicketTool } from "./create-ticket";
 import { findPageUrlTool } from "./find-page-url";
@@ -31,6 +32,12 @@ export interface CoreToolDefinition {
   inputSchema: Record<string, unknown>;
   /** READ_RISK, or CORE_WRITE_RISK when the tool changes anything (dry-run simulates it). */
   risk: ToolRisk;
+  /**
+   * For a tool that only works in some conversations (e.g. it needs the
+   * shopper's browser on the store): whether the planner should be offered it
+   * here. Missing = always.
+   */
+  isAvailable?(conversation: Conversation): Promise<boolean>;
   /**
    * Tool body. Receives the conversation (so the impl can scope to the org)
    * plus the parsed args. Whatever it returns is JSON-serialized into the
@@ -62,6 +69,14 @@ class CoreToolRegistry {
     return Array.from(this.tools.values());
   }
 
+  /** The tools the planner is offered in this conversation. */
+  async listFor(conversation: Conversation): Promise<CoreToolDefinition[]> {
+    const offered = await Promise.all(
+      this.list().map(async (tool) => !tool.isAvailable || (await tool.isAvailable(conversation))),
+    );
+    return this.list().filter((_tool, index) => offered[index]);
+  }
+
   async execute(
     name: string,
     conversation: Conversation,
@@ -83,3 +98,5 @@ coreToolRegistry.register(completeProductCaseTool);
 coreToolRegistry.register(createTicketTool);
 coreToolRegistry.register(findPageUrlTool);
 coreToolRegistry.register(calculateDateTool);
+coreToolRegistry.register(addToCartTool);
+coreToolRegistry.register(goToCheckoutTool);

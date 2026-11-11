@@ -1,6 +1,7 @@
 {
   "name": "Shopify",
   "description": "Connect your Shopify store so the agent can look up orders, customers, and products, track shipments, and handle cancellations, refunds, and returns.",
+  "summary": "Look up orders, recommend real products from your catalog and handle disputes.",
   "tools": {
     "shopify_get_shop": {
       "label": "Get Store Info",

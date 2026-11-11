@@ -1,6 +1,7 @@
 {
   "name": "Spacebring",
   "description": "Connect your Spacebring co-working space so the assistant can book, move and cancel rooms for members, invite their guests, report issues to the team and answer house questions.",
+  "summary": "Book, move and cancel rooms for members, invite guests and report issues.",
   "tools": {
     "spacebring_get_member": {
       "label": "Get Member",

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { addToCart, cartFor } from "../cart";
+import { addToCart, cartFor, runStoreAction } from "../cart";
 import type { CartContribution, RecommendedProduct } from "@/types";
 
 const cart: CartContribution = {
@@ -96,5 +96,77 @@ describe("addToCart", () => {
   it("fails when the store refuses", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 422 }));
     await expect(addToCart(cart, { cartItemId: "44" })).rejects.toThrow("422");
+  });
+});
+
+describe("after an add", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("tells the page its cart changed, with the plugin's events and ours", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
+    const heard: string[] = [];
+    const listen = (name: string) =>
+      document.addEventListener(name, () => heard.push(name), { once: true });
+    ["theme:refresh", "hay:cart-updated", "bad name"].forEach(listen);
+
+    const withEvents = {
+      ...cart,
+      props: { ...cart.props, afterAddEvents: "theme:refresh,bad name" },
+    };
+    await addToCart(withEvents, { cartItemId: "44" });
+
+    expect(heard).toEqual(["theme:refresh", "hay:cart-updated"]);
+  });
+
+  it("says nothing when the store refused", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 422 }));
+    const listener = vi.fn();
+    document.addEventListener("hay:cart-updated", listener, { once: true });
+    await expect(addToCart(cart, { cartItemId: "44" })).rejects.toThrow();
+    expect(listener).not.toHaveBeenCalled();
+    document.removeEventListener("hay:cart-updated", listener);
+  });
+});
+
+describe("runStoreAction (what the assistant asks this browser to do)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("adds what the server resolved to the store's cart", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const answer = await runStoreAction(
+      [cart],
+      "add_to_cart",
+      { source: "store", cartItemId: "44", quantity: 2 },
+      "conv-1",
+    );
+
+    expect(answer).toBe("Added to the cart.");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).items[0]).toMatchObject({
+      id: 44,
+      quantity: 2,
+    });
+  });
+
+  it("answers before it opens the checkout", async () => {
+    vi.useFakeTimers();
+    const page = { assign: vi.fn() } as unknown as Location;
+
+    const answer = await runStoreAction([cart], "go_to_checkout", { source: "store" }, null, page);
+
+    expect(answer).toBe("Opening the checkout page.");
+    expect(page.assign).not.toHaveBeenCalled();
+    vi.runAllTimers();
+    expect(page.assign).toHaveBeenCalledWith("/checkout");
+  });
+
+  it("refuses a cart this page does not have", async () => {
+    await expect(
+      runStoreAction([cart], "add_to_cart", { source: "other", cartItemId: "44" }, null),
+    ).rejects.toThrow();
   });
 });

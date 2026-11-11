@@ -29,6 +29,7 @@ import { Conversation } from "@server/database/entities/conversation.entity";
 import { Message, MessageType } from "@server/database/entities/message.entity";
 import { IsNull, type QueryDeepPartialEntity } from "typeorm";
 import { LLMService } from "@server/services/core/llm.service";
+import type { UsageRecord } from "@server/services/llm/provider.types";
 import { PromptService } from "@server/services/prompt.service";
 import { redactString } from "@server/lib/logger/redaction";
 import { createLogger } from "@server/lib/logger";
@@ -359,7 +360,7 @@ export class CloseClassifierService {
       });
       await this.writeClassification(row, conversation, decision, response, {
         model: result.model,
-        usage: result.usage as unknown as Record<string, unknown>,
+        usage: result.usage,
       });
       await insightRunsService.record({
         organizationId: row.organization_id,
@@ -530,7 +531,7 @@ export class CloseClassifierService {
     conversation: Conversation,
     decision: OutcomeDecision,
     response: ClassifierResponse,
-    llm: { model: string; usage: Record<string, unknown> },
+    llm: { model: string; usage: UsageRecord },
   ): Promise<void> {
     const written = await AppDataSource.transaction(async (manager) => {
       const result = await manager

@@ -1,73 +1,272 @@
-export enum SupportedLanguage {
-  ENGLISH = "en",
-  SPANISH = "es",
-  FRENCH = "fr",
-  GERMAN = "de",
-  PORTUGUESE = "pt",
-  ITALIAN = "it",
-  DUTCH = "nl",
-  RUSSIAN = "ru",
-  CHINESE = "zh",
-  JAPANESE = "ja",
-  KOREAN = "ko",
-  ARABIC = "ar",
-  HINDI = "hi",
-  TURKISH = "tr",
-  POLISH = "pl",
-  SWEDISH = "sv",
-  DANISH = "da",
-  NORWEGIAN = "no",
-  FINNISH = "fi",
-  GREEK = "el",
-  HEBREW = "he",
-  THAI = "th",
-  VIETNAMESE = "vi",
-  INDONESIAN = "id",
-  MALAY = "ms",
-  CZECH = "cs",
-  SLOVAK = "sk",
-  HUNGARIAN = "hu",
-  ROMANIAN = "ro",
-  BULGARIAN = "bg",
-  UKRAINIAN = "uk",
-  CATALAN = "ca",
-  CROATIAN = "hr",
+/**
+ * Languages Hay understands: ISO 639-1 codes for living languages, plus the
+ * written variants that need their own code. Dead and constructed languages
+ * (Latin, Sanskrit, Esperanto, ...) are left out.
+ *
+ * - `pt` is Brazilian Portuguese (prompts and copy are written in it);
+ *   `pt-PT` is European Portuguese.
+ * - `zh` is Simplified Chinese; `zh-Hant` is Traditional Chinese.
+ *
+ * Names are never stored: use {@link languageName}.
+ */
+export const LANGUAGE_CODES = [
+  "aa",
+  "ab",
+  "af",
+  "ak",
+  "am",
+  "an",
+  "ar",
+  "as",
+  "av",
+  "ay",
+  "az",
+  "ba",
+  "be",
+  "bg",
+  "bi",
+  "bm",
+  "bn",
+  "bo",
+  "br",
+  "bs",
+  "ca",
+  "ce",
+  "ch",
+  "co",
+  "cr",
+  "cs",
+  "cv",
+  "cy",
+  "da",
+  "de",
+  "dv",
+  "dz",
+  "ee",
+  "el",
+  "en",
+  "es",
+  "et",
+  "eu",
+  "fa",
+  "ff",
+  "fi",
+  "fj",
+  "fo",
+  "fr",
+  "fy",
+  "ga",
+  "gd",
+  "gl",
+  "gn",
+  "gu",
+  "gv",
+  "ha",
+  "he",
+  "hi",
+  "ho",
+  "hr",
+  "ht",
+  "hu",
+  "hy",
+  "hz",
+  "id",
+  "ig",
+  "ii",
+  "ik",
+  "is",
+  "it",
+  "iu",
+  "ja",
+  "jv",
+  "ka",
+  "kg",
+  "ki",
+  "kj",
+  "kk",
+  "kl",
+  "km",
+  "kn",
+  "ko",
+  "kr",
+  "ks",
+  "ku",
+  "kv",
+  "kw",
+  "ky",
+  "lb",
+  "lg",
+  "li",
+  "ln",
+  "lo",
+  "lt",
+  "lu",
+  "lv",
+  "mg",
+  "mh",
+  "mi",
+  "mk",
+  "ml",
+  "mn",
+  "mr",
+  "ms",
+  "mt",
+  "my",
+  "na",
+  "nb",
+  "nd",
+  "ne",
+  "ng",
+  "nl",
+  "nn",
+  "no",
+  "nr",
+  "nv",
+  "ny",
+  "oc",
+  "oj",
+  "om",
+  "or",
+  "os",
+  "pa",
+  "pl",
+  "ps",
+  "pt",
+  "pt-PT",
+  "qu",
+  "rm",
+  "rn",
+  "ro",
+  "ru",
+  "rw",
+  "sc",
+  "sd",
+  "se",
+  "sg",
+  "si",
+  "sk",
+  "sl",
+  "sm",
+  "sn",
+  "so",
+  "sq",
+  "sr",
+  "ss",
+  "st",
+  "su",
+  "sv",
+  "sw",
+  "ta",
+  "te",
+  "tg",
+  "th",
+  "ti",
+  "tk",
+  "tl",
+  "tn",
+  "to",
+  "tr",
+  "ts",
+  "tt",
+  "tw",
+  "ty",
+  "ug",
+  "uk",
+  "ur",
+  "uz",
+  "ve",
+  "vi",
+  "wa",
+  "wo",
+  "xh",
+  "yi",
+  "yo",
+  "za",
+  "zh",
+  "zh-Hant",
+  "zu",
+] as const;
+
+export type LanguageCode = (typeof LANGUAGE_CODES)[number];
+
+export const DEFAULT_LANGUAGE: LanguageCode = "en";
+
+const LANGUAGE_CODE_SET: ReadonlySet<string> = new Set(LANGUAGE_CODES);
+
+/** Codes browsers send that ISO 639-1 spells differently. */
+const LANGUAGE_ALIASES: Record<string, LanguageCode> = { fil: "tl" };
+
+/** Regions that write Traditional Chinese when no script is given. */
+const TRADITIONAL_CHINESE_REGIONS = new Set(["TW", "HK", "MO"]);
+
+export function isLanguageCode(value: unknown): value is LanguageCode {
+  return typeof value === "string" && LANGUAGE_CODE_SET.has(value);
 }
 
-export const DEFAULT_LANGUAGE = SupportedLanguage.ENGLISH;
+/**
+ * Map a BCP-47 tag (`sv-SE`, `pt_PT`, `zh-TW`, `iw`) to a {@link LanguageCode},
+ * or null when it is empty, malformed or not a language Hay knows.
+ */
+export function normalizeLanguage(value: string | null | undefined): LanguageCode | null {
+  const tag = value?.trim().replace(/_/g, "-");
+  if (!tag) return null;
 
-export const LANGUAGE_NAMES: Record<SupportedLanguage, string> = {
-  [SupportedLanguage.ENGLISH]: "English",
-  [SupportedLanguage.SPANISH]: "Español",
-  [SupportedLanguage.FRENCH]: "Français",
-  [SupportedLanguage.GERMAN]: "Deutsch",
-  [SupportedLanguage.PORTUGUESE]: "Português",
-  [SupportedLanguage.ITALIAN]: "Italiano",
-  [SupportedLanguage.DUTCH]: "Nederlands",
-  [SupportedLanguage.RUSSIAN]: "Русский",
-  [SupportedLanguage.CHINESE]: "中文",
-  [SupportedLanguage.JAPANESE]: "日本語",
-  [SupportedLanguage.KOREAN]: "한국어",
-  [SupportedLanguage.ARABIC]: "العربية",
-  [SupportedLanguage.HINDI]: "हिन्दी",
-  [SupportedLanguage.TURKISH]: "Türkçe",
-  [SupportedLanguage.POLISH]: "Polski",
-  [SupportedLanguage.SWEDISH]: "Svenska",
-  [SupportedLanguage.DANISH]: "Dansk",
-  [SupportedLanguage.NORWEGIAN]: "Norsk",
-  [SupportedLanguage.FINNISH]: "Suomi",
-  [SupportedLanguage.GREEK]: "Ελληνικά",
-  [SupportedLanguage.HEBREW]: "עברית",
-  [SupportedLanguage.THAI]: "ไทย",
-  [SupportedLanguage.VIETNAMESE]: "Tiếng Việt",
-  [SupportedLanguage.INDONESIAN]: "Bahasa Indonesia",
-  [SupportedLanguage.MALAY]: "Bahasa Melayu",
-  [SupportedLanguage.CZECH]: "Čeština",
-  [SupportedLanguage.SLOVAK]: "Slovenčina",
-  [SupportedLanguage.HUNGARIAN]: "Magyar",
-  [SupportedLanguage.ROMANIAN]: "Română",
-  [SupportedLanguage.BULGARIAN]: "Български",
-  [SupportedLanguage.UKRAINIAN]: "Українська",
-  [SupportedLanguage.CATALAN]: "Català",
-  [SupportedLanguage.CROATIAN]: "Hrvatski",
-};
+  let locale: Intl.Locale;
+  try {
+    locale = new Intl.Locale(tag);
+  } catch {
+    return null;
+  }
+
+  const language = LANGUAGE_ALIASES[locale.language] ?? locale.language;
+  if (language === "pt" && locale.region === "PT") return "pt-PT";
+  if (language === "zh") {
+    const traditional =
+      locale.script === "Hant" ||
+      (!locale.script && !!locale.region && TRADITIONAL_CHINESE_REGIONS.has(locale.region));
+    return traditional ? "zh-Hant" : "zh";
+  }
+  return isLanguageCode(language) ? language : null;
+}
+
+/**
+ * Name of a language, written in `displayLocale` ("Dutch", or "Nederlands" for `nl`).
+ * `pt` is Brazilian Portuguese in Hay, so it is named as `pt-BR`.
+ */
+export function languageName(
+  code: string | null | undefined,
+  displayLocale: string = DEFAULT_LANGUAGE,
+): string {
+  const value = code?.trim() || DEFAULT_LANGUAGE;
+  try {
+    return (
+      new Intl.DisplayNames([displayLocale], { type: "language" }).of(
+        value === "pt" ? "pt-BR" : value,
+      ) ?? value
+    );
+  } catch {
+    return value;
+  }
+}
+
+/** Fewest letters a message needs before its detected language is trusted. */
+const MIN_LETTERS_TO_TRUST_LANGUAGE = 12;
+
+/**
+ * Whether a customer message's detected language should replace the
+ * conversation's. Short replies ("ok", "👍", "merci") are often detected as
+ * the wrong language, so they never switch it.
+ */
+export function shouldAdoptLanguage(
+  text: string | null | undefined,
+  detected: string | null | undefined,
+  current: string | null | undefined,
+): detected is LanguageCode {
+  if (!isLanguageCode(detected) || detected === current) return false;
+  // One Chinese, Japanese or Korean character carries about a word's worth of text.
+  const ideographs =
+    text?.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu)
+      ?.length ?? 0;
+  const letters = text?.match(/\p{L}/gu)?.length ?? 0;
+  return letters + ideographs * 2 >= MIN_LETTERS_TO_TRUST_LANGUAGE;
+}

@@ -71,6 +71,7 @@
     },
     "groups": {
       "commerce": "Where you sell",
+      "shipping": "Shipping",
       "payments": "Payments",
       "crm": "Customers and CRM",
       "helpdesk": "Support",

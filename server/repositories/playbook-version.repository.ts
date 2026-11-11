@@ -26,7 +26,7 @@ export class PlaybookVersionRepository {
   async findByPlaybookId(playbookId: string): Promise<PlaybookVersion[]> {
     return await this.getRepository().find({
       where: { playbook_id: playbookId },
-      relations: ["created_by", "published_by"],
+      relations: { created_by: true, published_by: true },
       order: { version_number: "DESC" },
     });
   }
@@ -34,21 +34,21 @@ export class PlaybookVersionRepository {
   async findById(id: string): Promise<PlaybookVersion | null> {
     return await this.getRepository().findOne({
       where: { id },
-      relations: ["created_by", "published_by"],
+      relations: { created_by: true, published_by: true },
     });
   }
 
   async findDraftByPlaybookId(playbookId: string): Promise<PlaybookVersion | null> {
     return await this.getRepository().findOne({
       where: { playbook_id: playbookId, status: PlaybookVersionStatus.DRAFT },
-      relations: ["created_by", "published_by"],
+      relations: { created_by: true, published_by: true },
     });
   }
 
   async findActiveByPlaybookId(playbookId: string): Promise<PlaybookVersion | null> {
     return await this.getRepository().findOne({
       where: { playbook_id: playbookId, status: PlaybookVersionStatus.ACTIVE },
-      relations: ["created_by", "published_by"],
+      relations: { created_by: true, published_by: true },
     });
   }
 

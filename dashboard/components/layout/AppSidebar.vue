@@ -63,6 +63,7 @@ import { useAppStore } from "@/stores/app";
 import { useSetupStore } from "@/stores/setup";
 import { Hay } from "@/utils/api";
 import { roleProtectedRoutes } from "@/utils/route-access";
+import { pluginDetailPath } from "@/utils/marketplace";
 import type { RouterOutputs } from "@/types/trpc";
 
 type PluginMenuItem = RouterOutputs["plugins"]["getMenuItems"]["items"][number];
@@ -177,10 +178,15 @@ const navMain = computed(() => {
     });
   }
 
-  // Insights and feedback on AI replies; the agent role cannot open /insights.
+  // Analytics, insights and feedback on AI replies; the agent role cannot open them.
   const qualityItems = [{ title: t("nav.tests"), url: "/tests", isActive: isPathActive("/tests") }];
   if (!userStore.isAgent) {
     qualityItems.push(
+      {
+        title: t("nav.analytics"),
+        url: "/analytics",
+        isActive: isPathActive("/analytics"),
+      },
       {
         title: t("nav.insights"),
         url: "/insights",
@@ -236,13 +242,20 @@ const navMain = computed(() => {
         {
           title: t("nav.marketplace"),
           url: "/integrations/marketplace",
-          isActive: route.path === "/integrations/marketplace",
+          // A plugin that is not connected yet is still a marketplace page.
+          isActive:
+            route.path === "/integrations/marketplace" ||
+            (route.path.startsWith("/integrations/plugins/") &&
+              !appStore.enabledPlugins.some(
+                (plugin) => route.path === pluginDetailPath(plugin.id),
+              )),
         },
         // Add enabled plugins dynamically
         ...appStore.enabledPlugins.map((plugin) => ({
           title: plugin.name,
-          url: `/integrations/plugins/${encodeURIComponent(plugin.id)}`,
-          isActive: route.path === `/integrations/plugins/${encodeURIComponent(plugin.id)}`,
+          url: pluginDetailPath(plugin.id),
+          isActive: route.path === pluginDetailPath(plugin.id),
+          needsSetup: appStore.pluginStatus(plugin.id) === "needs_setup",
         })),
       ],
     });

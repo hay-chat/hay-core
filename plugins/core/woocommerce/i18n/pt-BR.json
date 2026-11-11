@@ -1,6 +1,7 @@
 {
   "name": "WooCommerce",
   "description": "Conecte sua loja WooCommerce para que o agente consulte os pedidos de um cliente, acompanhe envios, cancele ou redirecione pedidos ainda não despachados, emita reembolsos e responda perguntas sobre produtos e estoque.",
+  "summary": "Encontre pedidos, rastreie envios, cancele ou redirecione, reembolse e responda sobre estoque.",
   "tools": {
     "woocommerce_get_store": {
       "label": "Informações da loja",

@@ -10,6 +10,7 @@
       "title": "Resoluções cobráveis",
       "period": "{start} a {end}",
       "periodNote": "Contado no seu período de cobrança, as mesmas datas da sua fatura.",
+      "included": "de {included} incluídas no seu plano",
       "planNote": "A franquia do seu plano e eventuais cobranças de resoluções extras estão na sua página de cobrança.",
       "paused": "O agente de IA está pausado porque as resoluções do plano acabaram. As conversas aguardam sua equipe.",
       "calendarNote": "Contado por mês do calendário (UTC). Sua fatura pode usar outras datas de período."

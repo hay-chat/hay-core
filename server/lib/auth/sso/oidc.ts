@@ -218,14 +218,14 @@ export async function exchangeCode(params: {
   }
 }
 
-async function fetchSigningKeys(jwksUri: string): Promise<crypto.JsonWebKey[]> {
+async function fetchSigningKeys(jwksUri: string): Promise<crypto.webcrypto.JsonWebKey[]> {
   try {
     const response = await request(jwksUri, { headers: { accept: "application/json" } });
     if (!response.ok) throw new Error(`JWKS answered ${response.status}`);
     const body = await readJson(response);
     if (!Array.isArray(body.keys)) throw new Error("JWKS has no keys");
     return body.keys.filter(
-      (key): key is crypto.JsonWebKey =>
+      (key): key is crypto.webcrypto.JsonWebKey =>
         !!key && typeof key === "object" && (key.use === undefined || key.use === "sig"),
     );
   } catch {

@@ -4,7 +4,12 @@ import { config } from "@server/config/env";
 import { AppDataSource } from "@server/database/data-source";
 import { PushSubscription } from "@server/database/entities/push-subscription.entity";
 import { createLogger } from "@server/lib/logger";
-import { organizationNotificationLocale } from "./notification-locale";
+import {
+  groupByNotificationLocale,
+  organizationNotificationLocale,
+  userNotificationLocale,
+  type NotificationLocale,
+} from "./notification-locale";
 import { orgDashboardPath } from "@server/lib/dashboard-links";
 
 const logger = createLogger("push-notifications");
@@ -32,8 +37,11 @@ export interface SubscribeInput {
   userAgent?: string | null;
 }
 
-/** Test-alert copy by organization notification locale. */
-const TEST_COPY = {
+/** Title and body of a push in one locale. */
+export type PushCopy = (locale: NotificationLocale) => { title: string; body: string };
+
+/** Test-alert copy by notification locale. */
+const TEST_COPY: Record<NotificationLocale, { title: string; body: string }> = {
   en: {
     title: "Hay.chat alerts are on",
     body: "You will be notified here when a conversation needs a human.",
@@ -46,10 +54,14 @@ const TEST_COPY = {
     title: "Las alertas de Hay.chat están activadas",
     body: "Te avisaremos aquí cuando una conversación necesite a una persona.",
   },
-} as const;
+  nl: {
+    title: "Hay.chat-meldingen staan aan",
+    body: "Je krijgt hier een melding als een gesprek een mens nodig heeft.",
+  },
+};
 
-/** "A reply could not be delivered" copy by organization notification locale. */
-const DELIVERY_FAILED_COPY = {
+/** "A reply could not be delivered" copy by notification locale. */
+const DELIVERY_FAILED_COPY: Record<NotificationLocale, { title: string; body: string }> = {
   en: {
     title: "A reply could not be delivered",
     body: "Hay.chat retried 3 times and gave up. Open the conversation to follow up.",
@@ -62,7 +74,11 @@ const DELIVERY_FAILED_COPY = {
     title: "No se pudo entregar una respuesta",
     body: "Hay.chat lo intentó 3 veces sin éxito. Abre la conversación para darle seguimiento.",
   },
-} as const;
+  nl: {
+    title: "Een antwoord kon niet worden afgeleverd",
+    body: "Hay.chat heeft het 3 keer geprobeerd en is gestopt. Open het gesprek om het op te volgen.",
+  },
+};
 
 /** Per-recipient result of a push: how many devices accepted it. */
 export interface PushResult {
@@ -169,21 +185,8 @@ class PushNotificationService {
     organizationId: string;
     conversationId: string;
   }): Promise<void> {
-    if (!this.isConfigured()) return;
-    const copy = DELIVERY_FAILED_COPY[await organizationNotificationLocale(args.organizationId)];
-    const subscriptions = await this.repo()
-      .createQueryBuilder("s")
-      .innerJoin(
-        "user_organizations",
-        "uo",
-        "uo.user_id = s.user_id AND uo.organization_id = :organizationId AND uo.is_active = true AND uo.role IN (:...roles)",
-        { organizationId: args.organizationId, roles: ["owner", "admin"] },
-      )
-      .getMany();
-    await this.deliver(subscriptions, {
+    await this.toOwnersAndAdmins(args.organizationId, (locale) => DELIVERY_FAILED_COPY[locale], {
       kind: "channel_delivery_failed",
-      title: copy.title,
-      body: copy.body,
       url: orgDashboardPath(args.organizationId, `/conversations/${args.conversationId}`),
       tag: `delivery-failed:${args.conversationId}`,
     });
@@ -191,36 +194,47 @@ class PushNotificationService {
 
   /**
    * A channel is failing (channel-health.service, D13-11): every active owner
-   * and admin. Copy is localized by the caller.
+   * and admin, each in their own language.
    */
   async onChannelFailing(args: {
     organizationId: string;
-    title: string;
-    body: string;
+    copy: PushCopy;
     url: string;
     tag: string;
   }): Promise<void> {
-    await this.toOwnersAndAdmins({ kind: "channel_failing", ...args });
+    await this.toOwnersAndAdmins(args.organizationId, args.copy, {
+      kind: "channel_failing",
+      url: args.url,
+      tag: args.tag,
+    });
   }
 
   /**
    * A payment dispute needs a response (disputes.service, D2-7/D2-8): every
-   * active owner and admin. Copy is localized by the caller.
+   * active owner and admin, each in their own language.
    */
   async onDisputeOpened(args: {
     organizationId: string;
-    title: string;
-    body: string;
+    copy: PushCopy;
     url: string;
     tag: string;
   }): Promise<void> {
-    await this.toOwnersAndAdmins({ kind: "dispute_opened", ...args });
+    await this.toOwnersAndAdmins(args.organizationId, args.copy, {
+      kind: "dispute_opened",
+      url: args.url,
+      tag: args.tag,
+    });
   }
 
-  private async toOwnersAndAdmins({
-    organizationId,
-    ...payload
-  }: PushPayload & { organizationId: string }): Promise<void> {
+  /**
+   * Every device of the organization's active owners and admins, in each
+   * person's interface language (the organization's when they have none).
+   */
+  private async toOwnersAndAdmins(
+    organizationId: string,
+    copy: PushCopy,
+    payload: Omit<PushPayload, "title" | "body">,
+  ): Promise<void> {
     if (!this.isConfigured()) return;
     const subscriptions = await this.repo()
       .createQueryBuilder("s")
@@ -230,17 +244,28 @@ class PushNotificationService {
         "uo.user_id = s.user_id AND uo.organization_id = :organizationId AND uo.is_active = true AND uo.role IN (:...roles)",
         { organizationId, roles: ["owner", "admin"] },
       )
+      .leftJoin("s.user", "u")
+      .addSelect(["u.id", "u.interfaceLanguage"])
       .getMany();
-    await this.deliver(subscriptions, payload);
+    if (subscriptions.length === 0) return;
+
+    const groups = groupByNotificationLocale(
+      subscriptions,
+      (subscription) => subscription.user?.interfaceLanguage,
+      await organizationNotificationLocale(organizationId),
+    );
+    await Promise.all(
+      [...groups].map(([locale, group]) => this.deliver(group, { ...payload, ...copy(locale) })),
+    );
   }
 
-  /** The "send a test" button: the caller's own devices only. */
+  /** The "send a test" button: the caller's own devices only, in their language. */
   async sendTest(
-    userId: string,
+    user: { id: string; interfaceLanguage?: string | null },
     organizationId: string,
   ): Promise<{ sent: number; removed: number }> {
-    const copy = TEST_COPY[await organizationNotificationLocale(organizationId)];
-    const subscriptions = await this.repo().find({ where: { user_id: userId } });
+    const copy = TEST_COPY[await userNotificationLocale(user.interfaceLanguage, organizationId)];
+    const subscriptions = await this.repo().find({ where: { user_id: user.id } });
     return this.deliver(subscriptions, {
       kind: "test",
       title: copy.title,

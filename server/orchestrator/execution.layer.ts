@@ -51,12 +51,14 @@ import { isPageToolResult } from "@server/services/webchat/page-tools.service";
 import { Document } from "@server/entities/document.entity";
 import { describeLocalTime } from "./local-time";
 import { handoffCopy } from "./handoff-copy";
+import type { HandoffReason } from "./handoff-reason";
 import { hasFactualSpecifics } from "@server/services/core/reply-risk";
 import {
   resolveQuickCheckSettings,
   type OrganizationSettings,
 } from "@server/types/organization-settings.types";
 import type { FormSchema } from "@hay/form-schema";
+import { languageName as languageNameOf } from "@server/types/language.types";
 import { formSchemaSchema } from "@hay/form-schema";
 
 function describeBadDate(date: BadDate): string {
@@ -169,6 +171,8 @@ export interface ExecutionResult {
   };
   handoff?: {
     reason: string;
+    /** Why, as a fixed code, when a guardrail or fallback caused the hand-off. */
+    code?: HandoffReason;
     fields?: Record<string, unknown>;
   };
   close?: {
@@ -343,7 +347,7 @@ export class ExecutionLayer {
       // the enabled_tools gate in run.ts exempts core tools so playbooks
       // don't have to opt in.
       const { coreToolRegistry } = await import("@server/services/core/core-tools");
-      const coreTools = coreToolRegistry.list();
+      const coreTools = await coreToolRegistry.listFor(conversation);
       const enabledTools = conversation.enabled_tools ?? [];
       // Page tools (WebMCP): registered by the page the visitor is chatting
       // from, present only while its socket is open. Third tool source, exempt
@@ -401,23 +405,7 @@ export class ExecutionLayer {
         const shouldEnforceLanguage = customerMessages.length <= 3;
 
         if (shouldEnforceLanguage) {
-          const languageNames: Record<string, string> = {
-            en: "English",
-            pt: "Portuguese",
-            es: "Spanish",
-            de: "German",
-            fr: "French",
-            it: "Italian",
-            nl: "Dutch",
-            pl: "Polish",
-            ru: "Russian",
-            ja: "Japanese",
-            zh: "Chinese",
-            ko: "Korean",
-            ar: "Arabic",
-            hi: "Hindi",
-          };
-          const languageName = languageNames[customerLanguage] || customerLanguage.toUpperCase();
+          const languageName = languageNameOf(customerLanguage);
           const languageInstruction = `\n\nIMPORTANT LANGUAGE REQUIREMENT: The customer is communicating in ${languageName}. You MUST respond ONLY in ${languageName}, regardless of the language used in the prompts, instructions, or system messages. This is a critical requirement that overrides all other language-related instructions.`;
           finalPrompt = responsePrompt + languageInstruction;
         }
@@ -468,6 +456,7 @@ export class ExecutionLayer {
       log.debug("Invoking LLM for execution planning");
 
       const response = await this.llmService.invoke({
+        caller: "planner",
         history: [
           ...(pageToolsTurn ? [pageToolsTurn] : []),
           ...(referenceTurn ? [referenceTurn] : []),
@@ -482,10 +471,12 @@ export class ExecutionLayer {
 
       // ASK_TEAM (D19): only offered when the organization turned quick checks
       // on; the question defaults to the shopper's own words.
+      let unansweredFact = false;
       if (result.step === "ASK_TEAM") {
         if (!quickCheck) {
           result.step = "HANDOFF";
           result.handoffReason ??= "The AI could not answer a fact";
+          unansweredFact = true;
         } else if (!result.teamQuestion?.trim()) {
           result.teamQuestion = lastCustomerContent(messages);
         }
@@ -516,6 +507,7 @@ export class ExecutionLayer {
       if (result.handoffReason) {
         result.handoff = {
           reason: result.handoffReason,
+          ...(unansweredFact ? { code: "unanswered_fact" as const } : {}),
         };
       }
       if (result.closeReason) {
@@ -820,6 +812,7 @@ export class ExecutionLayer {
           reason: companyInterestAssessment.evaluationFailed
             ? "Company interest check unavailable"
             : `Company interest violation: ${companyInterestAssessment.violationType}`,
+          code: "company_interest",
           fields: {
             violationType: companyInterestAssessment.violationType,
             severity: companyInterestAssessment.severity,
@@ -922,6 +915,7 @@ export class ExecutionLayer {
             userMessage: fallbackMessage,
             handoff: {
               reason: "Low confidence in AI response - unverified company claims",
+              code: "low_confidence",
               fields: {
                 confidenceScore: result.confidence?.score,
                 confidenceTier: result.confidence?.tier,
@@ -1080,6 +1074,7 @@ export class ExecutionLayer {
           reason: assessment.evaluationFailed
             ? "Action claim check unavailable"
             : "Claimed action without tool execution",
+          code: "action_claim",
           fields: {
             claimedActions: assessment.claimedActions,
             toolsCalledThisTurn: options.toolsCalledThisTurn ?? [],
@@ -1127,6 +1122,7 @@ export class ExecutionLayer {
     });
 
     let badLinks: BadLink[];
+    const startedAt = Date.now();
     try {
       const messages = await conversation.getMessages();
       const { website, siteUrls } = await this.getLinkContext(conversation);
@@ -1136,6 +1132,10 @@ export class ExecutionLayer {
         siteUrls,
         website,
       });
+      log.info(
+        { durationMs: Date.now() - startedAt, badLinks: badLinks.length },
+        "Link check completed",
+      );
     } catch (error) {
       // The check must never break a turn.
       log.warn({ error }, "Link check failed, sending the reply unchecked");
@@ -1198,6 +1198,7 @@ export class ExecutionLayer {
       userMessage: fallbackMessage,
       handoff: {
         reason: "Reply linked to a page that does not exist",
+        code: "broken_link",
         fields: { deadLinks: badLinks.map((link) => link.url) },
       },
       badLinks,
@@ -1297,6 +1298,7 @@ export class ExecutionLayer {
       ),
       handoff: {
         reason: "Reply stated a date that could not be verified",
+        code: "unverified_date",
         fields: { badDates: badDates.map((date) => date.raw) },
       },
       badDates,
@@ -1941,6 +1943,7 @@ export class ExecutionLayer {
       });
 
       const composed = await this.llmService.invoke<string>({
+        caller: "contextual-fallback",
         prompt,
         temperature: 0.3,
         // Keeps the call on the org's provider and AI region (EU-only orgs).

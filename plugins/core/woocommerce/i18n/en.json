@@ -1,6 +1,7 @@
 {
   "name": "WooCommerce",
   "description": "Connect your WooCommerce store so the agent can find a customer's orders, track shipments, cancel or re-route undispatched orders, issue refunds, and answer product and stock questions.",
+  "summary": "Find orders, track shipments, cancel or re-route, refund, and answer stock questions.",
   "tools": {
     "woocommerce_get_store": {
       "label": "Get Store Info",

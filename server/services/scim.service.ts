@@ -197,7 +197,7 @@ export class ScimService {
     try {
       const row = await AppDataSource.getRepository(ScimToken).findOne({
         where: { tokenHash: sha256(token) },
-        relations: ["organization"],
+        relations: { organization: true },
       });
       if (!row) return null;
       // The same rule as API tokens: a deactivated or suspended organization is out of reach.

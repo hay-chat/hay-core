@@ -100,6 +100,28 @@ memory without Redis), publishes `page_tool_call` on `websocket:events` so any i
 socket forwards it, and listens on `webchat:page-tool-results` for answers from another instance.
 Dispatch is the `page:` branch in `ToolExecutionService.executeToolCall`.
 
+## Built-in store actions (no page code)
+
+On a store whose plugin describes its cart (a `cart@1` webchat contribution, see
+`WebchatCartV1Props` in `packages/plugin-sdk/types/webchat.ts`), the widget can add to the cart
+without the page registering anything:
+
+- The shopper clicks **Add to cart** on a product card, or
+- the AI calls the core tools `add_to_cart` / `go_to_checkout`. The server works out which variant
+  the shopper means and sends a `tool_call` frame marked `builtin: true`; the widget sends the
+  store's cart request from the shopper's browser and answers with `tool_result` as usual.
+
+These are offered only while the widget is connected from a page on the catalog's own site. They do
+not depend on the page-tools setting above: each store plugin has its own switch, on by default.
+`go_to_checkout` only navigates; the shopper pays on the store's page.
+
+After every successful add the widget fires `hay:cart-updated` on `document.body` (bubbling), plus
+the theme events the plugin listed. A theme whose cart count does not refresh can listen for it:
+
+```js
+document.addEventListener("hay:cart-updated", () => myTheme.refreshCart());
+```
+
 ## Hay's own tools
 
 The dashboard registers its own page tools (`dashboard/composables/usePageTools.ts`) on the

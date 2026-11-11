@@ -2,7 +2,7 @@
  * Tracing is off unless an endpoint is configured, and what it exports never
  * carries message text, emails or credentials.
  */
-import { InMemorySpanExporter } from "@opentelemetry/sdk-trace-base";
+import { InMemorySpanExporter } from "@opentelemetry/sdk-trace";
 import {
   extractTraceContext,
   initTracing,

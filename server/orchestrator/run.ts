@@ -9,7 +9,7 @@ import { PlaybookStatus } from "@server/database/entities/playbook.entity";
 import type { Playbook } from "@server/database/entities/playbook.entity";
 import { shouldReselectPlaybook } from "./playbook-gate";
 import { withOverridePlaybook } from "@server/services/playbook-version-override";
-import { MessageType } from "@server/database/entities/message.entity";
+import { MessageIntent, MessageType } from "@server/database/entities/message.entity";
 import { ToolExecutionService } from "@server/services/core/tool-execution.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import type { ConversationContext, GuardrailLogEntry, ProcessingPhase } from "./types";
@@ -17,8 +17,10 @@ import { LLMService } from "@server/services/core/llm.service";
 import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
 import { hasTiptapContent } from "@server/types/tiptap.types";
+import { shouldAdoptLanguage } from "@server/types/language.types";
 import { closureCopy } from "./closure-copy";
 import { availabilityContext, availabilityHandoffLine, handoffCopy } from "./handoff-copy";
+import { resolveHandoffReason } from "./handoff-reason";
 import { getAvailability, typicalFirstReplyMinutes } from "@server/services/business-hours.service";
 import {
   handoffTicketsService,
@@ -612,6 +614,18 @@ export const runConversation = async (conversationId: string) => {
       language,
     });
 
+    // Follow the customer when they switch language mid-conversation.
+    if (shouldAdoptLanguage(lastCustomerMessage.content, language, conversation.language)) {
+      log.debug(
+        { from: conversation.language, to: language },
+        "Customer switched language, updating conversation language",
+      );
+      await conversationRepository.update(conversation.id, conversation.organization_id, {
+        language,
+      });
+      conversation.language = language;
+    }
+
     // Check if user indicated potential closure intent
     const hasClosureIntent =
       intent.label === "close_satisfied" || intent.label === "close_unsatisfied";
@@ -696,6 +710,7 @@ export const runConversation = async (conversationId: string) => {
         );
 
         closingMessage = await llmService.invoke({
+          caller: "closing-message",
           history: messages,
           prompt,
           // Short closing line; falls back to a hardcoded string on error.
@@ -844,7 +859,7 @@ export const runConversation = async (conversationId: string) => {
     );
 
     // 04. Execution - Handle iterative execution with tool calls
-    await handleExecutionLoop(conversation, processingStartedAt, language);
+    await handleExecutionLoop(conversation, processingStartedAt, language ?? undefined);
 
     // Update processing state to idle (done)
     await updateProcessingState(conversation, "idle");
@@ -1341,6 +1356,7 @@ async function handleExecutionLoop(
         step: "HANDOFF",
         handoff: executionResult.handoff ?? {
           reason: executionResult.handoffReason ?? "The AI could not answer a fact",
+          code: "unanswered_fact",
         },
       };
     }
@@ -1487,16 +1503,31 @@ async function handleExecutionLoop(
         !executionResult.aiUnavailable &&
         !executionResult.planningExhausted;
 
+      // Why, for the hand-offs report. The first hand-off's reason is kept,
+      // like handed_off_at.
+      const handoffMetadata = {
+        ...(conversation.metadata ?? {}),
+        ...(plannedHandoff ? { plannedHandoff: true } : {}),
+        ...(conversation.metadata?.handoffReason
+          ? {}
+          : {
+              handoffReason: resolveHandoffReason({
+                code: executionResult.handoff?.code,
+                aiUnavailable: executionResult.aiUnavailable,
+                planningExhausted: executionResult.planningExhausted,
+                plannedHandoff,
+                customerAskedForHuman:
+                  (await conversation.getLastCustomerMessage())?.intent === MessageIntent.HANDOFF,
+              }),
+            }),
+      };
+
       // Every hand-off queues the conversation for the team.
       await conversationRepository.update(conversation.id, conversation.organization_id, {
         status: "pending-human",
-        ...(plannedHandoff
-          ? { metadata: { ...(conversation.metadata ?? {}), plannedHandoff: true } }
-          : {}),
+        metadata: handoffMetadata,
       });
-      if (plannedHandoff) {
-        conversation.metadata = { ...(conversation.metadata ?? {}), plannedHandoff: true };
-      }
+      conversation.metadata = handoffMetadata;
       await publishStatusChange(
         conversation.organization_id,
         conversation.id,

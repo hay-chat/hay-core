@@ -1,6 +1,7 @@
 {
   "name": "HubSpot",
   "description": "Connect your HubSpot CRM to access and manage contacts, companies, deals, tickets, and other CRM objects",
+  "summary": "Read and update contacts, companies, deals and tickets.",
   "tools": {
     "hubspot_create_contact": {
       "label": "Create Contact",

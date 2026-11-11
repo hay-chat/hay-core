@@ -154,15 +154,11 @@
       </CardHeader>
       <CardContent class="space-y-6">
         <div class="grid gap-4 md:grid-cols-2">
-          <Input
-            v-model="settings.defaultLanguage"
-            type="select"
+          <LanguageSelect
+            :model-value="settings.defaultLanguage"
             :label="$t('platform.defaultLanguage')"
-            :options="[
-              { label: $t('platform.languages.en'), value: 'en' },
-              { label: $t('platform.languages.pt'), value: 'pt' },
-            ]"
             :helper-text="$t('platform.defaultLanguageHelper')"
+            @update:model-value="setDefaultLanguage"
           />
 
           <Input
@@ -522,7 +518,7 @@ import { TIMEZONE_GROUPS } from "@/utils/timezones";
 // Vite runtime alias. A value import of these enums leaves them in the browser
 // bundle and breaks the Rollup build. Import the types only and use the enums'
 // string values (cast to the type) for defaults — the casts erase at build time.
-import type { SupportedLanguage } from "@server/types/language.types";
+import type { LanguageCode } from "@server/types/language.types";
 import type { DateFormat, TimeFormat, Timezone } from "@server/types/organization-settings.types";
 import type { RouterInputs } from "@/types/trpc";
 
@@ -531,7 +527,6 @@ type UpdateSettingsInput = RouterInputs["organizations"]["updateSettings"];
 const { t } = useI18n();
 const toast = useToast();
 const userStore = useUserStore();
-const { setLocaleFromBackend } = useLocale();
 
 const logoUpload = useFileUpload({
   accept: "image/*",
@@ -612,7 +607,7 @@ const settings = ref<PlatformSettings>({
   organizationName: "",
   organizationAbout: "",
   organizationWebsite: "",
-  defaultLanguage: "en" as SupportedLanguage,
+  defaultLanguage: "en" as LanguageCode,
   timezone: "UTC" as Timezone,
   dateFormat: "MM/DD/YYYY" as DateFormat,
   timeFormat: "12h" as TimeFormat,
@@ -664,6 +659,11 @@ const settings = ref<PlatformSettings>({
 const hasChanges = computed(() => {
   return JSON.stringify(settings.value) !== JSON.stringify(originalSettings.value);
 });
+
+// LanguageSelect only offers known codes; the server validates them again.
+const setDefaultLanguage = (code: string | null) => {
+  if (code) settings.value.defaultLanguage = code as LanguageCode;
+};
 
 const timezoneOptions = computed(() => {
   const options: { label: string; value: string }[] = [];
@@ -834,9 +834,6 @@ const saveSettings = async (escalationOffConfirmed = false) => {
         }
       }
 
-      // Sync dashboard locale immediately when language changes
-      await setLocaleFromBackend(settings.value.defaultLanguage);
-
       // Sync date/time formatting immediately when settings change
       const { setOrgDateTimeSettings } = useOrgDateTime();
       setOrgDateTimeSettings({
@@ -900,7 +897,7 @@ const resetToDefaults = () => {
       organizationName: originalSettings.value.organizationName,
       organizationAbout: originalSettings.value.organizationAbout,
       organizationWebsite: originalSettings.value.organizationWebsite,
-      defaultLanguage: "en" as SupportedLanguage,
+      defaultLanguage: "en" as LanguageCode,
       timezone: "UTC" as Timezone,
       dateFormat: "MM/DD/YYYY" as DateFormat,
       timeFormat: "12h" as TimeFormat,

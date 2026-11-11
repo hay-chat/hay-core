@@ -174,7 +174,11 @@ const {
     // Named on the "working" overlay while a page tool runs.
     agentName: resolvedAgentName.value,
   },
-  { challenge: challengeContribution, preChatForm: props.publicConfig?.preChatForm ?? null },
+  {
+    challenge: challengeContribution,
+    preChatForm: props.publicConfig?.preChatForm ?? null,
+    contributions: props.publicConfig?.contributions ?? [],
+  },
 );
 
 // Product cards add to the store's cart through the plugins' cart@1 contributions.
