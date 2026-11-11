@@ -178,6 +178,14 @@ export const config = {
     synchronize: false, // Never use synchronize in production
     logging: process.env.DB_LOGGING === "true",
     maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || "10", 10),
+    // DB_PORT/DB_NAME point at a transaction pooler (PgBouncer, e.g. a
+    // DigitalOcean connection pool). Session state does not survive a
+    // transaction there, so per-connection settings are not sent at startup
+    // (set them on the role instead), and migrations and the scheduler's
+    // session lock use the direct connection (DB_DIRECT_PORT/DB_DIRECT_NAME).
+    transactionPooler: process.env.DB_TRANSACTION_POOLER === "true",
+    directPort: parseInt(process.env.DB_DIRECT_PORT || process.env.DB_PORT || "5432", 10),
+    directDatabase: process.env.DB_DIRECT_NAME || process.env.DB_NAME || "hay_db",
     connectionTimeout: parseInt(process.env.DB_CONNECTION_TIMEOUT || "60000", 10),
   },
 

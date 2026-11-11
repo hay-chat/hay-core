@@ -1,10 +1,11 @@
-import { AppDataSource } from "@server/database/data-source";
+import { AppDataSource, createDirectDataSource } from "@server/database/data-source";
+import { config } from "@server/config/env";
 import { ScheduledJob } from "@server/entities/scheduled-job.entity";
 import { ScheduledJobHistory } from "@server/entities/scheduled-job-history.entity";
 import { createLogger } from "@server/lib/logger";
 import { metrics } from "@server/lib/metrics";
 import * as cron from "node-cron";
-import type { QueryRunner } from "typeorm";
+import type { DataSource, QueryRunner } from "typeorm";
 
 const logger = createLogger("scheduler");
 
@@ -78,6 +79,7 @@ export class SchedulerService {
   private isInitialized = false;
   private isShuttingDown = false;
   private lockRunner: QueryRunner | null = null;
+  private lockDataSource: DataSource | null = null;
 
   /**
    * Initialize the scheduler service
@@ -285,6 +287,8 @@ export class SchedulerService {
     // Clear all jobs
     this.jobs.clear();
     await this.closeLockRunner();
+    await this.lockDataSource?.destroy().catch(() => undefined);
+    this.lockDataSource = null;
 
     this.isInitialized = false;
     logger.info("Scheduler service shut down");
@@ -512,10 +516,25 @@ export class SchedulerService {
 
   private async getLockRunner(): Promise<QueryRunner> {
     if (!this.lockRunner || this.lockRunner.isReleased) {
-      this.lockRunner = AppDataSource.createQueryRunner();
+      this.lockRunner = (await this.getLockDataSource()).createQueryRunner();
       await this.lockRunner.connect();
     }
     return this.lockRunner;
+  }
+
+  /**
+   * Session-level advisory locks need one real Postgres session. Behind a
+   * transaction pooler each statement can land on a different backend, so the
+   * lock lives on its own direct connection there.
+   */
+  private async getLockDataSource(): Promise<DataSource> {
+    if (!config.database.transactionPooler) return AppDataSource;
+    if (!this.lockDataSource) {
+      const source = createDirectDataSource();
+      await source.initialize();
+      this.lockDataSource = source;
+    }
+    return this.lockDataSource;
   }
 
   private async closeLockRunner(): Promise<void> {
