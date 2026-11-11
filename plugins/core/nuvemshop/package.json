@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Connect your Nuvemshop / Tiendanube store so the agent can find a customer's orders, track shipments, cancel or re-route undispatched orders, record refund requests honestly, send unpaid-order payment links, issue capped goodwill coupons, and answer product and stock questions",
+  "homepage": "https://hay.chat/docs/user-guide/integrations/nuvemshop/",
   "author": "Hay",
   "main": "dist/index.js",
   "hay-plugin": {

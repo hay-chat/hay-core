@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Connect your Correios contract so the agent can track a shipment by its tracking code: current status, latest event, history, delivery date, and whether the parcel has stopped moving",
+  "homepage": "https://hay.chat/docs/user-guide/integrations/correios/",
   "author": "Hay",
   "main": "dist/index.js",
   "hay-plugin": {
