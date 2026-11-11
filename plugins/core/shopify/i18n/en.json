@@ -120,6 +120,10 @@
       "label": "Coupon validity (days)",
       "description": "Codes the agent creates expire after at most this many days."
     },
+    "cartActions": {
+      "label": "Add to cart from chat",
+      "description": "Show an Add to cart button on the products Hay.chat recommends in the chat on your storefront. The product goes into the shopper's own cart without leaving the page. Turn off to show only the link to the product."
+    },
     "staleTrackingDomesticDays": {
       "label": "Stale tracking: domestic (days)",
       "description": "Treat a domestic shipment as stuck when its tracking has not moved for more than this many days."

@@ -66,3 +66,18 @@ merchant already used it) and adds a note to `uncategorizedText`. Hay.chat never
 submits; the merchant reviews and submits in the Shopify admin. Needs the
 `read_shopify_payments_disputes`, `read_shopify_payments_dispute_evidences` and
 `write_shopify_payments_dispute_evidences` scopes (re-consent). See `DISPUTES.md`.
+
+## Add to cart from chat (`webchat` capability)
+
+On the storefront, product cards in the chat get an **Add to cart** button (config field
+`cartActions`, on by default). The plugin only describes the request (`src/cart.ts`, a `cart@1`
+webchat contribution); the widget sends it from the shopper's browser to the storefront's
+[Ajax Cart API](https://shopify.dev/docs/api/ajax/reference/cart): `POST /cart/add.js`.
+
+- The catalog sync gives each variant a `cartItemId` (its numeric variant id) when the product is
+  on the online store and the variant is available for sale.
+- The cart line carries a private line item property, `_hay_conversation`, with the conversation
+  id. Shopify hides it at checkout and shows it on the order in the admin. A theme whose cart page
+  prints every property, without skipping names that start with `_`, would show it there.
+- Shopify-hosted themes only: the Ajax API does not exist on a headless storefront, where the card
+  falls back to its buy link.

@@ -47,6 +47,7 @@ import {
   type ShopifyClient,
 } from "./disputes.js";
 import { cartPermalink } from "./buy-link.js";
+import { CART_REQUESTS, cartItemId } from "./cart.js";
 import { complianceTopic, handleComplianceWebhook, pluginApiMutation } from "./compliance.js";
 import type {
   CanonicalProduct,
@@ -268,6 +269,7 @@ async function shopifyGraphql<T>(
 function mapVariant(node: ShopifyVariantNode, onlineStoreUrl?: string | null): CanonicalVariant {
   return {
     buyUrl: node.availableForSale === false ? undefined : cartPermalink(onlineStoreUrl, node.id),
+    cartItemId: cartItemId(onlineStoreUrl, node),
     externalId: node.id,
     sku: node.sku ?? undefined,
     barcode: node.barcode ?? undefined,
@@ -570,6 +572,15 @@ export default defineHayPlugin((globalCtx) => {
           description: "Codes the agent creates expire after at most this many days.",
           default: 30,
         },
+        cartActions: {
+          type: "boolean",
+          label: "Add to cart from chat",
+          description:
+            "Show an Add to cart button on the products Hay.chat recommends in the chat on " +
+            "your storefront. The product goes into the shopper's own cart without leaving " +
+            "the page. Turn off to show only the link to the product.",
+          default: true,
+        },
         staleTrackingDomesticDays: {
           type: "number",
           label: "Stale tracking: domestic (days)",
@@ -594,6 +605,12 @@ export default defineHayPlugin((globalCtx) => {
             "deadlines. Hay.chat relays it as written when a customer asks how to return " +
             "something. Leave empty and Hay.chat hands those questions to your team.",
         },
+      });
+
+      ctx.register.webchat.contribution({
+        id: "cart",
+        type: "cart@1",
+        props: { enabled: ctx.config.field("cartActions"), ...CART_REQUESTS },
       });
 
       // Managed: one-click OAuth. Hay Core substitutes {shop} from shopDomain and
