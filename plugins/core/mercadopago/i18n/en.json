@@ -1,6 +1,7 @@
 {
   "name": "Mercado Pago",
   "description": "Connect Mercado Pago so the agent can find the payment behind an order, resend an unpaid Pix code to a verified customer, refund within what was paid and report refund status honestly.",
+  "summary": "Find the payment behind an order, resend a Pix code and refund within what was paid.",
   "tools": {
     "mercadopago_get_payment": {
       "label": "Get Payment",

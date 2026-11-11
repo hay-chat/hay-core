@@ -1,6 +1,7 @@
 {
   "name": "Atlassian",
   "description": "Importe páginas do Confluence como documentos e deixe o agente trabalhar com tickets do Jira.",
+  "summary": "Importe páginas do Confluence como documentos e dê ao agente ferramentas do Jira.",
   "tools": {},
   "config": {
     "authMode": {

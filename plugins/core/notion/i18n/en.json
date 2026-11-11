@@ -1,6 +1,7 @@
 {
   "name": "Notion",
   "description": "Import Notion pages and database entries into your knowledge base.",
+  "summary": "Import Notion pages and database entries into the knowledge base.",
   "tools": {},
   "config": {
     "apiToken": {

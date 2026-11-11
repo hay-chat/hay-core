@@ -1,6 +1,7 @@
 {
   "name": "Tiendanube",
   "description": "Conecta tu tienda Tiendanube para que el agente encuentre pedidos, siga envíos, cancele o cambie la dirección de pedidos no despachados, registre solicitudes de reembolso, envíe enlaces de pago de pedidos impagos, dé cupones de cortesía con tope y responda sobre productos y stock.",
+  "summary": "Encuentra pedidos, rastrea envíos, envía enlaces de pago y da cupones de cortesía con tope.",
   "tools": {
     "nuvemshop_get_store": {
       "label": "Ver Datos de la Tienda",

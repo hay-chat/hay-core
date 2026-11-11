@@ -1,6 +1,7 @@
 {
   "name": "Zendesk",
   "description": "Connect your Zendesk account to manage tickets, customers, and support workflows",
+  "summary": "Work with tickets and customers, and fit into your support workflows.",
   "tools": {
     "list_tickets": {
       "label": "List Tickets",

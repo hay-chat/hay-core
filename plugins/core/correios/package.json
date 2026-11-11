@@ -9,6 +9,7 @@
     "entry": "./dist/index.js",
     "displayName": "Correios",
     "category": "integration",
+    "marketplaceCategory": "payments",
     "capabilities": [
       "mcp",
       "auth"

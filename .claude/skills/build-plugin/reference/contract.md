@@ -61,6 +61,7 @@ to it over loopback HTTP, authenticated with a per-worker secret: `/health`, `/m
   "entry": "./dist/index.js",        // compiled entry (required)
   "displayName": "Zendesk",          // human name (required)
   "category": "integration",         // see below (required)
+  "marketplaceCategory": "crm",      // marketplace section: channels | commerce | payments | crm | knowledge | security
   "capabilities": ["mcp", "auth"],   // see below (required)
   "env": ["ZENDESK_API_TOKEN"]       // allow-list for config-field env fallback (optional)
 }

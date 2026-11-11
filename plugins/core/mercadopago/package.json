@@ -9,6 +9,7 @@
     "entry": "./dist/index.js",
     "displayName": "Mercado Pago",
     "category": "integration",
+    "marketplaceCategory": "payments",
     "capabilities": [
       "mcp",
       "auth"

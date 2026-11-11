@@ -1,6 +1,7 @@
 {
   "name": "Cal.com",
   "description": "Connect your Cal.com account so the agent can list event types, find open slots, and book, reschedule, or cancel meetings.",
+  "summary": "List event types, find open slots, and book, reschedule or cancel meetings.",
   "tools": {
     "get_me": {
       "label": "Get Account",

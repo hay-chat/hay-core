@@ -1,6 +1,7 @@
 {
   "name": "Melhor Envio",
   "description": "Conecte sua conta do Melhor Envio para que o agente responda onde está o pedido: status do envio, transportadora, código e link de rastreio, datas de postagem e entrega, e encomendas que parecem paradas.",
+  "summary": "Responda onde está o pedido: status, transportadora, link de rastreio e encomendas que parecem paradas.",
   "tools": {
     "melhorenvio_track_shipment": {
       "label": "Rastrear envio",

@@ -1,6 +1,7 @@
 {
   "name": "Melhor Envio",
   "description": "Connect your Melhor Envio account so the agent can answer where-is-my-order questions: shipment status, carrier, tracking code and link, posting and delivery dates, and parcels that look stuck.",
+  "summary": "Answer where-is-my-order: status, carrier, tracking link and parcels that look stuck.",
   "tools": {
     "melhorenvio_track_shipment": {
       "label": "Track shipment",

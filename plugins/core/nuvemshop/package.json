@@ -9,6 +9,7 @@
     "entry": "./dist/index.js",
     "displayName": "Nuvemshop",
     "category": "integration",
+    "marketplaceCategory": "commerce",
     "capabilities": [
       "mcp",
       "auth",

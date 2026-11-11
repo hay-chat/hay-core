@@ -1,6 +1,7 @@
 {
   "name": "Messenger",
   "description": "Conecte suas Páginas do Facebook e responda conversas do Messenger com a IA do Hay.chat",
+  "summary": "Responda mensagens da sua Página do Facebook com o seu agente.",
   "tools": {},
   "config": {
     "clientId": {
