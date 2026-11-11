@@ -131,11 +131,16 @@ export class ConfidenceGuardrailService {
     const fullConfig = { ...ConfidenceGuardrailService.DEFAULT_CONFIG, ...config };
 
     // Calculate individual confidence components. A grounding score the caller
-    // already obtained via assessGrounding() is reused, not re-asked.
+    // already obtained via assessGrounding() is reused, not re-asked. Grounding
+    // and certainty are independent LLM calls, so they run in parallel.
+    const [grounding, certainty] = await Promise.all([
+      precomputed?.grounding ?? this.calculateGroundingScore(context),
+      this.calculateCertaintyScore(context),
+    ]);
     const breakdown: ConfidenceBreakdown = {
-      grounding: precomputed?.grounding ?? (await this.calculateGroundingScore(context)),
+      grounding,
       retrieval: this.calculateRetrievalScore(context),
-      certainty: await this.calculateCertaintyScore(context),
+      certainty,
     };
 
     // Calculate weighted overall score

@@ -70,6 +70,25 @@ function describeBadDate(date: BadDate): string {
 const MAX_PLANNER_CALLS_PER_TURN = 20;
 const MAX_RECHECK_DEPTH = 1;
 
+/** Customer intents whose replies skip guardrail Stages 1 and 2 (no factual specifics). */
+const EXEMPT_GUARDRAIL_INTENTS: MessageIntent[] = [
+  MessageIntent.GREET,
+  MessageIntent.CLOSE_SATISFIED,
+  MessageIntent.CLOSE_UNSATISFIED,
+];
+
+/** A reply's grounding score and the context it was judged against. */
+interface GroundingCheck {
+  context: ConfidenceContext;
+  grounding: number;
+}
+
+/** Stage 1 and Stage 2 checks started early, in parallel, for one reply. */
+interface LateStageChecks {
+  companyInterest: Promise<CompanyInterestAssessment>;
+  grounding: Promise<GroundingCheck>;
+}
+
 const BAD_LINK_NOTE: Record<BadLink["reason"], string> = {
   dead: "does not exist",
   unlisted: "not a known page of the website",
@@ -670,6 +689,23 @@ export class ExecutionLayer {
     });
     log.debug("Applying two-stage guardrails to RESPOND step");
 
+    // Greetings and goodbyes skip Stages 1 and 2, unless the reply states
+    // numbers, amounts or links: those get checked whatever the intent.
+    const lastCustomerMessage = await conversation.getLastCustomerMessage();
+    const isConversationalReply = (message: string): boolean =>
+      !!lastCustomerMessage?.intent &&
+      !hasFactualSpecifics(message) &&
+      EXEMPT_GUARDRAIL_INTENTS.includes(lastCustomerMessage.intent as MessageIntent);
+
+    // Stages 1 and 2 are slow LLM calls that only judge the drafted reply, so
+    // start them now, alongside Stage 0 and the link/date checks. Decisions are
+    // still taken in the original order below; if an earlier stage stops or
+    // rewrites the reply, these results are dropped or recomputed.
+    const draftedMessage = result.userMessage!;
+    let lateChecks = isConversationalReply(draftedMessage)
+      ? null
+      : this.startLateStageChecks(conversation, draftedMessage);
+
     // STAGE 0: Action-claim consistency. Runs BEFORE the intent exemption below
     // so a false "I've cancelled it, glad I could help!" on a closing intent is
     // still caught. May return a re-planned result (retry) or a HANDOFF.
@@ -706,30 +742,22 @@ export class ExecutionLayer {
       return dateResult;
     }
 
-    // Greetings and goodbyes skip the remaining stages, unless the reply states
-    // numbers, amounts or links: those get checked whatever the intent.
-    const lastCustomerMessage = await conversation.getLastCustomerMessage();
-    if (lastCustomerMessage?.intent && !hasFactualSpecifics(result.userMessage ?? "")) {
-      const intent = lastCustomerMessage.intent as MessageIntent;
-
-      const exemptIntents: MessageIntent[] = [
-        MessageIntent.GREET,
-        MessageIntent.CLOSE_SATISFIED,
-        MessageIntent.CLOSE_UNSATISFIED,
-      ];
-
-      if (exemptIntents.includes(intent)) {
-        log.debug({ intent }, "Skipping guardrails - conversational intent detected");
-        return result;
-      }
+    const reply = result.userMessage!;
+    if (isConversationalReply(reply)) {
+      log.debug(
+        { intent: lastCustomerMessage?.intent },
+        "Skipping guardrails - conversational intent detected",
+      );
+      return result;
+    }
+    // The link check may have taken links out of the reply: judge what is sent.
+    if (!lateChecks || reply !== draftedMessage) {
+      lateChecks = this.startLateStageChecks(conversation, reply);
     }
 
     // STAGE 1: Company Interest Protection
     log.debug("Stage 1: Assessing company interest");
-    const companyInterestAssessment = await this.assessCompanyInterest(
-      conversation,
-      result.userMessage!,
-    );
+    const companyInterestAssessment = await lateChecks.companyInterest;
 
     result.companyInterest = companyInterestAssessment;
 
@@ -832,9 +860,10 @@ export class ExecutionLayer {
     //   untouched, so low retrieval quality alone never escalates a
     //   claim-free reply; a low score falls into the same full assessment →
     //   recheck → escalate/fallback path as a flagged reply.
+    const groundingCheck = await lateChecks.grounding;
     const confidenceAssessment = companyInterestAssessment.requiresFactCheck
-      ? await this.assessResponseConfidence(conversation, result.userMessage!)
-      : await this.assessUnflaggedResponseGrounding(conversation, result.userMessage!);
+      ? await this.assessResponseConfidence(conversation, reply, groundingCheck)
+      : await this.assessUnflaggedResponseGrounding(conversation, groundingCheck);
 
     if (confidenceAssessment) {
       log.debug(
@@ -1367,10 +1396,40 @@ export class ExecutionLayer {
   private async assessResponseConfidence(
     conversation: Conversation,
     response: string,
+    groundingCheck?: GroundingCheck,
   ): Promise<ConfidenceAssessment> {
-    const context = await this.buildConfidenceContext(conversation, response);
+    const context =
+      groundingCheck?.context ?? (await this.buildConfidenceContext(conversation, response));
     const config = await this.getConfidenceConfig(conversation);
-    return await this.confidenceService.assessConfidence(context, config);
+    return await this.confidenceService.assessConfidence(
+      context,
+      config,
+      groundingCheck ? { grounding: groundingCheck.grounding } : undefined,
+    );
+  }
+
+  /**
+   * Start the Stage 1 company-interest check and the Stage 2 grounding check
+   * for a reply, in parallel. Both only judge the reply, so they can run before
+   * the earlier stages have decided. Callers that drop the result (an earlier
+   * stage stopped the reply) must not cause unhandled rejections, hence the
+   * no-op catch; awaiting the promises still throws as before.
+   */
+  private startLateStageChecks(conversation: Conversation, response: string): LateStageChecks {
+    const companyInterest = this.assessCompanyInterest(conversation, response);
+    const grounding = this.checkGrounding(conversation, response);
+    companyInterest.catch(() => undefined);
+    grounding.catch(() => undefined);
+    return { companyInterest, grounding };
+  }
+
+  /** Stage 2 grounding-only LLM call for a reply, with the context it was judged against. */
+  private async checkGrounding(
+    conversation: Conversation,
+    response: string,
+  ): Promise<GroundingCheck> {
+    const context = await this.buildConfidenceContext(conversation, response);
+    return { context, grounding: await this.confidenceService.assessGrounding(context) };
   }
 
   /**
@@ -1382,11 +1441,10 @@ export class ExecutionLayer {
    */
   private async assessUnflaggedResponseGrounding(
     conversation: Conversation,
-    response: string,
+    groundingCheck: GroundingCheck,
   ): Promise<ConfidenceAssessment | null> {
-    const context = await this.buildConfidenceContext(conversation, response);
+    const { context, grounding } = groundingCheck;
     const config = await this.getConfidenceConfig(conversation);
-    const grounding = await this.confidenceService.assessGrounding(context);
 
     logger.debug(
       {
