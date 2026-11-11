@@ -10,7 +10,7 @@ class UserRepository {
   async findById(id: string): Promise<User | null> {
     return this.repository.findOne({
       where: { id },
-      relations: ["organization"],
+      relations: { organization: true },
     });
   }
 
@@ -20,7 +20,7 @@ class UserRepository {
   async findByEmail(email: string): Promise<User | null> {
     return this.repository.findOne({
       where: { email: email.toLowerCase() },
-      relations: ["organization"],
+      relations: { organization: true },
     });
   }
 

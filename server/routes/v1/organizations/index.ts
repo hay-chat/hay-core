@@ -954,7 +954,7 @@ export const organizationsRouter = t.router({
           userId: input.userId,
           organizationId: ctx.organizationId,
         },
-        relations: ["user"],
+        relations: { user: true },
       });
 
       if (!userOrg) {
@@ -1105,7 +1105,7 @@ export const organizationsRouter = t.router({
           userId: input.userId,
           organizationId: ctx.organizationId,
         },
-        relations: ["user"],
+        relations: { user: true },
       });
 
       if (!userOrg) {
@@ -1305,7 +1305,7 @@ export const organizationsRouter = t.router({
           organizationId: input.organizationId,
           isActive: true,
         },
-        relations: ["organization", "organization.logoUpload"],
+        relations: { organization: { logoUpload: true } },
       });
 
       if (!userOrg) {

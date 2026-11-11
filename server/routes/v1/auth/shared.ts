@@ -19,7 +19,7 @@ export async function getUserOrganizations(userId: string) {
   const userOrgRepository = AppDataSource.getRepository(UserOrganization);
   const userOrganizations = await userOrgRepository.find({
     where: { userId, isActive: true },
-    relations: ["organization", "organization.logoUpload"],
+    relations: { organization: { logoUpload: true } },
     order: { createdAt: "ASC" },
   });
 
@@ -132,7 +132,7 @@ export async function requireChallengeUser(challengeToken: string): Promise<User
   const user = challenge
     ? await AppDataSource.getRepository(User).findOne({
         where: { id: challenge.userId },
-        relations: ["organization"],
+        relations: { organization: true },
       })
     : null;
   if (

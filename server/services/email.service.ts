@@ -479,7 +479,7 @@ export async function getOrganizationLocale(organizationId?: string | null): Pro
     const orgRepo = AppDataSource.getRepository(Organization);
     const org = await orgRepo.findOne({
       where: { id: organizationId },
-      select: ["id", "defaultLanguage"],
+      select: { id: true, defaultLanguage: true },
       loadEagerRelations: false,
     });
     return org?.defaultLanguage || DEFAULT_LANGUAGE;

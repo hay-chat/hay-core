@@ -118,7 +118,7 @@ export async function pendingScans(organizationId: string, ids: string[]): Promi
   if (!ids.length || !isScanEnabled()) return [];
   const rows = await Upload.find({
     where: { id: In(ids), organizationId, scanStatus: "pending" },
-    select: ["id"],
+    select: { id: true },
   });
   return rows.map((row) => row.id);
 }
@@ -130,7 +130,10 @@ export async function waitForScans(
 ): Promise<Map<string, ScanStatus | null>> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const rows = await Upload.find({ where: { id: In(ids) }, select: ["id", "scanStatus"] });
+    const rows = await Upload.find({
+      where: { id: In(ids) },
+      select: { id: true, scanStatus: true },
+    });
     const statuses = new Map(rows.map((row) => [row.id, row.scanStatus ?? null] as const));
     const pending = [...statuses.values()].some((status) => status === "pending");
     if (!pending || Date.now() >= deadline) return statuses;

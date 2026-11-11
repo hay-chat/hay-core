@@ -661,7 +661,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   async getLastHumanMessage(conversationId: string): Promise<Message | null> {
     const conversation = await this.getRepository().findOne({
       where: { id: conversationId },
-      relations: ["messages"],
+      relations: { messages: true },
     });
 
     if (!conversation?.messages) return null;

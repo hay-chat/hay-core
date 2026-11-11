@@ -5,7 +5,7 @@
 const mockSdkLoaded = jest.fn();
 for (const name of [
   "@opentelemetry/api",
-  "@opentelemetry/sdk-trace-base",
+  "@opentelemetry/sdk-trace",
   "@opentelemetry/exporter-trace-otlp-http",
   "@opentelemetry/resources",
   "@opentelemetry/context-async-hooks",

@@ -3,7 +3,7 @@
  * joins the trace of the publisher that sent the message.
  */
 import { EventEmitter } from "events";
-import { InMemorySpanExporter } from "@opentelemetry/sdk-trace-base";
+import { InMemorySpanExporter } from "@opentelemetry/sdk-trace";
 
 const mockConnect = jest.fn<Promise<unknown>, []>();
 jest.mock("amqplib", () => ({ __esModule: true, default: { connect: () => mockConnect() } }));

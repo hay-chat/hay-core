@@ -104,7 +104,7 @@ export async function sendSignupVerificationEmail(user: User, token: string): Pr
 
   const userOrg = await AppDataSource.getRepository(UserOrganization).findOne({
     where: { userId: user.id },
-    relations: ["organization"],
+    relations: { organization: true },
   });
   const locale = userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
 

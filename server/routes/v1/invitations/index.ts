@@ -315,7 +315,7 @@ export const invitationsRouter = t.router({
 
       const invitations = await invitationRepository.find({
         where,
-        relations: ["invitedByUser"],
+        relations: { invitedByUser: true },
         order: { createdAt: "DESC" },
         take: INVITATION_LIST_LIMIT,
       });
@@ -411,7 +411,7 @@ export const invitationsRouter = t.router({
       // Find invitation by token
       const invitation = await invitationRepository.findOne({
         where: { tokenHash },
-        relations: ["organization"],
+        relations: { organization: true },
       });
 
       if (!invitation) {
@@ -578,7 +578,7 @@ export const invitationsRouter = t.router({
 
       const invitation = await invitationRepository.findOne({
         where: { tokenHash },
-        relations: ["organization", "organization.logoUpload", "invitedByUser"],
+        relations: { organization: { logoUpload: true }, invitedByUser: true },
       });
 
       if (!invitation) {
@@ -643,7 +643,7 @@ export const invitationsRouter = t.router({
           id: input.invitationId,
           organizationId: ctx.organizationId,
         },
-        relations: ["organization"],
+        relations: { organization: true },
       });
 
       if (!invitation) {
