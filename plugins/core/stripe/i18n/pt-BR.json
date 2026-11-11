@@ -1,6 +1,7 @@
 {
   "name": "Stripe",
   "description": "Conecte sua conta Stripe para gerenciar pagamentos, clientes, assinaturas e mais",
+  "summary": "Consulte pagamentos, clientes e assinaturas, e acompanhe as disputas de perto.",
   "tools": {
     "get_stripe_account_info": {
       "label": "Ver informações da conta",

@@ -68,6 +68,8 @@ export interface UsageSummary {
     excluded: number;
     notBilled: Record<NotBilledOutcome, number>;
   };
+  /** Resolutions the plan includes per period; null when the operator has not sent it. */
+  includedResolutions: number | null;
   exclusions: { used: number; allowance: number; open: boolean };
   /** Only what core already knows from the operator (access state). */
   agentPaused: { paused: boolean; reason: string | null };
@@ -321,12 +323,13 @@ export class ResolutionLedgerService {
 
     const org = await AppDataSource.getRepository(Organization).findOne({
       where: { id: organizationId },
-      select: { id: true, agentPausedAt: true, agentPauseReason: true },
+      select: { id: true, agentPausedAt: true, agentPauseReason: true, limits: true },
     });
 
     return {
       period,
       billable: breakdown.billed,
+      includedResolutions: org?.limits?.includedResolutions ?? null,
       breakdown,
       exclusions: {
         used: exclusionsUsed,

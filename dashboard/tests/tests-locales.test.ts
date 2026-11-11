@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-// D7-11..13: the Tests pages read every string from tests.json. Both locales
+// D7-11..13: the Tests pages read every string from tests.json. All locales
 // must have the same keys, and the report never shows a headline percentage.
 const read = (locale: string) =>
   JSON.parse(readFileSync(join(__dirname, "..", "i18n/locales", locale, "tests.json"), "utf8"));
@@ -21,20 +21,24 @@ function strings(value: unknown): string[] {
 }
 
 describe("tests locales", () => {
-  it("en and pt-BR have the same keys", () => {
-    expect(keys(read("pt-BR")).sort()).toEqual(keys(read("en")).sort());
+  it.each(["pt-BR", "nl"])("en and %s have the same keys", (locale) => {
+    expect(keys(read(locale)).sort()).toEqual(keys(read("en")).sort());
   });
 
   it("shows no percentages in the replay report", () => {
-    for (const locale of ["en", "pt-BR"]) {
+    for (const locale of ["en", "pt-BR", "nl"]) {
       expect(strings(read(locale).tests.report).join("\n")).not.toContain("%");
     }
   });
 
   it("never claims Require Approval holds actions", () => {
     // D7-13: approval holds replies only; D4 action approvals are separate.
-    const claims = [/approval holds? (the )?actions/i, /segura (também )?(as )?ações/i];
-    for (const locale of ["en", "pt-BR"]) {
+    const claims = [
+      /approval holds? (the )?actions/i,
+      /segura (também )?(as )?ações/i,
+      /goedkeuring houdt (ook )?(de )?acties/i,
+    ];
+    for (const locale of ["en", "pt-BR", "nl"]) {
       const text = strings(read(locale)).join("\n");
       for (const claim of claims) expect(text).not.toMatch(claim);
       expect(strings(read(locale).tests.readiness).join("\n")).not.toContain("%");

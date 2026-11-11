@@ -68,7 +68,7 @@ const manifests = readManifests();
 const declared = manifests.filter((m) => m.setup);
 
 describe("plugin manifests: setup block", () => {
-  it("at least the commerce, payments, CRM, helpdesk, marketing, knowledge and booking plugins declare one", () => {
+  it("at least the commerce, shipping, payments, CRM, helpdesk, marketing, knowledge and booking plugins declare one", () => {
     const groups = new Set(declared.map((m) => m.setup!.group));
     expect([...groups].sort()).toEqual([...SETUP_PLUGIN_GROUPS].sort());
   });

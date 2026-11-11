@@ -1,5 +1,5 @@
 import type { Context, Span, Tracer } from "@opentelemetry/api";
-import type { SpanExporter } from "@opentelemetry/sdk-trace-base";
+import type { SpanExporter } from "@opentelemetry/sdk-trace";
 import { config } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
 
@@ -89,27 +89,29 @@ export async function initTracing(
   try {
     const [otelApi, base, exporter, resources, contextHooks, core] = await Promise.all([
       import("@opentelemetry/api"),
-      import("@opentelemetry/sdk-trace-base"),
+      import("@opentelemetry/sdk-trace"),
       import("@opentelemetry/exporter-trace-otlp-http"),
       import("@opentelemetry/resources"),
       import("@opentelemetry/context-async-hooks"),
       import("@opentelemetry/core"),
     ]);
 
-    const provider = new base.BasicTracerProvider({
+    const provider = new base.TracerProvider({
       resource: resources.resourceFromAttributes({ "service.name": serviceName }),
       sampler: new base.ParentBasedSampler({
         root: new base.TraceIdRatioBasedSampler(sampleRatio),
       }),
       spanProcessors: [
         options.spanExporter
-          ? new base.SimpleSpanProcessor(options.spanExporter)
-          : new base.BatchSpanProcessor(
-              new exporter.OTLPTraceExporter({
+          ? new base.SimpleSpanProcessor({ exporter: options.spanExporter })
+          : new base.BatchSpanProcessor({
+              exporter: new exporter.OTLPTraceExporter({
                 url: `${endpoint.replace(/\/+$/, "")}/v1/traces`,
               }),
-              { maxQueueSize: 512, maxExportBatchSize: 128, scheduledDelayMillis: 5000 },
-            ),
+              maxQueueSize: 512,
+              maxExportBatchSize: 128,
+              scheduledDelayMillis: 5000,
+            }),
       ],
     });
     otelApi.context.setGlobalContextManager(

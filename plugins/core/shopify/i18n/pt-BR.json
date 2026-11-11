@@ -1,6 +1,7 @@
 {
   "name": "Shopify",
   "description": "Conecte sua loja Shopify para que o agente possa consultar pedidos, clientes e produtos, rastrear entregas e cuidar de cancelamentos, reembolsos e devoluções.",
+  "summary": "Consulte pedidos, recomende produtos reais do seu catálogo e cuide de disputas.",
   "tools": {
     "shopify_get_shop": {
       "label": "Ver Dados da Loja",

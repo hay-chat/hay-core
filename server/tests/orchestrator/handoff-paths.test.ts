@@ -102,6 +102,11 @@ const INSTRUCTIONS = {
   content: [{ type: "paragraph", content: [{ type: "text", text: "Ask for their email." }] }],
 };
 
+/** The update a hand-off writes: the queue status and why, for the hand-offs report. */
+function handedOff(handoffReason: string, metadata: Record<string, unknown> = {}) {
+  return { status: "pending-human", metadata: { ...metadata, handoffReason } };
+}
+
 /** `assistant`: the organization's hand-off settings. */
 function makeConversation(assistant: Record<string, unknown>) {
   return {
@@ -190,7 +195,7 @@ describe("hand-off line", () => {
         }),
       }),
     ]);
-    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, { status: "pending-human" });
+    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, handedOff("ai_decision"));
   });
 
   it("answers in the customer's language", async () => {
@@ -241,9 +246,7 @@ describe("hand-off line", () => {
 
       await runConversation(CONVERSATION_ID);
 
-      expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, {
-        status: "pending-human",
-      });
+      expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, handedOff("ai_decision"));
       expect(conversation.addHandoffInstructions).toHaveBeenCalledWith(
         INSTRUCTIONS,
         handoffType,
@@ -264,7 +267,7 @@ describe("hand-off line", () => {
     await runConversation(CONVERSATION_ID);
 
     expect(conversation.addHandoffInstructions).not.toHaveBeenCalled();
-    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, { status: "pending-human" });
+    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, handedOff("ai_unavailable"));
     expect(botMessages()).toEqual([
       expect.objectContaining({
         content: handoffCopy("handoffQueued", "en"),
@@ -339,7 +342,66 @@ describe("hand-off line", () => {
         }),
       }),
     );
-    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, { status: "pending-human" });
+    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, handedOff("ai_decision"));
+  });
+});
+
+describe("hand-off reason", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    customerLanguage = "en";
+    mockTypicalReply.mockResolvedValue(null);
+    mockWithinHours.mockResolvedValue(true);
+    mockExecute.mockResolvedValue({ step: "HANDOFF", userMessage: PLANNER_LINE });
+  });
+
+  it("records that the shopper asked for a person", async () => {
+    given({}, 1);
+    conversation.getLastCustomerMessage.mockResolvedValue({
+      id: "msg-1",
+      content: "I want to talk to a person",
+      intent: "handoff",
+      savePerception: jest.fn(),
+    } as never);
+
+    await runConversation(CONVERSATION_ID);
+
+    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, handedOff("customer_request"));
+  });
+
+  it("records the guardrail that stopped the reply", async () => {
+    mockExecute.mockResolvedValue({
+      step: "HANDOFF",
+      userMessage: PLANNER_LINE,
+      handoff: { reason: "Reply linked to a page that does not exist", code: "broken_link" },
+    });
+    given({}, 1);
+
+    await runConversation(CONVERSATION_ID);
+
+    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, handedOff("broken_link"));
+  });
+
+  it("records a playbook's planned hand-off", async () => {
+    given({}, 1);
+    conversation.metadata = { playbookPrescribesHandoff: true };
+
+    await runConversation(CONVERSATION_ID);
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      CONVERSATION_ID,
+      ORG_ID,
+      handedOff("playbook", { playbookPrescribesHandoff: true, plannedHandoff: true }),
+    );
+  });
+
+  it("keeps the first hand-off's reason when the conversation is handed off again", async () => {
+    given({}, 1);
+    conversation.metadata = { handoffReason: "low_confidence" };
+
+    await runConversation(CONVERSATION_ID);
+
+    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, handedOff("low_confidence"));
   });
 });
 
@@ -403,7 +465,11 @@ describe("planner that keeps calling tools", () => {
       }),
     );
     expect(conversation.addHandoffInstructions).not.toHaveBeenCalled();
-    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, { status: "pending-human" });
+    expect(mockUpdate).toHaveBeenCalledWith(
+      CONVERSATION_ID,
+      ORG_ID,
+      handedOff("planning_exhausted"),
+    );
     expect(botMessages()).toEqual([
       expect.objectContaining({
         content: handoffCopy("handoffNobodyOnline", "en"),

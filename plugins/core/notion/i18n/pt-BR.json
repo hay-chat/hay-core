@@ -1,6 +1,7 @@
 {
   "name": "Notion",
   "description": "Importe páginas e itens de bancos de dados do Notion para a sua base de conhecimento.",
+  "summary": "Importe páginas e itens de bancos de dados do Notion para a base de conhecimento.",
   "tools": {},
   "config": {
     "apiToken": {

@@ -26,7 +26,7 @@ async function loadUserOrganization(
       organizationId,
       isActive: true,
     },
-    relations: ["organization"],
+    relations: { organization: true },
   });
 
   return userOrg || undefined;

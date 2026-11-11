@@ -1,6 +1,7 @@
 {
   "name": "Zendesk",
   "description": "Conecte sua conta Zendesk para gerenciar tickets, clientes e fluxos de suporte",
+  "summary": "Trabalhe com tickets e clientes, dentro dos seus fluxos de suporte.",
   "tools": {
     "list_tickets": {
       "label": "Listar Tickets",

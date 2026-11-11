@@ -91,11 +91,14 @@ const internalOrganizationsRouter = router({
   /**
    * Plan limits from the operator (Lane A4). `maxSimulationsPerMonth` null
    * falls back to the core default (config/simulation-caps.ts).
+   * `includedResolutions` is the plan's resolutions per billing period, shown
+   * as the quota on the dashboard; left out, it is not changed.
    */
   setLimits: internalProcedure
     .input(
       organizationIdInput.extend({
         maxSimulationsPerMonth: z.number().int().min(0).max(100_000).nullable(),
+        includedResolutions: z.number().int().min(0).max(10_000_000).nullable().optional(),
       }),
     )
     .mutation(async ({ input }) => {
@@ -128,7 +131,7 @@ const internalOrganizationsRouter = router({
       }
       const owner = await AppDataSource.getRepository(UserOrganization).findOne({
         where: { organizationId: input.organizationId, role: "owner" },
-        relations: ["user"],
+        relations: { user: true },
         order: { createdAt: "ASC" },
       });
 

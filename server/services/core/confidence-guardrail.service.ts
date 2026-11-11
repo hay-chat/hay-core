@@ -232,6 +232,7 @@ export class ConfidenceGuardrailService {
       };
 
       const result = await this.llmService.invoke<string>({
+        caller: "guardrail-grounding",
         prompt: evaluationPrompt,
         jsonSchema: schema,
         temperature: 0.2, // Low temperature for consistent evaluation
@@ -293,6 +294,7 @@ export class ConfidenceGuardrailService {
       };
 
       const result = await this.llmService.invoke<string>({
+        caller: "guardrail-certainty",
         prompt: certaintyPrompt,
         jsonSchema: schema,
         temperature: 0.2,

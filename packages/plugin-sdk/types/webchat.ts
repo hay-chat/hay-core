@@ -70,6 +70,12 @@ export interface WebchatCartV1Props {
   tokenPath?: string;
   tokenResponseHeader?: string;
   tokenRequestHeader?: string;
+  /**
+   * DOM events the widget fires on `document.body` (bubbling) after a successful
+   * add, so the store's theme refreshes its cart count or drawer. Comma-separated
+   * event names, at most 8. The widget always fires `hay:cart-updated` as well.
+   */
+  afterAddEvents?: string;
 }
 
 /** A contribution prop is either a literal or a reference to a config field. */

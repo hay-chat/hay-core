@@ -447,7 +447,7 @@ export class PrivacyService {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
     const request = await requestRepository.findOne({
       where: { id: requestId },
-      relations: ["job"],
+      relations: { job: true },
     });
 
     if (!request) {
@@ -638,7 +638,7 @@ export class PrivacyService {
 
     const memberships = await AppDataSource.getRepository(UserOrganization).find({
       where: { userId },
-      relations: ["organization"],
+      relations: { organization: true },
       order: { createdAt: "ASC" },
     });
 
@@ -650,7 +650,14 @@ export class PrivacyService {
 
     const documents = await documentRepository.find({
       where: [{ createdBy: userId }, { updatedBy: userId }],
-      select: ["id", "title", "createdAt", "updatedAt", "metadata", "attachments"],
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        updatedAt: true,
+        metadata: true,
+        attachments: true,
+      },
     });
 
     const uploads = await uploadRepository.find({
@@ -957,13 +964,20 @@ export class PrivacyService {
     await emailService.initialize();
     const baseUrl = getDashboardUrl();
     const downloadUrl = `${baseUrl}/privacy/download?requestId=${request.id}&token=${downloadToken}`;
-    const locale = await getOrganizationLocale(organizationId);
+    // Each owner or admin reads it in their interface language, else the organization's.
+    const [organizationLocale, languages] = await Promise.all([
+      getOrganizationLocale(organizationId),
+      AppDataSource.query(`SELECT email, interface_language FROM users WHERE email = ANY($1)`, [
+        recipients,
+      ]) as Promise<Array<{ email: string; interface_language: string | null }>>,
+    ]);
+    const languageOf = new Map(languages.map((row) => [row.email, row.interface_language]));
 
     for (const to of recipients) {
       await emailService.sendTemplateEmail({
         to,
         template: "privacy-export-ready-merchant",
-        locale,
+        locale: languageOf.get(to) || organizationLocale,
         variables: {
           downloadUrl,
           customerLabel,

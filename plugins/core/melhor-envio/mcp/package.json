@@ -1,0 +1,14 @@
+{
+  "name": "hay-plugin-melhor-envio-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local Node MCP server for Melhor Envio: read-only shipment tracking over the Melhor Envio REST API. Spawned over stdio by the Melhor Envio plugin.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "zod": "^3.25.76"
+  }
+}

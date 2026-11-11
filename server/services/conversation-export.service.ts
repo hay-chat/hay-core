@@ -3,6 +3,18 @@ import { csvCell } from "@server/lib/csv";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { Message, MessageType } from "@server/database/entities/message.entity";
 import { formatZonedDateTime, safeTimeZone } from "@server/utils/zoned-datetime";
+import { createLogger } from "@server/lib/logger";
+import { languageName, normalizeLanguage, type LanguageCode } from "@server/types/language.types";
+import { translationService } from "./translation.service";
+
+const logger = createLogger("conversation-export");
+
+/** Messages an export shows translated: what the customer, the AI and the team wrote. */
+const TRANSLATABLE_TYPES: readonly MessageType[] = [
+  MessageType.CUSTOMER,
+  MessageType.BOT_AGENT,
+  MessageType.HUMAN_AGENT,
+];
 
 const MESSAGE_TYPE_LABELS: Record<MessageType, string> = {
   [MessageType.CUSTOMER]: "Customer",
@@ -16,14 +28,78 @@ const MESSAGE_TYPE_LABELS: Record<MessageType, string> = {
   [MessageType.FORM]: "Form",
 };
 
+/**
+ * Messages in a reader's language, next to the record. `content` stays what
+ * the customer saw; these are the reader's copies by message id.
+ */
+export interface ExportTranslation {
+  language: LanguageCode;
+  texts: Map<string, string>;
+}
+
 export interface PdfExportOptions {
   /** The organization's name, shown as the store in the header. */
   storeName: string;
   /** IANA zone every timestamp is shown in (the organization's time zone). */
   timeZone: string;
+  /** Shown under each message, labelled, when it differs from the original. */
+  translation?: ExportTranslation;
 }
 
 export class ConversationExportService {
+  /**
+   * The conversation's customer, AI and team messages in `language`. Stored
+   * translations are reused; the rest are translated and stored on their
+   * message, as the inbox does. `complete` is false when translating failed:
+   * the export still goes out, with what was already stored.
+   */
+  async translate(
+    conversation: Conversation,
+    language: LanguageCode,
+  ): Promise<{ translation: ExportTranslation; complete: boolean }> {
+    const texts = new Map<string, string>();
+    const missing: Message[] = [];
+    for (const message of conversation.messages ?? []) {
+      if (!TRANSLATABLE_TYPES.includes(message.type) || !message.content?.trim()) continue;
+      const stored =
+        normalizeLanguage(message.detectedLanguage) === language
+          ? message.content
+          : message.translations?.[language];
+      if (stored) texts.set(message.id, stored);
+      else missing.push(message);
+    }
+
+    let complete = true;
+    if (missing.length) {
+      try {
+        const translated = await translationService.translateTexts({
+          organizationId: conversation.organization_id,
+          items: missing.map((message) => ({ id: message.id, text: message.content })),
+          targetLanguage: language,
+        });
+        await Promise.all(
+          missing.map((message) => {
+            const result = translated.get(message.id)!;
+            texts.set(message.id, result.text);
+            return translationService.saveMessageTranslation({
+              messageId: message.id,
+              language,
+              text: result.text,
+              detectedLanguage: result.sourceLanguage,
+            });
+          }),
+        );
+      } catch (error) {
+        complete = false;
+        logger.error(
+          { err: error, conversationId: conversation.id, language },
+          "Export translation failed; exporting stored translations only",
+        );
+      }
+    }
+    return { translation: { language, texts }, complete };
+  }
+
   async generatePdf(conversation: Conversation, options: PdfExportOptions): Promise<Buffer> {
     const timeZone = safeTimeZone(options.timeZone);
     const at = (date: Date | string | null | undefined) => formatZonedDateTime(date, timeZone);
@@ -94,6 +170,19 @@ export class ConversationExportService {
           .fontSize(10)
           .text(message.content || "", { indent: 10 });
 
+        const translated = options.translation?.texts.get(message.id);
+        if (translated && translated !== message.content) {
+          doc
+            .font("Helvetica-Oblique")
+            .fontSize(8)
+            .fillColor("#555555")
+            .text(`Translation (${languageName(options.translation!.language)}):`, { indent: 10 })
+            .font("Helvetica")
+            .fontSize(10)
+            .text(translated, { indent: 10 })
+            .fillColor("black");
+        }
+
         if (message.metadata?.toolName) {
           doc
             .font("Helvetica-Oblique")
@@ -117,7 +206,8 @@ export class ConversationExportService {
     });
   }
 
-  generateCsv(conversation: Conversation): string {
+  /** With `translation`, a `translated_content` column follows `content`. */
+  generateCsv(conversation: Conversation, translation?: ExportTranslation): string {
     const headers = [
       "conversation_id",
       "conversation_title",
@@ -134,6 +224,7 @@ export class ConversationExportService {
       "direction",
       "sender",
       "content",
+      ...(translation ? ["translated_content"] : []),
       "sentiment",
       "intent",
       "detected_language",
@@ -165,6 +256,7 @@ export class ConversationExportService {
         msg.direction,
         msg.sender || "",
         msg.content || "",
+        ...(translation ? [translation.texts.get(msg.id) ?? ""] : []),
         msg.sentiment || "",
         msg.intent || "",
         msg.detectedLanguage || "",

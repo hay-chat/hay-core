@@ -45,7 +45,7 @@ export function stateOf(
 export async function isUnderAttack(organizationId: string): Promise<boolean> {
   const settings = await repository().findOne({
     where: { organizationId },
-    select: ["id", "underAttackUntil", "underAttackSource"],
+    select: { id: true, underAttackUntil: true, underAttackSource: true },
   });
   return stateOf(settings).active;
 }

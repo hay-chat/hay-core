@@ -24,7 +24,7 @@ jest.mock("@server/services/llm/org-usage-budget", () => ({ isOrgOverBudget: asy
 jest.mock("@server/services/media-analysis/pipeline", () => ({
   waitForMediaAnalysis: async () => undefined,
 }));
-jest.mock("@server/services/core/core-tools", () => ({ coreToolRegistry: { list: () => [] } }));
+jest.mock("@server/services/core/core-tools", () => ({ coreToolRegistry: { listFor: async () => [] } }));
 
 const mockLogger = {
   debug: jest.fn(),

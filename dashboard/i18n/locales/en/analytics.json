@@ -1,0 +1,187 @@
+{
+  "analytics": {
+    "page": {
+      "title": "Analytics",
+      "description": "How the AI is doing: what it resolves, what it hands to your team and how customers rate it.",
+      "seoTitle": "Analytics - Hay.chat"
+    },
+    "actions": {
+      "refresh": "Refresh",
+      "export": "Export CSV"
+    },
+    "tabs": {
+      "overview": "Overview",
+      "csat": "CSAT",
+      "handoffs": "Hand-offs",
+      "topics": "Topics",
+      "playbooks": "Playbooks"
+    },
+    "comparisonNote": "Counted by the day a conversation closed. Changes compare with the period of the same length just before.",
+    "vsPrevious": "vs previous period",
+    "noPrevious": "Nothing to compare with",
+    "loadFailed": "This report could not be loaded.",
+    "retry": "Try again",
+    "exportFailed": "The export failed",
+    "empty": {
+      "title": "No closed conversations in this period",
+      "description": "Pick a longer period, or come back once conversations have closed."
+    },
+    "table": {
+      "closes": "Closed",
+      "aiResolutionRate": "AI resolution rate",
+      "handoffRate": "Hand-off rate",
+      "csat": "CSAT"
+    },
+    "overview": {
+      "aiResolutionRate": "AI resolution rate",
+      "aiResolved": "Resolved by AI",
+      "closes": "Closed conversations",
+      "handoffRate": "Hand-off rate",
+      "trendTitle": "AI resolution rate by day",
+      "trendDescription": "Share of each day's closed conversations the AI resolved",
+      "outcomesTitle": "How conversations ended",
+      "outcomesDescription": "Every closed conversation gets one outcome",
+      "definition": "AI resolution rate is the conversations the AI resolved, divided by all closed conversations. Tests and spam are left out. A resolution stops counting if the customer comes back within 72 hours or your team excludes it, so this matches the resolutions on your Usage page."
+    },
+    "outcomes": {
+      "confirmed": {
+        "label": "Confirmed",
+        "description": "The AI resolved it and the customer said so."
+      },
+      "assumed": {
+        "label": "Assumed",
+        "description": "The AI answered and the customer did not come back."
+      },
+      "assisted": {
+        "label": "Planned hand-off",
+        "description": "A playbook told the AI to pass it to your team."
+      },
+      "human": {
+        "label": "Resolved by your team",
+        "description": "The AI could not resolve it and a person did."
+      },
+      "unhappy": {
+        "label": "Unhappy",
+        "description": "The customer said the answer did not help."
+      },
+      "abandoned": {
+        "label": "Abandoned",
+        "description": "No real question, or it ended without a real answer."
+      }
+    },
+    "csat": {
+      "average": "Average rating",
+      "responseRate": "Response rate",
+      "aiAverage": "AI only",
+      "humanAverage": "With your team",
+      "ratings": "{count} ratings",
+      "trendTitle": "Average rating by day",
+      "trendDescription": "By the day the customer rated",
+      "distributionTitle": "Ratings by score",
+      "lowScoresTitle": "Low ratings",
+      "lowScoresDescription": "Conversations rated 1 or 2, lowest first",
+      "noLowScores": "No conversation was rated 1 or 2 in this period.",
+      "untitled": "Untitled conversation",
+      "ai": "AI only",
+      "human": "With your team",
+      "columns": {
+        "conversation": "Conversation",
+        "rating": "Rating",
+        "handledBy": "Handled by",
+        "ratedAt": "Rated"
+      },
+      "emptyTitle": "No ratings in this period",
+      "emptyDescription": "{count} webchat conversations closed and none was rated. Check that the rating question is on in Settings, Webchat.",
+      "definition": "Ratings come from the question the web widget asks when a conversation ends, from 1 to 5. Other channels do not ask yet. Response rate is rated conversations divided by closed webchat conversations."
+    },
+    "handoffs": {
+      "title": "Hand-offs",
+      "rate": "Hand-off rate",
+      "reasonsTitle": "Why the AI handed off",
+      "reasonsDescription": "Most common first",
+      "trendTitle": "Hand-offs by day",
+      "trendDescription": "Closed conversations that reached your team",
+      "columns": {
+        "reason": "Reason",
+        "category": "Type",
+        "count": "Hand-offs",
+        "share": "Share"
+      },
+      "categories": {
+        "planned": { "label": "Planned" },
+        "customer_asked": { "label": "Customer asked" },
+        "fallback": { "label": "Fallback" },
+        "not_recorded": { "label": "Not recorded" }
+      },
+      "reasons": {
+        "playbook": {
+          "label": "Playbook step",
+          "description": "The playbook says to pass this to a person."
+        },
+        "customer_request": {
+          "label": "Customer asked for a person",
+          "description": "The customer asked to talk to someone."
+        },
+        "low_confidence": {
+          "label": "Not sure of the answer",
+          "description": "The AI could not back its answer with your knowledge."
+        },
+        "company_interest": {
+          "label": "Protecting your business",
+          "description": "The reply could have gone against your interests."
+        },
+        "action_claim": {
+          "label": "Action not carried out",
+          "description": "The reply claimed an action the AI had not done."
+        },
+        "broken_link": {
+          "label": "Broken link",
+          "description": "The reply linked to a page that does not exist."
+        },
+        "unverified_date": {
+          "label": "Unverified date",
+          "description": "The reply gave a date the AI could not confirm."
+        },
+        "unanswered_fact": {
+          "label": "Missing fact",
+          "description": "The AI needed a fact it does not have."
+        },
+        "ai_unavailable": {
+          "label": "AI unavailable",
+          "description": "The AI provider was down or the daily budget was used up."
+        },
+        "planning_exhausted": {
+          "label": "Too many steps",
+          "description": "The AI could not finish the reply in the steps allowed."
+        },
+        "ai_decision": {
+          "label": "AI chose to hand off",
+          "description": "The AI decided a person should take it."
+        },
+        "not_recorded": {
+          "label": "Not recorded",
+          "description": "From before reasons were kept, or a teammate took over."
+        }
+      },
+      "notRecordedNote": "{count} hand-offs have no reason: they happened before reasons were recorded, or a teammate took the conversation over.",
+      "emptyTitle": "No hand-offs in this period",
+      "emptyDescription": "No closed conversation reached your team."
+    },
+    "topics": {
+      "title": "Topics",
+      "column": "Topic",
+      "coverage": "{labelled} of {closes} closed conversations have a topic",
+      "emptyTitle": "No topics in this period",
+      "emptyDescription": "Topics come from the review the AI writes when a conversation closes.",
+      "definition": "The topic is the one or two words the close review gives each conversation. Similar wording is not merged yet, so \"shipping\" and \"delivery\" show as two topics. CSAT is the average rating, with the number of ratings in brackets."
+    },
+    "playbooks": {
+      "title": "Playbooks",
+      "description": "How conversations ended, by the playbook that handled them",
+      "column": "Playbook",
+      "none": "No playbook",
+      "deleted": "Deleted playbook",
+      "definition": "A conversation counts for the playbook it was on when it closed. CSAT is the average rating, with the number of ratings in brackets."
+    }
+  }
+}

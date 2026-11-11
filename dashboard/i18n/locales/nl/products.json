@@ -1,0 +1,27 @@
+{
+  "products": {
+    "title": "Producten",
+    "description": "Catalogus gespiegeld vanuit je e-commerceplatforms. De agent doet aanbevelingen uit deze producten in winkelgesprekken.",
+    "browseMarketplace": "Marketplace bekijken",
+    "loading": "Producten laden…",
+    "loadMore": "Meer laden",
+    "inStock": "Op voorraad",
+    "outOfStock": "Niet op voorraad",
+    "summary": "{total} product(en) · {embeddings} embedding(s)",
+    "search": {
+      "label": "Catalogus doorzoeken",
+      "placeholder": "Zoek op titel of handle",
+      "apply": "Toepassen"
+    },
+    "filters": {
+      "source": "Bron",
+      "availability": "Beschikbaarheid",
+      "allSources": "Alle bronnen",
+      "any": "Alle"
+    },
+    "empty": {
+      "title": "Nog geen producten",
+      "description": "Schakel een productbron-plugin in (bijv. Shopify) of doe een POST naar de openbare ingestion-API om je catalogus te spiegelen."
+    }
+  }
+}

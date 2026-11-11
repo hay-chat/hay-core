@@ -15,6 +15,9 @@ export default defineConfig({
       "@hay/form-schema": fileURLToPath(
         new URL("../packages/form-schema/src/index.ts", import.meta.url),
       ),
+      "@hay/languages": fileURLToPath(
+        new URL("../server/types/language.types.ts", import.meta.url),
+      ),
     },
   },
   test: {

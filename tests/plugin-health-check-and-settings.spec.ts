@@ -36,8 +36,10 @@ test.describe("Plugin Health Check and Settings E2E", () => {
 
     // Find Shopify plugin (connector-type that should have health check)
     console.log("\n🔍 Finding Shopify plugin (MCP Connector)...");
-    const shopifyHeading = page.locator('h2:has-text("Shopify")').first();
-    const shopifyExists = await shopifyHeading.isVisible({ timeout: 5000 }).catch(() => false);
+    const shopifyCard = page
+      .locator('[data-testid="marketplace-card"]:has-text("Shopify")')
+      .first();
+    const shopifyExists = await shopifyCard.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (!shopifyExists) {
       console.log("⚠️  Shopify plugin not available, skipping connector test");
@@ -45,27 +47,13 @@ test.describe("Plugin Health Check and Settings E2E", () => {
       return;
     }
 
-    const installButton = page
-      .locator('h2:has-text("Shopify")')
-      .locator("xpath=ancestor::*")
-      .locator('button:has-text("Install")')
-      .first();
-    const configureButton = page
-      .locator('h2:has-text("Shopify")')
-      .locator("xpath=ancestor::*")
-      .locator('button:has-text("Configure")')
-      .first();
-
-    const isAlreadyInstalled = await configureButton.isVisible();
-
-    if (isAlreadyInstalled) {
-      console.log("⚠️  Shopify already installed, clicking Configure...");
-      await configureButton.click();
-    } else {
-      console.log("📦 Installing Shopify plugin...");
-      await installButton.click();
-      // Wait for navigation to plugin page (URL encoded)
-      await page.waitForURL(/\/integrations\/plugins\//, { timeout: 20000 });
+    // The card opens the plugin page; a plugin that is not connected yet shows Connect there.
+    await shopifyCard.click();
+    await page.waitForURL(/\/integrations\/plugins\//, { timeout: 20000 });
+    const connectButton = page.locator('[data-testid="plugin-connect"]');
+    if (await connectButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      console.log("📦 Connecting Shopify plugin...");
+      await connectButton.click();
     }
 
     // Wait for page to load

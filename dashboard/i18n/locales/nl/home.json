@@ -1,0 +1,156 @@
+{
+  "home": {
+    "title": "Inbox",
+    "headTitle": "Inbox - Hay.chat",
+    "headline": {
+      "loading": "Controleren wie er wacht…",
+      "waiting": "Niets wacht op een mens | 1 gesprek wacht op een mens | {count} gesprekken wachten op een mens"
+    },
+    "subline": {
+      "longestWait": "Langste wachttijd: {time}.",
+      "aiHandling": "Hay.chat handelt {count} open gesprek af. | Hay.chat handelt {count} open gesprekken af.",
+      "allQuiet": "Op dit moment geen open gesprekken."
+    },
+    "waitingCount": "{count} wachten op een mens",
+    "sections": {
+      "waiting": "Wacht op een mens",
+      "mine": "Door jou behandeld",
+      "team": "Door teamleden behandeld"
+    },
+    "questions": {
+      "title": "Vragen voor het team",
+      "description": "De AI wist deze niet en checkt het bij jou. Intussen blijft hij de andere vragen van de klant beantwoorden.",
+      "untitled": "Gesprek",
+      "asked": "{time} geleden gevraagd",
+      "statusOpen": "De klant is verteld dat er hier binnen een paar minuten antwoord komt.",
+      "statusTimedOut": "Wacht in je wachtrij. De klant is verteld dat het team zal antwoorden.",
+      "customerSaid": "Klant schreef: {message}",
+      "translated": "Vertaald naar jouw taal",
+      "answerLabel": "Jouw antwoord",
+      "answerPlaceholder": "bijv. Ja, de vaas van 40 cm wordt in een cadeauverpakking verzonden.",
+      "sendAsWritten": "Versturen zoals geschreven",
+      "saveToKnowledge": "Opslaan in kennisbank",
+      "rephraseHelp": "De AI geeft je antwoord door in de taal van de klant en gebruikt alleen wat jij hebt geschreven.",
+      "asWrittenHelp": "Je antwoord gaat precies zo naar de klant als je het hebt geschreven.",
+      "send": "Antwoord versturen",
+      "dismiss": "Negeren",
+      "sent": "Antwoord naar de klant verstuurd",
+      "dismissed": "Vraag genegeerd",
+      "dismissedOpen": "Vraag genegeerd. De klant is verteld dat het team zal antwoorden, en de chat staat in je wachtrij.",
+      "failed": "Er is iets misgegaan. Probeer het opnieuw."
+    },
+    "answerPage": {
+      "headTitle": "Beantwoord de vraag van een klant - Hay.chat",
+      "title": "Een klant wacht op deze vraag",
+      "description": "De AI van {organization} kon deze niet beantwoorden en checkt het bij het team. Je antwoord gaat naar de klant in de chat.",
+      "sentTitle": "Antwoord verstuurd",
+      "sentDescription": "De klant krijgt je antwoord in de chat. Je kunt deze pagina sluiten.",
+      "unavailableTitle": "Deze vraag kan hier niet worden beantwoord",
+      "alreadyHandled": "Iemand heeft deze al beantwoord of gesloten.",
+      "invalidLink": "Deze link is ongeldig of verlopen.",
+      "openInbox": "Inbox openen"
+    },
+    "row": {
+      "noSummary": "Samenvatting is nog niet klaar. Open het gesprek om het te lezen.",
+      "waitingFor": "Wacht {time}",
+      "since": "Sinds {time} geleden",
+      "unknownCustomer": "Klant",
+      "takeOver": "Overnemen",
+      "open": "Openen",
+      "handledBy": "Behandeld door {name}"
+    },
+    "empty": {
+      "title": "Alles rustig",
+      "description": "Wanneer Hay.chat een gesprek aan een mens overdraagt, verschijnt het hier eerst. Zet meldingen aan om het op dit apparaat te horen."
+    },
+    "error": {
+      "title": "Kan gesprekken niet laden",
+      "retry": "Opnieuw proberen"
+    },
+    "metrics": "Statistieken en rapporten",
+    "push": {
+      "enable": "Meldingen op dit apparaat",
+      "enabled": "Meldingen aan",
+      "description": "Krijg een melding op dit apparaat zodra een gesprek een mens nodig heeft, ook als Hay.chat niet open is. Meldingen gaan naar teamleden met de status Beschikbaar. Als niemand binnen 10 minuten antwoordt, stuurt Hay.chat opnieuw een melding en daarna een e-mail.",
+      "statusOn": "Dit apparaat krijgt meldingen",
+      "statusOff": "Dit apparaat krijgt geen meldingen",
+      "sendTest": "Testmelding versturen",
+      "testSent": "Testmelding verstuurd",
+      "testSentBody": "Hij zou binnen een paar seconden op dit apparaat moeten verschijnen.",
+      "testNone": "Er is geen apparaat aangemeld",
+      "unsupported": "Deze browser kan geen pushmeldingen ontvangen. Voeg op een iPhone Hay.chat eerst toe aan je beginscherm en open het vanaf daar.",
+      "unavailable": "Pushmeldingen zijn nog niet ingesteld op deze Hay.chat-server. Vraag je beheerder om VAPID-sleutels toe te voegen.",
+      "denied": "Meldingen zijn voor deze site geblokkeerd in je browserinstellingen. Sta ze toe en laad de pagina opnieuw.",
+      "failed": "Kan meldingen niet inschakelen",
+      "blocked": "Meldingen uit",
+      "privacyLabel": "Klantgegevens verbergen op het vergrendelscherm",
+      "privacyHelp": "Meldingen zeggen alleen \"Een klant heeft een mens nodig\". Open Hay.chat om te zien wie het is. Geldt voor al je apparaten.",
+      "privacyOn": "Klantgegevens verborgen in meldingen",
+      "privacyOff": "Meldingen tonen de klant en samenvatting",
+      "privacyFailed": "Kan deze instelling niet wijzigen"
+    },
+    "aiPause": {
+      "title": "AI overal pauzeren",
+      "description": "Stopt direct elk AI-antwoord op elk kanaal, inclusief follow-ups en automatisch sluiten bij inactiviteit. Klanten die schrijven krijgen één kort bericht dat je team zal antwoorden, en hun gesprekken wachten hier op je.",
+      "statusOn": "AI gepauzeerd",
+      "statusOff": "AI antwoordt",
+      "pausedBy": "Gepauzeerd door {name} op {when}.",
+      "pausedAt": "Gepauzeerd op {when}.",
+      "perChannel": "De AI op slechts één kanaal uitzetten (alleen concepten)",
+      "banner": "De AI is overal gepauzeerd. Je team beantwoordt elk gesprek.",
+      "resume": "AI hervatten",
+      "paused": "AI overal gepauzeerd",
+      "resumed": "AI hervat",
+      "failed": "Kan de AI-pauze niet wijzigen. Probeer het opnieuw."
+    },
+    "install": {
+      "title": "Meldingen op je iPhone",
+      "description": "iPhone toont alleen meldingen van Hay.chat als Hay.chat op je beginscherm staat. Het kost drie tikken.",
+      "stepShare": "Tik in Safari op de deelknop",
+      "stepAdd": "Scrol omlaag en tik op \"Zet op beginscherm\" en daarna op \"Voeg toe\"",
+      "stepOpen": "Open Hay.chat via het nieuwe icoon op je beginscherm en zet meldingen aan",
+      "dismiss": "Deze stappen verbergen"
+    },
+    "spam": {
+      "title": "Spam",
+      "headTitle": "Spam - Hay.chat",
+      "description": "Gesprekken die als spam zijn tegengehouden. De AI van Hay.chat beantwoordt ze niet en ze tellen nooit mee voor je factuur.",
+      "link": "Spam",
+      "empty": {
+        "title": "Geen spam",
+        "description": "Wanneer Hay.chat een gesprek als spam tegenhoudt, verschijnt het hier zodat je het kunt controleren."
+      },
+      "error": "Kan spam niet laden",
+      "notSpam": "Geen spam",
+      "open": "Openen",
+      "flagged": "{time} geleden tegengehouden",
+      "noPreview": "Geen bericht",
+      "unknownCustomer": "Bezoeker",
+      "notSpamDone": "Uit spam gehaald",
+      "notSpamReengaged": "Uit spam gehaald. De AI van Hay.chat antwoordt nu.",
+      "markSpam": "Markeren als spam",
+      "markSpamDone": "Gemarkeerd als spam. De AI van Hay.chat zal het niet beantwoorden.",
+      "actionFailed": "Kan het gesprek niet bijwerken",
+      "sources": {
+        "detector": "Spamdetector",
+        "staff": "Gemarkeerd door je team",
+        "close_classifier": "Gevonden bij sluiten",
+        "other": "Spam"
+      },
+      "signals": {
+        "links": "Veel links",
+        "link_only": "Alleen een link",
+        "repeated": "Herhaalde tekst",
+        "too_long": "Erg lang bericht",
+        "no_text": "Geen woorden",
+        "known_pattern": "Bekende spamzinnen",
+        "unverified": "Botcontrole mislukt"
+      },
+      "classifier": "AI-controle: {reason}",
+      "banner": {
+        "title": "Tegengehouden als spam",
+        "description": "De AI van Hay.chat beantwoordt dit gesprek niet en het telt niet mee voor je factuur."
+      }
+    }
+  }
+}

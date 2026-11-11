@@ -1,0 +1,108 @@
+{
+  "evidence": {
+    "headTitle": "Bewijspakketten - Hay.chat",
+    "title": "Bewijspakketten",
+    "description": "Bundel elk gesprek over een bestelling in één document dat je kunt bijvoegen wanneer een klant een betaling betwist.",
+    "search": {
+      "label": "Bestelnummer",
+      "placeholder": "bijv. #1001",
+      "submit": "Bestelling zoeken",
+      "forConversation": "Bestellingen genoemd in dit gesprek",
+      "forCustomer": "Bestellingen waarover deze klant het had",
+      "clear": "In plaats daarvan zoeken op bestelnummer",
+      "empty": "Geen enkel gesprek noemt deze bestelling. Bestellingen worden gevonden wanneer Hay.chat ze in je winkel heeft opgezocht of een bericht ze noemde (bijvoorbeeld \"#1001\").",
+      "emptyConversation": "Dit gesprek noemt geen bestelling.",
+      "emptyCustomer": "De gesprekken van deze klant noemen geen bestelling."
+    },
+    "order": {
+      "label": "Bestelling #{number}",
+      "conversations": "{count} gesprek | {count} gesprekken",
+      "lastSeen": "Laatst genoemd {at}",
+      "fromMessages": "Uit berichten",
+      "select": "Selecteren",
+      "selected": "Geselecteerd"
+    },
+    "conversationOnly": {
+      "title": "Alleen dit gesprek gebruiken",
+      "description": "Stel het pakket samen uit dit gesprek zonder bestelling."
+    },
+    "options": {
+      "title": "Pakket samenstellen",
+      "forOrder": "Bestelling #{number}, {count} gesprek | Bestelling #{number}, {count} gesprekken",
+      "forConversation": "Dit gesprek",
+      "template": "Reden van de betwisting",
+      "templates": {
+        "generic": "Algemeen",
+        "item_not_received": "Artikel niet ontvangen",
+        "not_as_described": "Artikel niet zoals beschreven of defect",
+        "cancelled_credit": "Geannuleerde bestelling of terugbetaling niet verwerkt"
+      },
+      "templateHelp": "Bepaalt welke winkelacties en beleidsregels de samenvatting vooraan zet. Het volledige gesprek wordt altijd meegenomen.",
+      "pdf": "PDF downloaden",
+      "zip": "ZIP downloaden",
+      "zipHelp": "De ZIP bevat ook de bijlagen, een README en een SHA-256-manifest, zodat iedereen kan controleren dat er geen bestand is gewijzigd.",
+      "downloaded": "Bewijspakket gedownload",
+      "imagesOmitted": "Sommige afbeeldingen waren te groot voor de PDF-limiet van 4 MB en zijn uit de PDF weggelaten. Ze zitten in de ZIP.",
+      "overCap": "Deze PDF is groter dan 4 MB. Sommige betaalproviders accepteren zulke grote bestanden niet; kies minder gesprekken of maak hem kleiner voordat je hem uploadt.",
+      "failed": "Kan het bewijspakket niet samenstellen. Probeer het opnieuw."
+    },
+    "notes": {
+      "title": "Voordat je het indient",
+      "honest": "Het pakket is een vastlegging van wat Hay.chat over deze gesprekken heeft opgeslagen. Het garandeert geen uitkomst van een betwisting, en elke betaalprovider bepaalt zelf welk bewijs hij accepteert.",
+      "retention": "Je bewaartermijn voor gegevens is ingesteld op {days} dagen. Oudere gesprekken worden verwijderd en kunnen geen deel uitmaken van een pakket. Betwistingen kunnen maanden na een bestelling worden gestart, dus een korte bewaartermijn laat je met minder bewijs achter.",
+      "retentionOff": "Gesprekken worden bewaard totdat je ze verwijdert, dus voor oudere bestellingen kan nog steeds een pakket worden gemaakt.",
+      "retentionLink": "Instellingen voor gegevensbewaring"
+    },
+    "disputes": {
+      "title": "Betalingsbetwistingen",
+      "description": "Chargebacks gemeld door je gekoppelde betaalplatforms. Voeg het bewijspakket toe en controleer het vóór de deadline op het platform.",
+      "order": "Bestelling {order}",
+      "noOrderLabel": "Bestelling onbekend",
+      "status": {
+        "needs_response": "Reactie nodig",
+        "under_review": "In behandeling",
+        "won": "Gewonnen",
+        "lost": "Verloren",
+        "closed": "Gesloten"
+      },
+      "drafted": "Bewijs toegevoegd, niet ingediend",
+      "dueBy": "Bewijs uiterlijk {at}",
+      "noOrder": "Nog geen enkel gesprek noemt deze bestelling, dus er is niets om toe te voegen.",
+      "download": "Pakket downloaden",
+      "attach": "Bewijs toevoegen",
+      "attachAgain": "Opnieuw toevoegen",
+      "open": "Openen in {platform}",
+      "confirmTitle": "Het bewijspakket aan deze betwisting toevoegen?",
+      "confirmDescription": "Hay.chat uploadt de bewijs-PDF naar deze betwisting op {platform} en voegt een korte notitie toe. Hay.chat dient de reactie nooit in, maar sommige platforms (bijvoorbeeld Shopify Payments) versturen opgeslagen bewijs automatisch op de deadline, dus controleer het vóór die tijd op {platform}. Bestanden die je daar hebt toegevoegd, blijven behouden.",
+      "confirm": "Bewijs toevoegen",
+      "attached": "Bewijs toegevoegd aan de betwisting op {platform}",
+      "attachedHelp": "Opgeslagen op {platform}, niet ingediend door Hay.chat. Controleer het daar vóór de deadline: sommige platforms versturen opgeslagen bewijs automatisch op die datum.",
+      "reasons": {
+        "product_not_received": "Artikel niet ontvangen",
+        "product_unacceptable": "Niet zoals beschreven",
+        "credit_not_processed": "Terugbetaling niet verwerkt",
+        "subscription_canceled": "Abonnement opgezegd",
+        "duplicate": "Dubbele afschrijving",
+        "fraudulent": "Frauduleus",
+        "unrecognized": "Onbekende afschrijving",
+        "general": "Algemeen",
+        "customer_initiated": "Door klant gestart",
+        "incorrect_account_details": "Onjuiste rekeninggegevens",
+        "insufficient_funds": "Onvoldoende saldo",
+        "bank_cannot_process": "Bank kan niet verwerken",
+        "debit_not_authorized": "Afschrijving niet geautoriseerd"
+      },
+      "errors": {
+        "NOT_EDITABLE": "Deze betwisting accepteert geen bewijs meer. Mogelijk is ze al ingediend of gesloten.",
+        "SLOT_TAKEN": "De betwisting bevat al bestanden die je op het platform hebt toegevoegd, dus Hay.chat heeft ze niet vervangen. Download het pakket en voeg het daar toe.",
+        "SCOPE_MISSING": "De koppeling heeft geen toestemming om bewijs bij betwistingen te bewerken. Koppel de integratie opnieuw en keur de nieuwe machtigingen goed.",
+        "NOT_FOUND": "Het platform kon deze betwisting niet vinden.",
+        "NOT_CONNECTED": "De integratie die deze betwisting meldde, is niet gekoppeld of kan geen bewijs toevoegen.",
+        "PROVIDER_ERROR": "Het platform heeft het bewijs niet geaccepteerd. Probeer het opnieuw, of download het pakket en voeg het daar toe.",
+        "NO_ORDER": "Geen enkel gesprek noemt deze bestelling, dus er is niets om toe te voegen.",
+        "NO_CONVERSATIONS": "De gesprekken over deze bestelling zijn niet meer opgeslagen.",
+        "TOO_LARGE": "Het bewijsbestand is te groot om toe te voegen. Download het via deze pagina en maak het kleiner voordat je het uploadt."
+      }
+    }
+  }
+}

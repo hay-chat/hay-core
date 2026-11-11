@@ -38,7 +38,7 @@ module.exports = {
     ],
   },
   transformIgnorePatterns: [
-    "/node_modules/(?!(htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities|file-type|strtok3|token-types|@tokenizer|@borewit|uint8array-extras)/)",
+    "/node_modules/(?!(linkedom|cssomnom|uhyphen|css-select|css-what|boolbase|nth-check|html-escaper|htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities|file-type|strtok3|token-types|@tokenizer|@borewit|uint8array-extras)/)",
   ],
   collectCoverageFrom: [
     "services/**/*.ts",

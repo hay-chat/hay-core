@@ -118,7 +118,7 @@ export async function buildPageProductPrompt(
       take: MAX_LISTED_VARIANTS,
     });
 
-    const lines = [line("title", product.title)];
+    const lines = [line("product_id", product.id), line("title", product.title)];
     const price = priceRange(product);
     if (price) lines.push(line("price", price));
     lines.push(line("in_stock", product.available ? "yes" : "no"));
