@@ -28,7 +28,10 @@
       "egress": [
         "melhorenvio.com.br"
       ]
-    }
+    },
+    "oauthHosts": [
+      "melhorenvio.com.br"
+    ]
   },
   "scripts": {
     "build": "tsc",
