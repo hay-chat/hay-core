@@ -17,7 +17,7 @@ class OrganizationService {
   async findOne(id: string): Promise<Organization | null> {
     return this.repository.findOne({
       where: { id },
-      relations: ["logoUpload"],
+      relations: { logoUpload: true },
     });
   }
 

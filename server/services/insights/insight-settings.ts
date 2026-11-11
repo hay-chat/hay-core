@@ -92,7 +92,7 @@ export async function getOrganizationThresholds(
 ): Promise<InsightThresholds> {
   const org = await AppDataSource.getRepository(Organization).findOne({
     where: { id: organizationId },
-    select: ["id", "settings"],
+    select: { id: true, settings: true },
   });
   return resolveThresholds(org?.settings?.insights);
 }
@@ -133,7 +133,7 @@ export async function getOrganizationOverride(
 ): Promise<InsightSettingsOverride> {
   const org = await AppDataSource.getRepository(Organization).findOne({
     where: { id: organizationId },
-    select: ["id", "settings"],
+    select: { id: true, settings: true },
   });
   const value = org?.settings?.insights;
   return value && typeof value === "object" ? (value as InsightSettingsOverride) : {};

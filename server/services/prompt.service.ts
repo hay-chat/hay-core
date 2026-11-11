@@ -151,7 +151,7 @@ export class PromptService {
         const conversationRepo = AppDataSource.getRepository(Conversation);
         const conversation = await conversationRepo.findOne({
           where: { id: options.conversationId },
-          select: ["language", "organization_id"],
+          select: { language: true, organization_id: true },
         });
 
         if (conversation?.language) {
@@ -172,7 +172,7 @@ export class PromptService {
         const organizationRepo = AppDataSource.getRepository(Organization);
         const org = await organizationRepo.findOne({
           where: { id: options.organizationId },
-          select: ["id", "defaultLanguage"],
+          select: { id: true, defaultLanguage: true },
           loadEagerRelations: false,
         });
 

@@ -479,7 +479,7 @@ export class WebSocketService {
       AppDataSource.getRepository(User).find({ where: { id: In(userIds) } }),
       AppDataSource.getRepository(UserOrganization).find({
         where: { userId: In(userIds), isActive: true },
-        relations: ["organization"],
+        relations: { organization: true },
       }),
       sessionIds.length === 0
         ? Promise.resolve([] as Session[])
@@ -575,7 +575,7 @@ export class WebSocketService {
     // active member before streaming that organization's events.
     const membership = await AppDataSource.getRepository(UserOrganization).findOne({
       where: { userId: decoded.userId, organizationId: client.organizationId, isActive: true },
-      relations: ["organization"],
+      relations: { organization: true },
     });
     if (!membership) {
       logger.warn({ clientId }, "WebSocket client is not a member of the requested organization");

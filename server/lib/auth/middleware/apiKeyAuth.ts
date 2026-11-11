@@ -25,7 +25,7 @@ export async function authenticateApiKeyAuth(authHeader?: string): Promise<AuthU
   const apiKeyRepository = AppDataSource.getRepository(ApiKey);
   const matchedApiKey = await apiKeyRepository.findOne({
     where: { keyHash: await hashApiKey(apiKey), isActive: true },
-    relations: ["organization"],
+    relations: { organization: true },
   });
 
   if (!matchedApiKey) {

@@ -275,7 +275,7 @@ export const authRouter = t.router({
     const userRepository = AppDataSource.getRepository(User);
     const user = await userRepository.findOne({
       where: { email: email.toLowerCase() },
-      relations: ["organization"],
+      relations: { organization: true },
     });
 
     if (!user) {
@@ -521,7 +521,7 @@ export const authRouter = t.router({
 
         const userOrg = await AppDataSource.getRepository(UserOrganization).findOne({
           where: { userId: user.id },
-          relations: ["organization"],
+          relations: { organization: true },
         });
         const locale = userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
 
@@ -660,7 +660,7 @@ export const authRouter = t.router({
         await emailService.initialize();
         const userOrg = await AppDataSource.getRepository(UserOrganization).findOne({
           where: { userId: user.id },
-          relations: ["organization"],
+          relations: { organization: true },
         });
         const locale = userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
 
@@ -743,7 +743,7 @@ export const authRouter = t.router({
       const userRepository = AppDataSource.getRepository(User);
       const user = await userRepository.findOne({
         where: { id: userEntity.id },
-        relations: ["organization"],
+        relations: { organization: true },
       });
 
       if (!user) {
@@ -1376,7 +1376,7 @@ export const authRouter = t.router({
 
         const userOrg = await AppDataSource.getRepository(UserOrganization).findOne({
           where: { userId: user.id },
-          relations: ["organization"],
+          relations: { organization: true },
         });
         const locale = userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
 

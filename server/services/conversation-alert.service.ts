@@ -662,7 +662,7 @@ class ConversationAlertService {
       ? conversation
       : ((await AppDataSource.getRepository(Conversation).findOne({
           where: { id: conversation.id },
-          relations: ["customer"],
+          relations: { customer: true },
         })) ?? conversation);
 
     const recipients =
@@ -744,7 +744,7 @@ class ConversationAlertService {
   ): Promise<void> {
     const conversation = await AppDataSource.getRepository(Conversation).findOne({
       where: { id: conversationId },
-      relations: ["customer"],
+      relations: { customer: true },
     });
     if (!conversation) return;
     const withinHours = await isWithinBusinessHours(
@@ -820,7 +820,7 @@ class ConversationAlertService {
   private async escalate(conversationId: string, cycleStartedAt: Date, now: Date): Promise<void> {
     const conversation = await AppDataSource.getRepository(Conversation).findOne({
       where: { id: conversationId },
-      relations: ["customer"],
+      relations: { customer: true },
     });
     if (!conversation) return;
 

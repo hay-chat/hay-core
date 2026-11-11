@@ -447,7 +447,7 @@ export class PrivacyService {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
     const request = await requestRepository.findOne({
       where: { id: requestId },
-      relations: ["job"],
+      relations: { job: true },
     });
 
     if (!request) {
@@ -638,7 +638,7 @@ export class PrivacyService {
 
     const memberships = await AppDataSource.getRepository(UserOrganization).find({
       where: { userId },
-      relations: ["organization"],
+      relations: { organization: true },
       order: { createdAt: "ASC" },
     });
 
@@ -650,7 +650,14 @@ export class PrivacyService {
 
     const documents = await documentRepository.find({
       where: [{ createdBy: userId }, { updatedBy: userId }],
-      select: ["id", "title", "createdAt", "updatedAt", "metadata", "attachments"],
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        updatedAt: true,
+        metadata: true,
+        attachments: true,
+      },
     });
 
     const uploads = await uploadRepository.find({
