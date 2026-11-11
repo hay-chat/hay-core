@@ -161,7 +161,15 @@ export interface HayPluginSetupHints {
   /** Business types that should be offered this plugin. */
   businessTypes: Array<"store" | "saas" | "service" | "other">;
   /** Where the plugin appears in the "what do you already use" step. */
-  group: "commerce" | "payments" | "crm" | "helpdesk" | "marketing" | "knowledge" | "booking";
+  group:
+    | "commerce"
+    | "shipping"
+    | "payments"
+    | "crm"
+    | "helpdesk"
+    | "marketing"
+    | "knowledge"
+    | "booking";
   /** Customer requests the plugin's tools can fulfil. */
   handles?: Array<
     "orders" | "refunds" | "order_changes" | "billing" | "subscriptions" | "bookings"
