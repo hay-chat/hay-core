@@ -35,4 +35,7 @@ export const CART_REQUESTS = {
     '{"items":[{"id":{{cartItemId}},"quantity":{{quantity}},' +
     `"properties":{"${CONVERSATION_PROPERTY}":"{{conversationId}}"}}]}`,
   checkoutPath: "/checkout",
+  // Shopify Markets serves a market from a folder ("/en-ca/") and asks for
+  // locale-aware cart URLs built on this global, which always ends in "/".
+  rootPathGlobal: "Shopify.routes.root",
 } as const;

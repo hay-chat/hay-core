@@ -79,5 +79,7 @@ webchat contribution); the widget sends it from the shopper's browser to the sto
 - The cart line carries a private line item property, `_hay_conversation`, with the conversation
   id. Shopify hides it at checkout and shows it on the order in the admin. A theme whose cart page
   prints every property, without skipping names that start with `_`, would show it there.
+- On a Shopify Markets storefront served from a locale folder (`/en-ca/`), the widget prefixes the
+  cart paths with the page's `Shopify.routes.root` (`rootPathGlobal`).
 - Shopify-hosted themes only: the Ajax API does not exist on a headless storefront, where the card
   falls back to its buy link.

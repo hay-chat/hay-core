@@ -54,6 +54,7 @@ describe("cart@1 contribution", () => {
         addPath: "/cart/add.js",
         addBody: CART_REQUESTS.addBody,
         checkoutPath: "/checkout",
+        rootPathGlobal: "Shopify.routes.root",
       },
     });
     expect(config.mock.calls[0][0].cartActions).toMatchObject({ type: "boolean", default: true });
