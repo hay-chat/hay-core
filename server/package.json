@@ -36,7 +36,7 @@
     "secrets:rotate-encryption-key": "tsx scripts/rotate-plugin-encryption-key.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.100.1",
+    "@anthropic-ai/sdk": "^1.6.0",
     "@aws-sdk/client-s3": "^3.1163.0",
     "@aws-sdk/lib-storage": "^3.1163.0",
     "@google/genai": "^3.0.0",
