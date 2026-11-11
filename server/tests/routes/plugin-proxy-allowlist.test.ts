@@ -13,9 +13,6 @@ const mockWorkerFetch = jest.fn();
 jest.mock("@server/services/plugin-manager.service", () => ({
   pluginManagerService: { getPlugin: mockGetPlugin, startPluginWorker: mockStartPluginWorker },
 }));
-jest.mock("@server/services/plugin-instance-manager.service", () => ({
-  pluginInstanceManagerService: { updateActivityTimestamp: jest.fn(async () => undefined) },
-}));
 jest.mock("@server/services/webhook-router.service", () => ({
   webhookRouterService: { getRoutingDescriptor: jest.fn(async () => null) },
 }));

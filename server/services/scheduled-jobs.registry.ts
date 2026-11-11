@@ -2,7 +2,6 @@ import { schedulerService, CronJobConfig } from "./scheduler.service";
 import { dpopCacheService } from "./dpop-cache.service";
 import { jobQueueService } from "./job-queue.service";
 import { privacyService } from "./privacy.service";
-import { pluginInstanceManagerService } from "./plugin-instance-manager.service";
 import { orchestratorWorker } from "@server/workers/orchestrator.worker";
 import { refreshOAuthTokens } from "./oauth-token-refresh.job";
 import { documentRetryService } from "./document-retry.service";
@@ -38,17 +37,6 @@ const jobRegistry: CronJobConfig[] = [
     perInstance: true,
     enabled: true,
     skipDatabaseLogging: true, // Don't log frequent cache cleanups
-  },
-
-  {
-    name: "plugin-instance-cleanup",
-    description: "Clean up stale plugin instances",
-    schedule: 60000, // Every 60 seconds
-    handler: async () => pluginInstanceManagerService.cleanupInactiveInstances(),
-    singleton: true,
-    perInstance: true,
-    enabled: true,
-    skipDatabaseLogging: true, // Don't log frequent cleanups
   },
 
   {
@@ -683,18 +671,6 @@ const jobRegistry: CronJobConfig[] = [
     maxRetries: 2,
     skipDatabaseLogging: true,
   },
-
-  // ============================================================
-  // FUTURE JOBS (Disabled for now)
-  // ============================================================
-  // {
-  //   name: 'plugin-instance-cleanup',
-  //   description: 'Clean up stale plugin instances',
-  //   schedule: 300000,  // Every 5 minutes
-  //   handler: async () => pluginInstanceManager.cleanup(),
-  //   singleton: true,
-  //   enabled: false,  // Enable when ready
-  // },
 ];
 
 /**
