@@ -380,6 +380,13 @@ export class LLMService {
   }
 
   private prepareMessages(history: string | Message[], systemPrompt?: string): ChatMessage[] {
+    // A prompt-only call (perception, playbook selection, guardrails) is one user
+    // message. Sending it as a system message plus an empty user turn makes some
+    // providers (DeepSeek V4, GLM on DigitalOcean) reject the request outright.
+    if (systemPrompt && history === "") {
+      return [{ role: "user", content: systemPrompt }];
+    }
+
     const messages: ChatMessage[] = [];
 
     if (systemPrompt) {
