@@ -35,7 +35,7 @@
         <p v-if="summary" class="max-w-xl text-base text-neutral-muted">{{ summary }}</p>
         <ul class="flex flex-wrap gap-1.5 pt-1" :aria-label="$t('pluginSettings.preConnect.tags')">
           <li v-for="chip in chips" :key="chip">
-            <Badge variant="secondary" class="bg-muted">{{ chip }}</Badge>
+            <Badge variant="outline">{{ chip }}</Badge>
           </li>
         </ul>
       </div>
@@ -79,7 +79,7 @@
             <li
               v-for="ability in abilities"
               :key="ability.key"
-              class="rounded-xl border border-border p-4"
+              class="rounded-xl border border-border bg-background p-4"
             >
               <p class="font-semibold">{{ ability.title }}</p>
               <p class="mt-1 text-[13px] text-neutral-muted">{{ ability.description }}</p>
@@ -113,7 +113,10 @@
       </div>
 
       <aside class="min-w-0 flex-1 basis-64 space-y-5">
-        <section aria-labelledby="plugin-details" class="rounded-xl border border-border p-5">
+        <section
+          aria-labelledby="plugin-details"
+          class="rounded-xl border border-border bg-background p-5"
+        >
           <h2 id="plugin-details" class="mb-3 font-semibold">
             {{ $t("pluginSettings.preConnect.details.title") }}
           </h2>
@@ -173,7 +176,7 @@
         <section
           v-if="dataItems.length > 0"
           aria-labelledby="plugin-data"
-          class="rounded-xl border border-border p-5"
+          class="rounded-xl border border-border bg-background p-5"
         >
           <h2 id="plugin-data" class="mb-1 font-semibold">
             {{ $t("pluginSettings.preConnect.data.title") }}

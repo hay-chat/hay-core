@@ -34,19 +34,16 @@
           :aria-label="$t('marketplace.categories.label')"
           class="flex flex-wrap gap-2"
         >
-          <Button
+          <FilterPill
             v-for="pill in categoryPills"
             :key="pill.id"
-            size="sm"
-            class="rounded-full"
-            :variant="selectedCategory === pill.id ? 'default' : 'outline'"
-            :aria-pressed="selectedCategory === pill.id"
+            :pressed="selectedCategory === pill.id"
+            :count="pill.count"
             :data-testid="`marketplace-category-${pill.id}`"
             @click="selectedCategory = pill.id"
           >
             {{ pill.label }}
-            <span class="ml-2 text-xs opacity-70">{{ pill.count }}</span>
-          </Button>
+          </FilterPill>
         </div>
       </div>
 
