@@ -116,7 +116,7 @@ not depend on the page-tools setting above: each store plugin has its own switch
 `go_to_checkout` only navigates; the shopper pays on the store's page.
 
 After every successful add the widget fires `hay:cart-updated` on `document.body` (bubbling), plus
-the theme events the plugin listed. A theme whose cart count does not refresh can listen for it:
+the theme events the plugin listed (`afterAddEvents`). A theme whose cart count does not refresh can listen for it:
 
 ```js
 document.addEventListener("hay:cart-updated", () => myTheme.refreshCart());
