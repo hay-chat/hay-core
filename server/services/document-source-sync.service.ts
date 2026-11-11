@@ -120,6 +120,16 @@ function mergeStats(a: SyncStats, b: SyncStats): SyncStats {
   };
 }
 
+/**
+ * `sourceUrl` is a document's public web address: the agent cites it, the site
+ * index shares it with customers, and the audit reads its URL structure. Only a
+ * website source's pages are public; a Notion/Confluence page URL stays in
+ * `externalUrl` only.
+ */
+function publicUrl(source: DocumentSource, url: string | undefined): string | undefined {
+  return isWebsiteSource(source) ? url : undefined;
+}
+
 export class DocumentSourceSyncService {
   /**
    * Injectable monotonic clock — tests can override. All elapsed-time
@@ -485,6 +495,7 @@ export class DocumentSourceSyncService {
         externalId: page.externalId,
         externalUpdatedAt: incomingUpdatedAt ?? undefined,
         externalUrl: page.externalUrl,
+        sourceUrl: publicUrl(source, page.externalUrl),
       });
     } else {
       document = existing;
@@ -504,6 +515,7 @@ export class DocumentSourceSyncService {
       content: fetched.markdown,
       externalUpdatedAt: fetchedUpdatedAt,
       externalUrl: fetched.externalUrl ?? page.externalUrl,
+      sourceUrl: publicUrl(source, fetched.externalUrl ?? page.externalUrl),
       status: DocumentationStatus.PUBLISHED,
       lastCrawledAt: new Date(),
     });
