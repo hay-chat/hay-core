@@ -2,6 +2,7 @@
   "name": "hay-channel-messenger-meta",
   "version": "1.0.0",
   "description": "Connect Facebook Messenger as a communication channel — exchange Page messages through Hay.chat's AI orchestrator using a shared Hay.chat-owned Meta app (Facebook Login)",
+  "homepage": "https://hay.chat/docs/user-guide/integrations/messenger/",
   "author": "Hay",
   "type": "module",
   "main": "dist/index.js",
@@ -9,6 +10,7 @@
     "entry": "./dist/index.js",
     "displayName": "Messenger",
     "category": "channel",
+    "marketplaceCategory": "channels",
     "channel": "messenger",
     "inactivity": {
       "warningMinutes": 60,

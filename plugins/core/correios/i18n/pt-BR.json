@@ -1,6 +1,7 @@
 {
   "name": "Correios",
   "description": "Conecte seu contrato dos Correios para que o agente rastreie uma encomenda pelo código de rastreamento: status atual, último evento, histórico, data de entrega e se o objeto parou de se movimentar.",
+  "summary": "Rastreie uma encomenda pelo código: status atual, histórico e previsão de entrega.",
   "tools": {
     "correios_track_shipment": {
       "label": "Rastrear encomenda",

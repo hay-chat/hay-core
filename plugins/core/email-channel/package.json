@@ -2,6 +2,7 @@
   "name": "hay-channel-email",
   "version": "1.0.0",
   "description": "Connect your support inbox as a channel — forward support@ emails to Hay.chat and let the AI reply by email, threaded like a normal conversation; the AI can also email your team",
+  "homepage": "https://hay.chat/docs/user-guide/integrations/email-inbox/",
   "author": "Hay",
   "type": "module",
   "main": "dist/index.js",
@@ -9,6 +10,7 @@
     "entry": "./dist/index.js",
     "displayName": "Email inbox",
     "category": "channel",
+    "marketplaceCategory": "channels",
     "channel": "email",
     "inactivity": {
       "closeMinutes": 2880

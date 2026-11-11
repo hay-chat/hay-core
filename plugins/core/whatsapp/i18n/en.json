@@ -1,6 +1,7 @@
 {
   "name": "WhatsApp",
   "description": "Connect a WhatsApp Business number and exchange messages, media and voice notes through Hay.chat's AI",
+  "summary": "Reply to WhatsApp messages, media and voice notes with your agent.",
   "tools": {},
   "config": {
     "handoffTemplateName": {

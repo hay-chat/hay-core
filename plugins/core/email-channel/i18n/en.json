@@ -1,6 +1,7 @@
 {
   "name": "Email inbox",
   "description": "Connect your support inbox: forward support{'@'} emails to Hay.chat and let the AI reply by email, threaded like a normal conversation. The AI can also email your team.",
+  "summary": "Forward support{'@'} to Hay and let the agent reply by email, threaded as usual.",
   "tools": {
     "send-email": {
       "label": "Send email to your team",

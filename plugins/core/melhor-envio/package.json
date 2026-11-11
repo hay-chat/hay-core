@@ -2,6 +2,7 @@
   "name": "hay-plugin-melhor-envio",
   "version": "1.0.0",
   "description": "Connect your Melhor Envio account so the agent can answer where-is-my-order questions: shipment status, carrier, tracking code and link, posting and delivery dates, and parcels that look stuck",
+  "homepage": "https://hay.chat/docs/user-guide/integrations/melhor-envio/",
   "author": "Hay",
   "type": "module",
   "main": "dist/index.js",
@@ -9,6 +10,7 @@
     "entry": "./dist/index.js",
     "displayName": "Melhor Envio",
     "category": "integration",
+    "marketplaceCategory": "payments",
     "capabilities": [
       "mcp",
       "auth"

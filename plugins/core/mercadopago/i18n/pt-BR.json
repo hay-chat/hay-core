@@ -1,6 +1,7 @@
 {
   "name": "Mercado Pago",
   "description": "Conecte o Mercado Pago para que o agente encontre o pagamento de um pedido, reenvie o código Pix de um pedido não pago a um cliente verificado, faça reembolsos dentro do valor pago e informe o status do reembolso com honestidade.",
+  "summary": "Encontre o pagamento de um pedido, reenvie o código Pix e reembolse dentro do valor pago.",
   "tools": {
     "mercadopago_get_payment": {
       "label": "Consultar pagamento",

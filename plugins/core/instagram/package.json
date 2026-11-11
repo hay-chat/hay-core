@@ -2,6 +2,7 @@
   "name": "hay-channel-instagram-meta",
   "version": "1.0.0",
   "description": "Connect Instagram as a communication channel — exchange Instagram DMs through Hay.chat's AI orchestrator using a shared Hay.chat-owned Meta app (Instagram Business Login)",
+  "homepage": "https://hay.chat/docs/user-guide/integrations/instagram/",
   "author": "Hay",
   "type": "module",
   "main": "dist/index.js",
@@ -9,6 +10,7 @@
     "entry": "./dist/index.js",
     "displayName": "Instagram",
     "category": "channel",
+    "marketplaceCategory": "channels",
     "channel": "instagram",
     "inactivity": {
       "warningMinutes": 60,

@@ -2,6 +2,7 @@
   "name": "hay-plugin-zendesk",
   "version": "2.0.0",
   "description": "Connect your Zendesk account to manage tickets, customers, and support workflows",
+  "homepage": "https://hay.chat/docs/user-guide/integrations/zendesk/",
   "author": "Hay",
   "type": "module",
   "main": "dist/index.js",
@@ -9,6 +10,7 @@
     "entry": "./dist/index.js",
     "displayName": "Zendesk",
     "category": "integration",
+    "marketplaceCategory": "crm",
     "capabilities": [
       "mcp",
       "tickets"

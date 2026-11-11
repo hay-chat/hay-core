@@ -2,6 +2,7 @@
   "name": "hay-plugin-woocommerce",
   "version": "1.0.0",
   "description": "Connect your WooCommerce store so the agent can find a customer's orders, track shipments, cancel or re-route undispatched orders, issue refunds, and answer product and stock questions",
+  "homepage": "https://hay.chat/docs/user-guide/integrations/woocommerce/",
   "author": "Hay",
   "type": "module",
   "main": "dist/index.js",
@@ -9,6 +10,7 @@
     "entry": "./dist/index.js",
     "displayName": "WooCommerce",
     "category": "integration",
+    "marketplaceCategory": "commerce",
     "capabilities": [
       "mcp",
       "products"

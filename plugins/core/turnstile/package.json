@@ -9,6 +9,7 @@
     "entry": "./dist/index.js",
     "displayName": "Bot protection (Cloudflare Turnstile)",
     "category": "tool",
+    "marketplaceCategory": "security",
     "capabilities": [
       "config",
       "webchat"

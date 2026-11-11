@@ -1,6 +1,7 @@
 {
   "name": "Correios",
   "description": "Connect your Correios contract so the agent can track a shipment by its tracking code: current status, latest event, history, delivery date, and whether the parcel has stopped moving.",
+  "summary": "Track a shipment by code: current status, history and expected delivery date.",
   "tools": {
     "correios_track_shipment": {
       "label": "Track Shipment",

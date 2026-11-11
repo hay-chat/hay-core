@@ -2,6 +2,7 @@
   "name": "hay-channel-chatwoot",
   "version": "1.0.0",
   "description": "Connect Chatwoot as a communication channel — route conversations through Hay.chat's AI orchestrator and escalate back to Chatwoot human agents",
+  "homepage": "https://hay.chat/docs/user-guide/integrations/chatwoot/",
   "author": "Hay",
   "type": "module",
   "main": "dist/index.js",
@@ -9,6 +10,7 @@
     "entry": "./dist/index.js",
     "displayName": "Chatwoot",
     "category": "channel",
+    "marketplaceCategory": "channels",
     "channel": "chatwoot",
     "capabilities": [
       "messages",

@@ -1,6 +1,7 @@
 {
   "name": "HubSpot",
   "description": "Conecte seu CRM HubSpot para acessar e gerenciar contatos, empresas, negociações, tickets e outros objetos do CRM",
+  "summary": "Consulte e atualize contatos, empresas, negociações e tickets.",
   "tools": {
     "hubspot_create_contact": {
       "label": "Criar Contato",

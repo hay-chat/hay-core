@@ -9,6 +9,7 @@
     "entry": "./dist/index.js",
     "displayName": "Spacebring",
     "category": "integration",
+    "marketplaceCategory": "knowledge",
     "capabilities": [
       "mcp",
       "auth"

@@ -1,6 +1,7 @@
 {
   "name": "Nuvemshop",
   "description": "Connect your Nuvemshop / Tiendanube store so the agent can find a customer's orders, track shipments, cancel or re-route undispatched orders, record refund requests, send payment links for unpaid orders, give capped goodwill coupons and answer product and stock questions.",
+  "summary": "Find orders, track shipments, send payment links and issue capped goodwill coupons.",
   "tools": {
     "nuvemshop_get_store": {
       "label": "Get Store Info",

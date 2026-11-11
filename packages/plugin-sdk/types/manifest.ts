@@ -14,6 +14,19 @@
 export type PluginCategory = "integration" | "channel" | "tool" | "analytics" | "products";
 
 /**
+ * Marketplace section the plugin is listed under.
+ *
+ * - `channels`: where customers reach the merchant
+ * - `commerce`: store platforms (orders, products, stock)
+ * - `payments`: payments and shipping
+ * - `crm`: CRM, helpdesk and marketing
+ * - `knowledge`: knowledge sources and bookings
+ * - `security`: protection for the webchat
+ */
+export type PluginMarketplaceCategory =
+  "channels" | "commerce" | "payments" | "crm" | "knowledge" | "security";
+
+/**
  * Plugin capabilities.
  *
  * Declares what features the plugin uses.
@@ -105,6 +118,14 @@ export interface HayPluginManifest {
    * @example "integration"
    */
   category: PluginCategory;
+
+  /**
+   * Section of the Hay marketplace the plugin is listed under. Plugins without
+   * one appear under "Other".
+   *
+   * @example "commerce"
+   */
+  marketplaceCategory?: PluginMarketplaceCategory;
 
   /**
    * List of capabilities the plugin uses.
