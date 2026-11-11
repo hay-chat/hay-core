@@ -37,7 +37,7 @@
     "title": "Platform Settings",
     "description": "Configure basic platform preferences",
     "defaultLanguage": "Default Language",
-    "defaultLanguageHelper": "Default language for new conversations and system messages",
+    "defaultLanguageHelper": "The language the AI uses with customers when it can't tell theirs. It doesn't change the dashboard language: each person picks that in their profile.",
     "timezone": "Timezone",
     "timezoneHelper": "Used for displaying timestamps and scheduling reports",
     "dateFormat": "Date Format",
@@ -48,10 +48,6 @@
     "testModeDescription": "When enabled, AI messages require approval before sending to customers.",
     "testModeCheckbox": "Require approval for AI messages by default",
     "testModeNote": "Note: Playground conversations always auto-send regardless of this setting.",
-    "languages": {
-      "en": "English",
-      "pt": "Portuguese"
-    },
     "timeFormats": {
       "12h": "12-hour (AM/PM)",
       "24h": "24-hour"
@@ -478,6 +474,17 @@
     }
   },
   "profile": {
+    "language": {
+      "title": "Language",
+      "description": "The language of the dashboard and of the conversations you read",
+      "interfaceLanguage": "Interface language",
+      "interfaceLanguageHelper": "The language of menus, buttons and messages in the dashboard.",
+      "translationLanguage": "Translate conversations into",
+      "translationLanguageHelper": "Customer messages are shown to you in this language, and your replies are translated into the customer's language before they are sent.",
+      "dontTranslate": "Don't translate",
+      "saved": "Language preferences saved",
+      "saveFailed": "Could not save your language preferences"
+    },
     "title": "Profile Settings",
     "description": "Manage your personal information and account security",
     "profilePicture": "Profile Picture",

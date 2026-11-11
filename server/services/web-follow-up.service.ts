@@ -53,6 +53,16 @@ const COPY: Record<
     footerNoLink:
       "Las respuestas a este correo no llegan al equipo. Abre el chat en nuestro sitio web para seguir hablando.",
   },
+  nl: {
+    subject: (company) => `${company} heeft je bericht beantwoord`,
+    title: "Je hebt een antwoord",
+    message: (sender) => `${sender} heeft je in de chat geantwoord:`,
+    button: "Verder met het gesprek",
+    footer:
+      "Antwoorden op deze e-mail komen niet bij het team aan. Open de chat om verder te praten. De link werkt alleen in de browser waarin je de chat bent begonnen.",
+    footerNoLink:
+      "Antwoorden op deze e-mail komen niet bij het team aan. Open de chat op onze website om verder te praten.",
+  },
 };
 
 /**

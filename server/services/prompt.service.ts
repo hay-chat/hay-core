@@ -9,7 +9,7 @@ import type {
   PromptConfig,
   PromptVariableType,
 } from "../types/prompt.types";
-import { SupportedLanguage, DEFAULT_LANGUAGE } from "../types/language.types";
+import { type LanguageCode, DEFAULT_LANGUAGE, LANGUAGE_CODES } from "../types/language.types";
 import { Organization } from "../entities/organization.entity";
 import { AppDataSource } from "../database/data-source";
 import { createLogger } from "@server/lib/logger";
@@ -38,7 +38,7 @@ export class PromptService {
     }
 
     this.config = {
-      supportedLanguages: Object.values(SupportedLanguage),
+      supportedLanguages: [...LANGUAGE_CODES],
       defaultLanguage: DEFAULT_LANGUAGE,
       cacheTTL: process.env.NODE_ENV === "production" ? 3600000 : 0, // 1 hour in prod, no cache in dev
       promptsDirectory: promptsDir,
@@ -77,7 +77,7 @@ export class PromptService {
    */
   async getPromptMetadata(
     promptId: string,
-    language?: SupportedLanguage,
+    language?: LanguageCode,
   ): Promise<PromptContent | null> {
     const lang = language || DEFAULT_LANGUAGE;
     return this.loadPromptWithFallback(promptId, lang);
@@ -86,7 +86,7 @@ export class PromptService {
   /**
    * List all available prompts
    */
-  async listPrompts(language?: SupportedLanguage): Promise<PromptContent[]> {
+  async listPrompts(language?: LanguageCode): Promise<PromptContent[]> {
     const lang = language || DEFAULT_LANGUAGE;
     const promptsDir = path.join(this.config.promptsDirectory, lang);
 
@@ -118,7 +118,7 @@ export class PromptService {
   /**
    * Clear the prompt cache
    */
-  clearCache(promptId?: string, language?: SupportedLanguage): void {
+  clearCache(promptId?: string, language?: LanguageCode): void {
     if (promptId && language) {
       const cacheKey = this.getCacheKey(promptId, language);
       this.cache.delete(cacheKey);
@@ -138,10 +138,10 @@ export class PromptService {
   /**
    * Determine the language to use
    */
-  private async determineLanguage(options?: Partial<PromptOptions>): Promise<SupportedLanguage> {
+  private async determineLanguage(options?: Partial<PromptOptions>): Promise<LanguageCode> {
     // Priority: explicit language > conversation language > organization language > default
     if (options?.language && this.isValidLanguage(options.language)) {
-      return options.language as SupportedLanguage;
+      return options.language as LanguageCode;
     }
 
     // Check conversation language first
@@ -155,7 +155,7 @@ export class PromptService {
         });
 
         if (conversation?.language) {
-          return conversation.language as SupportedLanguage;
+          return conversation.language as LanguageCode;
         }
 
         // If conversation has no language, fall back to the organization
@@ -192,7 +192,7 @@ export class PromptService {
    */
   private async loadPromptWithFallback(
     promptId: string,
-    language: SupportedLanguage,
+    language: LanguageCode,
   ): Promise<PromptContent> {
     // Try to load in requested language
     let content = await this.loadPrompt(promptId, language);
@@ -218,7 +218,7 @@ export class PromptService {
    */
   private async loadPrompt(
     promptId: string,
-    language: SupportedLanguage,
+    language: LanguageCode,
   ): Promise<PromptContent | null> {
     const cacheKey = this.getCacheKey(promptId, language);
 
@@ -278,7 +278,7 @@ export class PromptService {
   /**
    * Get the file path for a prompt
    */
-  private getPromptPath(promptId: string, language: SupportedLanguage): string {
+  private getPromptPath(promptId: string, language: LanguageCode): string {
     // Ensure .md extension
     const fileName = promptId.endsWith(".md") ? promptId : `${promptId}.md`;
     return path.join(this.config.promptsDirectory, language, fileName);
@@ -287,7 +287,7 @@ export class PromptService {
   /**
    * Get cache key for a prompt
    */
-  private getCacheKey(promptId: string, language: SupportedLanguage): string {
+  private getCacheKey(promptId: string, language: LanguageCode): string {
     return `${language}:${promptId}`;
   }
 
@@ -327,6 +327,6 @@ export class PromptService {
    * Check if a language code is valid
    */
   private isValidLanguage(language: string): boolean {
-    return this.config.supportedLanguages.includes(language as SupportedLanguage);
+    return this.config.supportedLanguages.includes(language as LanguageCode);
   }
 }

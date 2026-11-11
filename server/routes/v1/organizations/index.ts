@@ -8,7 +8,7 @@ import {
   toAccessState,
 } from "@server/services/organization-access.service";
 import { TRPCError } from "@trpc/server";
-import { SupportedLanguage } from "@server/types/language.types";
+import { LANGUAGE_CODES } from "@server/types/language.types";
 import {
   DateFormat,
   TimeFormat,
@@ -171,7 +171,7 @@ const updateSettingsSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   about: z.string().max(10000).optional(),
   website: websiteSchema.nullable().optional(),
-  defaultLanguage: z.nativeEnum(SupportedLanguage).optional(),
+  defaultLanguage: z.enum(LANGUAGE_CODES).optional(),
   dateFormat: z.nativeEnum(DateFormat).optional(),
   timeFormat: z.nativeEnum(TimeFormat).optional(),
   timezone: z.nativeEnum(Timezone).optional(),

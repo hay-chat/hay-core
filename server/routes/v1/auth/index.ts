@@ -23,7 +23,7 @@ import {
 } from "@server/trpc/middleware/auth";
 import { auditLogService } from "@server/services/audit-log.service";
 import { emailService, getOrganizationLocale } from "@server/services/email.service";
-import { DEFAULT_LANGUAGE } from "@server/types/language.types";
+import { DEFAULT_LANGUAGE, LANGUAGE_CODES } from "@server/types/language.types";
 import * as crypto from "crypto";
 import { redisService } from "@server/services/redis.service";
 import { config, getDashboardUrl } from "@server/config/env";
@@ -58,6 +58,15 @@ import {
 } from "@server/services/account-registration.service";
 
 const logger = createLogger("auth");
+
+/** Dashboard UI locales (dashboard/nuxt.config.ts `i18n.locales`). */
+export const INTERFACE_LANGUAGES = ["en", "pt-BR", "nl"] as const;
+type InterfaceLanguage = (typeof INTERFACE_LANGUAGES)[number];
+
+/** A stored interface language, or null once the dashboard stopped offering it. */
+function toInterfaceLanguage(value: string | null | undefined): InterfaceLanguage | null {
+  return INTERFACE_LANGUAGES.find((code) => code === value) ?? null;
+}
 
 const passwordSchema = z.string().min(8).max(128);
 
@@ -523,7 +532,8 @@ export const authRouter = t.router({
           where: { userId: user.id },
           relations: { organization: true },
         });
-        const locale = userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
+        const locale =
+          user.interfaceLanguage || userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
 
         await emailService.sendTemplateEmail({
           to: user.email,
@@ -662,7 +672,8 @@ export const authRouter = t.router({
           where: { userId: user.id },
           relations: { organization: true },
         });
-        const locale = userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
+        const locale =
+          user.interfaceLanguage || userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
 
         await emailService.sendTemplateEmail({
           to: user.email,
@@ -734,6 +745,8 @@ export const authRouter = t.router({
         activeOrganizationId: z.string().optional(),
         role: z.enum(["owner", "admin", "member", "viewer", "contributor", "agent"]),
         mfaEnrolmentRequired: z.boolean(),
+        interfaceLanguage: z.enum(INTERFACE_LANGUAGES).nullable(),
+        translationLanguage: z.enum(LANGUAGE_CODES).nullable(),
       }),
     )
     .query(async ({ ctx }) => {
@@ -797,6 +810,8 @@ export const authRouter = t.router({
           user.id,
           ctx.user!.ssoOrganizationId,
         ),
+        interfaceLanguage: toInterfaceLanguage(user.interfaceLanguage),
+        translationLanguage: user.translationLanguage ?? null,
       };
     }),
 
@@ -923,7 +938,7 @@ export const authRouter = t.router({
 
         // Send email notification
         await emailService.initialize();
-        const locale = await getOrganizationLocale(ctx.organizationId);
+        const locale = user.interfaceLanguage || (await getOrganizationLocale(ctx.organizationId));
         await emailService.sendTemplateEmail({
           to: user.email,
           locale,
@@ -990,6 +1005,10 @@ export const authRouter = t.router({
       z.object({
         firstName: z.string().optional(),
         lastName: z.string().optional(),
+        /** Dashboard UI language; null follows the browser. */
+        interfaceLanguage: z.enum(INTERFACE_LANGUAGES).nullable().optional(),
+        /** Language this person reads conversations in; null turns translation off. */
+        translationLanguage: z.enum(LANGUAGE_CODES).nullable().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -1005,7 +1024,7 @@ export const authRouter = t.router({
         });
       }
 
-      const changes: Record<string, { old?: string; new?: string }> = {};
+      const changes: Record<string, { old?: string | null; new?: string | null }> = {};
 
       if (input.firstName !== undefined && input.firstName !== user.firstName) {
         changes.firstName = { old: user.firstName, new: input.firstName };
@@ -1015,6 +1034,25 @@ export const authRouter = t.router({
       if (input.lastName !== undefined && input.lastName !== user.lastName) {
         changes.lastName = { old: user.lastName, new: input.lastName };
         user.lastName = input.lastName;
+      }
+
+      if (
+        input.interfaceLanguage !== undefined &&
+        input.interfaceLanguage !== (user.interfaceLanguage ?? null)
+      ) {
+        changes.interfaceLanguage = { old: user.interfaceLanguage, new: input.interfaceLanguage };
+        user.interfaceLanguage = input.interfaceLanguage;
+      }
+
+      if (
+        input.translationLanguage !== undefined &&
+        input.translationLanguage !== (user.translationLanguage ?? null)
+      ) {
+        changes.translationLanguage = {
+          old: user.translationLanguage,
+          new: input.translationLanguage,
+        };
+        user.translationLanguage = input.translationLanguage;
       }
 
       if (Object.keys(changes).length > 0) {
@@ -1230,7 +1268,7 @@ export const authRouter = t.router({
         };
 
         // Send verification email to NEW email
-        const locale = await getOrganizationLocale(ctx.organizationId);
+        const locale = user.interfaceLanguage || (await getOrganizationLocale(ctx.organizationId));
         logger.debug("Sending verification email to new address");
         const result1 = await emailService.sendTemplateEmail({
           to: input.newEmail.toLowerCase(),
@@ -1378,7 +1416,8 @@ export const authRouter = t.router({
           where: { userId: user.id },
           relations: { organization: true },
         });
-        const locale = userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
+        const locale =
+          user.interfaceLanguage || userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
 
         const emailVariables = {
           userName: user.getFullName(),
@@ -1610,7 +1649,7 @@ export const authRouter = t.router({
       };
 
       // Send verification email to new email address
-      const locale = await getOrganizationLocale(ctx.organizationId);
+      const locale = user.interfaceLanguage || (await getOrganizationLocale(ctx.organizationId));
       await emailService.sendTemplateEmail({
         to: user.pendingEmail,
         locale,

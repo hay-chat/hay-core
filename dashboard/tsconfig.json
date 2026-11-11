@@ -12,7 +12,8 @@
       "~/*": ["./*"],
       "@server/*": ["../server/*"],
       "@plugins/*": ["../plugins/*"],
-      "@hay/form-schema": ["../packages/form-schema/src/index.ts"]
+      "@hay/form-schema": ["../packages/form-schema/src/index.ts"],
+      "@hay/languages": ["../server/types/language.types.ts"]
     }
   },
   "include": [

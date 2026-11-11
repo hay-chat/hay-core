@@ -1,5 +1,5 @@
 /**
- * Copy for payment dispute alerts (team email + push, in the organization's
+ * Copy for payment dispute alerts (team email + push, in each recipient's
  * notification locale) and for the short note pushed to the platform with the
  * evidence pack (in the pack's locale).
  *
@@ -94,6 +94,26 @@ export const ALERT_COPY: Record<NotificationLocale, AlertCopy> = {
     },
     button: "Abrir el contracargo",
     footer: "Enviado a todos los propietarios y administradores de esta organización.",
+  },
+  nl: {
+    subject: (f) => `Nieuwe terugboeking${orderPart(f.order, "voor bestelling")} (${f.platform})`,
+    title: "Een klant heeft een terugboeking gestart",
+    reminderSubject: (f) =>
+      `Bewijs voor terugboeking moet binnenkort binnen zijn${orderPart(f.order, "voor bestelling")}`,
+    reminderTitle: "Het bewijs voor de terugboeking moet binnenkort binnen zijn",
+    message: (f) =>
+      `${f.platform} heeft een terugboeking gemeld${orderPart(f.order, "voor bestelling")}. Hay.chat kan de gesprekken met de klant eraan toevoegen; controleer de reactie op ${f.platform} vóór de deadline, want sommige platforms versturen opgeslagen bewijs op die datum automatisch.`,
+    reminderMessage: (f) =>
+      `Het bewijs voor de terugboeking${orderPart(f.order, "voor bestelling")} moet${f.dueBy ? ` op ${f.dueBy}` : " binnenkort"} binnen zijn en er is nog niets toegevoegd.`,
+    labels: {
+      order: "Bestelling",
+      platform: "Platform",
+      amount: "Bedrag",
+      reason: "Reden",
+      dueBy: "Bewijs uiterlijk",
+    },
+    button: "Terugboeking openen",
+    footer: "Verzonden naar alle eigenaren en beheerders van deze organisatie.",
   },
 };
 

@@ -91,6 +91,10 @@
     "showing": "Mostrando {from} a {to} de {total}",
     "viewDetails": "Ver Detalhes"
   },
+  "languageSelect": {
+    "placeholder": "Selecione um idioma",
+    "searchPlaceholder": "Buscar idiomas…"
+  },
   "unauthorized": {
     "pageTitle": "Acesso Negado",
     "pageDescription": "Você não tem permissão para acessar esta página",

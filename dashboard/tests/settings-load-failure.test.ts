@@ -74,7 +74,6 @@ describe("settings pages after a failed load", () => {
     vi.stubGlobal("computed", computed);
     vi.stubGlobal("watch", watch);
     vi.stubGlobal("onMounted", onMounted);
-    vi.stubGlobal("useLocale", () => ({ setLocaleFromBackend: vi.fn() }));
     api.list.mockResolvedValue([]);
   });
 

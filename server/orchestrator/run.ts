@@ -17,6 +17,7 @@ import { LLMService } from "@server/services/core/llm.service";
 import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
 import { hasTiptapContent } from "@server/types/tiptap.types";
+import { shouldAdoptLanguage } from "@server/types/language.types";
 import { closureCopy } from "./closure-copy";
 import { availabilityContext, availabilityHandoffLine, handoffCopy } from "./handoff-copy";
 import { getAvailability, typicalFirstReplyMinutes } from "@server/services/business-hours.service";
@@ -612,6 +613,18 @@ export const runConversation = async (conversationId: string) => {
       language,
     });
 
+    // Follow the customer when they switch language mid-conversation.
+    if (shouldAdoptLanguage(lastCustomerMessage.content, language, conversation.language)) {
+      log.debug(
+        { from: conversation.language, to: language },
+        "Customer switched language, updating conversation language",
+      );
+      await conversationRepository.update(conversation.id, conversation.organization_id, {
+        language,
+      });
+      conversation.language = language;
+    }
+
     // Check if user indicated potential closure intent
     const hasClosureIntent =
       intent.label === "close_satisfied" || intent.label === "close_unsatisfied";
@@ -845,7 +858,7 @@ export const runConversation = async (conversationId: string) => {
     );
 
     // 04. Execution - Handle iterative execution with tool calls
-    await handleExecutionLoop(conversation, processingStartedAt, language);
+    await handleExecutionLoop(conversation, processingStartedAt, language ?? undefined);
 
     // Update processing state to idle (done)
     await updateProcessingState(conversation, "idle");

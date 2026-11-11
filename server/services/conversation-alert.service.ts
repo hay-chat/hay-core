@@ -15,7 +15,11 @@ import {
 import { createLogger } from "@server/lib/logger";
 import { pushNotificationService, type PushPayload } from "./push-notification.service";
 import { isWithinBusinessHours } from "./business-hours.service";
-import { organizationNotificationLocale, type NotificationLocale } from "./notification-locale";
+import {
+  organizationNotificationLocale,
+  recipientNotificationLocale,
+  type NotificationLocale,
+} from "./notification-locale";
 import { isSimulationConversation } from "./simulation/simulation-kind";
 import { orgDashboardPath } from "@server/lib/dashboard-links";
 
@@ -98,6 +102,8 @@ export interface MemberCandidate {
   status: string;
   /** Lock-screen privacy: send this person a generic alert with no customer details. */
   hideAlertPreview: boolean;
+  /** Dashboard language; null reads alerts in the organization's language. */
+  interfaceLanguage: string | null;
 }
 
 export type CustomerMessageAlert = "customer_reply" | "followup";
@@ -208,6 +214,26 @@ const COPY: Record<
     unansweredEmailMessage: (who, minutes) =>
       `${who} escribió hace ${minutes} minutos en una conversación que tu equipo tomó, y nadie ha respondido todavía.`,
   },
+  nl: {
+    pushTitle: "Een klant heeft een mens nodig",
+    repushTitle: "Een klant wacht nog steeds op een mens",
+    untitled: "Nieuw gesprek",
+    summaryPending: "Tik om het gesprek te openen en over te nemen.",
+    emailSubject: (who) => `${who} wacht nog steeds op een antwoord`,
+    emailTitle: "Een klant wacht nog steeds",
+    emailMessage: (who, minutes) =>
+      `${who} heeft ${minutes} minuten geleden om een mens gevraagd en nog niemand van je team heeft gereageerd.`,
+    summaryLabel: "Samenvatting",
+    emailButton: "Gesprek openen",
+    emailFooter:
+      "Je ontvangt deze e-mail omdat je in Hay.chat op Beschikbaar staat. Zet jezelf op Afwezig om deze meldingen niet meer te krijgen.",
+    replyTitle: "Een klant heeft gereageerd",
+    followupTitle: "Nieuw bericht van een wachtende klant",
+    unansweredTitle: "Een klant wacht op je antwoord",
+    unansweredBody: (who, minutes) => `${who} wacht al ${minutes} minuten op een antwoord.`,
+    unansweredEmailMessage: (who, minutes) =>
+      `${who} schreef ${minutes} minuten geleden in een gesprek dat je team heeft overgenomen, en nog niemand heeft gereageerd.`,
+  },
 };
 
 /** Quick check with the team (D19): push and email copy. */
@@ -260,13 +286,24 @@ const QUESTION_COPY: Record<
     emailFooter:
       "El enlace no necesita inicio de sesión, funciona una vez y caduca en 24 horas. También puedes responder desde la Bandeja de entrada de Hay.chat.",
   },
+  nl: {
+    pushTitle: "Een klant wacht op een antwoord op een vraag",
+    emailSubject: (who) => `${who} vroeg iets waar de AI geen antwoord op had`,
+    emailTitle: "Een klant wacht op een antwoord op een vraag",
+    emailMessage: (who) =>
+      `${who} vroeg iets waar de AI geen antwoord op had, dus de AI legt het voor aan je team. Beantwoord de vraag en de AI stuurt je antwoord door naar de klant, in de taal van de klant.`,
+    questionLabel: "Vraag",
+    customerMessageLabel: "Bericht van de klant",
+    emailButton: "Vraag beantwoorden",
+    emailFooter:
+      "Voor de link hoef je niet in te loggen. Hij werkt één keer en verloopt na 24 uur. Je kunt ook antwoorden vanuit de Inbox in Hay.chat.",
+  },
 };
 
 function conversationPath(conversation: Pick<Conversation, "id" | "organization_id">): string {
   return orgDashboardPath(conversation.organization_id, `/conversations/${conversation.id}`);
 }
 
-/** Notifications about one conversation replace each other on a device. */
 /**
  * The lock-screen-safe version of an alert: no customer name, summary or
  * message text. Same link and tag, so tapping it still opens the conversation.
@@ -275,6 +312,7 @@ export function privateAlertPayload(payload: PushPayload, locale: NotificationLo
   return { ...payload, title: "Hay.chat", body: COPY[locale].pushTitle };
 }
 
+/** Notifications about one conversation replace each other on a device. */
 function conversationTag(conversation: Pick<Conversation, "id">): string {
   return `conversation:${conversation.id}`;
 }
@@ -315,9 +353,10 @@ class ConversationAlertService {
       user_active: boolean;
       status: string;
       hide_alert_preview: boolean;
+      interface_language: string | null;
     }> = await AppDataSource.query(
       `SELECT u.id, u.email, u.first_name, uo.is_active AS membership_active,
-              u.is_active AS user_active, u.status, u.hide_alert_preview
+              u.is_active AS user_active, u.status, u.hide_alert_preview, u.interface_language
          FROM user_organizations uo
          JOIN users u ON u.id = uo.user_id
         WHERE uo.organization_id = $1
@@ -335,6 +374,7 @@ class ConversationAlertService {
         userActive: row.user_active,
         status: row.status,
         hideAlertPreview: row.hide_alert_preview === true,
+        interfaceLanguage: row.interface_language,
       }))
       .filter(isAlertRecipient);
   }
@@ -347,8 +387,9 @@ class ConversationAlertService {
       first_name: string | null;
       status: string;
       hide_alert_preview: boolean;
+      interface_language: string | null;
     }> = await AppDataSource.query(
-      `SELECT u.id, u.email, u.first_name, u.status, u.hide_alert_preview
+      `SELECT u.id, u.email, u.first_name, u.status, u.hide_alert_preview, u.interface_language
          FROM user_organizations uo
          JOIN users u ON u.id = uo.user_id
         WHERE uo.organization_id = $1
@@ -364,6 +405,7 @@ class ConversationAlertService {
       userActive: true,
       status: row.status,
       hideAlertPreview: row.hide_alert_preview === true,
+      interfaceLanguage: row.interface_language,
     }));
   }
 
@@ -383,9 +425,7 @@ class ConversationAlertService {
     const recipients = await this.findActiveMembers(conversation.organization_id);
     if (recipients.length === 0) return { pushed: 0, emailed: 0 };
 
-    const locale = await organizationNotificationLocale(conversation.organization_id);
-    const copy = QUESTION_COPY[locale];
-    const who = customerLabel(conversation, locale);
+    const organizationLocale = await organizationNotificationLocale(conversation.organization_id);
     let pushed = 0;
     if (options.push) {
       const results = await this.pushTo(
@@ -393,15 +433,15 @@ class ConversationAlertService {
         question.askedAt,
         "question",
         recipients,
-        locale,
-        {
+        organizationLocale,
+        (locale) => ({
           kind: "team_question",
-          title: copy.pushTitle,
-          body: `${who}: ${excerpt(question.question)}`,
+          title: QUESTION_COPY[locale].pushTitle,
+          body: `${customerLabel(conversation, locale)}: ${excerpt(question.question)}`,
           url: orgDashboardPath(conversation.organization_id, `/inbox?question=${question.id}`),
           tag: `team_question:${question.id}`,
-        },
-        { title: "Hay.chat", body: copy.pushTitle },
+        }),
+        (locale) => ({ title: "Hay.chat", body: QUESTION_COPY[locale].pushTitle }),
       );
       pushed = [...results.values()].filter((status) => status === "sent").length;
     }
@@ -418,6 +458,9 @@ class ConversationAlertService {
           recipient.id,
         );
         if (!row) return;
+        const locale = recipientNotificationLocale(recipient.interfaceLanguage, organizationLocale);
+        const copy = QUESTION_COPY[locale];
+        const who = customerLabel(conversation, locale);
         try {
           const result = await emailService.sendTemplateEmail({
             to: recipient.email,
@@ -498,7 +541,8 @@ class ConversationAlertService {
 
   /**
    * Push one step to each recipient's devices, recording the result per
-   * recipient. Returns the status of each recipient this call claimed
+   * recipient, in their own language (the organization's when they have
+   * none). Returns the status of each recipient this call claimed
    * (recipients already claimed by an earlier call are left out). A recipient
    * with lock-screen privacy on gets the generic alert instead.
    */
@@ -507,23 +551,26 @@ class ConversationAlertService {
     cycleStartedAt: Date,
     step: NotificationStep,
     recipients: MemberCandidate[],
-    locale: NotificationLocale,
-    payload: PushPayload,
-    privateCopy?: { title: string; body: string },
+    organizationLocale: NotificationLocale,
+    payloadFor: (locale: NotificationLocale) => PushPayload,
+    privateCopyFor?: (locale: NotificationLocale) => { title: string; body: string },
   ): Promise<Map<string, NotificationStatus>> {
     const results = new Map<string, NotificationStatus>();
-    const privatePayload = privateCopy
-      ? { ...payload, ...privateCopy }
-      : privateAlertPayload(payload, locale);
     await Promise.all(
       recipients.map(async (recipient) => {
         const row = await this.claim(conversation, cycleStartedAt, step, "push", recipient.id);
         if (!row) return;
+        const locale = recipientNotificationLocale(recipient.interfaceLanguage, organizationLocale);
+        const payload = payloadFor(locale);
         let status: NotificationStatus;
         try {
           const result = await pushNotificationService.sendToUser(
             recipient.id,
-            recipient.hideAlertPreview ? privatePayload : payload,
+            !recipient.hideAlertPreview
+              ? payload
+              : privateCopyFor
+                ? { ...payload, ...privateCopyFor(locale) }
+                : privateAlertPayload(payload, locale),
           );
           status =
             result.sent > 0 ? "sent" : result.devices - result.removed > 0 ? "failed" : "no_device";
@@ -553,21 +600,30 @@ class ConversationAlertService {
       return;
     }
 
-    const locale = await organizationNotificationLocale(conversation.organization_id);
-    const copy = COPY[locale];
-    const who = customerLabel(conversation, locale);
-    await this.pushTo(conversation, cycleStartedAt, step, recipients, locale, {
-      kind: "conversation_needs_attention",
-      title: step === "initial" ? copy.pushTitle : copy.repushTitle,
-      body: conversation.summary
-        ? `${who}: ${conversation.summary}`
-        : `${who}. ${copy.summaryPending}`,
-      url: conversationPath(conversation),
-      tag: conversationTag(conversation),
-    });
+    const organizationLocale = await organizationNotificationLocale(conversation.organization_id);
+    await this.pushTo(
+      conversation,
+      cycleStartedAt,
+      step,
+      recipients,
+      organizationLocale,
+      (locale) => {
+        const copy = COPY[locale];
+        const who = customerLabel(conversation, locale);
+        return {
+          kind: "conversation_needs_attention",
+          title: step === "initial" ? copy.pushTitle : copy.repushTitle,
+          body: conversation.summary
+            ? `${who}: ${conversation.summary}`
+            : `${who}. ${copy.summaryPending}`,
+          url: conversationPath(conversation),
+          tag: conversationTag(conversation),
+        };
+      },
+    );
   }
 
-  /** Email one step to each recipient, recording the result per recipient. */
+  /** Email one step to each recipient in their language, recording the result per recipient. */
   private async emailTo(
     conversation: Conversation,
     cycleStartedAt: Date,
@@ -578,15 +634,16 @@ class ConversationAlertService {
     if (recipients.length === 0) return;
 
     const { emailService } = await import("./email.service");
-    const locale = await organizationNotificationLocale(conversation.organization_id);
-    const copy = COPY[locale];
-    const who = customerLabel(conversation, locale);
+    const organizationLocale = await organizationNotificationLocale(conversation.organization_id);
     const url = `${getDashboardUrl()}${conversationPath(conversation)}`;
 
     await Promise.all(
       recipients.map(async (recipient) => {
         const row = await this.claim(conversation, cycleStartedAt, step, "email", recipient.id);
         if (!row) return;
+        const locale = recipientNotificationLocale(recipient.interfaceLanguage, organizationLocale);
+        const copy = COPY[locale];
+        const who = customerLabel(conversation, locale);
         try {
           const result = await emailService.sendTemplateEmail({
             to: recipient.email,
@@ -671,17 +728,26 @@ class ConversationAlertService {
         : await this.findRecipients(target.organization_id);
     if (recipients.length === 0) return;
 
-    const locale = await organizationNotificationLocale(target.organization_id);
-    const copy = COPY[locale];
-    const who = customerLabel(target, locale);
+    const organizationLocale = await organizationNotificationLocale(target.organization_id);
     const text = excerpt(message.content);
-    await this.pushTo(target, collapseWindowStart(message.created_at), alert, recipients, locale, {
-      kind: "conversation_needs_attention",
-      title: alert === "customer_reply" ? copy.replyTitle : copy.followupTitle,
-      body: text ? `${who}: ${text}` : `${who}. ${copy.summaryPending}`,
-      url: conversationPath(target),
-      tag: conversationTag(target),
-    });
+    await this.pushTo(
+      target,
+      collapseWindowStart(message.created_at),
+      alert,
+      recipients,
+      organizationLocale,
+      (locale) => {
+        const copy = COPY[locale];
+        const who = customerLabel(target, locale);
+        return {
+          kind: "conversation_needs_attention",
+          title: alert === "customer_reply" ? copy.replyTitle : copy.followupTitle,
+          body: text ? `${who}: ${text}` : `${who}. ${copy.summaryPending}`,
+          url: conversationPath(target),
+          tag: conversationTag(target),
+        };
+      },
+    );
   }
 
   /**
@@ -756,23 +822,21 @@ class ConversationAlertService {
     const recipients = await this.heldRecipients(conversation);
     if (recipients.length === 0) return;
 
-    const locale = await organizationNotificationLocale(conversation.organization_id);
-    const copy = COPY[locale];
-    const who = customerLabel(conversation, locale);
+    const organizationLocale = await organizationNotificationLocale(conversation.organization_id);
     const minutes = minutesSince(waitingSince, now);
     const results = await this.pushTo(
       conversation,
       waitingSince,
       "unanswered",
       recipients,
-      locale,
-      {
+      organizationLocale,
+      (locale) => ({
         kind: "conversation_needs_attention",
-        title: copy.unansweredTitle,
-        body: copy.unansweredBody(who, minutes),
+        title: COPY[locale].unansweredTitle,
+        body: COPY[locale].unansweredBody(customerLabel(conversation, locale), minutes),
         url: conversationPath(conversation),
         tag: conversationTag(conversation),
-      },
+      }),
     );
 
     const unreached = recipients.filter((recipient) => {

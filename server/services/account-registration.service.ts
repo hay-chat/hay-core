@@ -106,7 +106,8 @@ export async function sendSignupVerificationEmail(user: User, token: string): Pr
     where: { userId: user.id },
     relations: { organization: true },
   });
-  const locale = userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
+  const locale =
+    user.interfaceLanguage || userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
 
   await emailService.sendTemplateEmail({
     to: user.email,

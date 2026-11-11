@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   Index,
 } from "typeorm";
+import type { TeamQuestionTranslations } from "../../types/translation-cache.types";
 
 /**
  * - open: the shopper was told the AI is checking with the team; the T+5 / T+10
@@ -60,6 +61,13 @@ export class TeamQuestion {
   /** The shopper message that raised it, for context. Untrusted text. */
   @Column({ type: "text", nullable: true })
   customerMessage!: string | null;
+
+  /**
+   * The question and customer message in team members' translation languages.
+   * Read and written only with raw SQL, so entity loads don't depend on the column.
+   */
+  @Column({ type: "jsonb", nullable: true, select: false, insert: false, update: false })
+  translations?: TeamQuestionTranslations | null;
 
   /** Shopper's language when asked (copy and relay). */
   @Column({ type: "varchar", length: 16, nullable: true })

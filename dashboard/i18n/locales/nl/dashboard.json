@@ -1,0 +1,52 @@
+{
+  "dashboard": {
+    "page": {
+      "title": "Dashboard",
+      "description": "Welkom terug! Dit is wat er speelt met je AI-assistent.",
+      "seoTitle": "Dashboard - Hay.chat",
+      "seoDescription": "Beheer je AI-assistent en bekijk prestatiecijfers"
+    },
+    "actions": {
+      "refresh": "Vernieuwen",
+      "viewAll": "Alles bekijken"
+    },
+    "metrics": {
+      "totalConversations": "Totaal aantal gesprekken",
+      "resolved": "opgelost",
+      "resolutionRate": "Oplossingspercentage",
+      "ofConversations": "van de gesprekken",
+      "avgMessages": "Gem. aantal berichten",
+      "messagesPer": "berichten per",
+      "conversation": "gesprek",
+      "avgResponseTime": "Gem. reactietijd",
+      "medianResponseTime": "mediaan {value}",
+      "noRepliesYet": "Geen antwoorden in deze periode"
+    },
+    "activity": {
+      "title": "Gespreksactiviteit",
+      "description": "Dagelijks aantal gesprekken",
+      "empty": "Geen gespreksactiviteit in deze periode"
+    },
+    "recentConversations": {
+      "title": "Recente gesprekken",
+      "description": "Laatste klantinteracties",
+      "emptyTitle": "Nog geen gesprekken",
+      "emptyDescription": "Begin te chatten met je assistent om hier gesprekken te zien"
+    },
+    "sentiment": {
+      "scoreTitle": "Klantsentimentscore",
+      "scorePeriod": "Afgelopen 30 dagen",
+      "breakdownTitle": "Sentimentverdeling",
+      "breakdownDescription": "Gedetailleerde analyse per sentimenttype",
+      "messages": "{count} berichten",
+      "emptyTitle": "Nog geen sentimentgegevens",
+      "emptyDescription": "De analyse verschijnt zodra berichten zijn verwerkt"
+    },
+    "timeAgo": {
+      "justNow": "Zojuist",
+      "minutesAgo": "{count} min geleden",
+      "hoursAgo": "{count} u geleden",
+      "daysAgo": "{count} d geleden"
+    }
+  }
+}

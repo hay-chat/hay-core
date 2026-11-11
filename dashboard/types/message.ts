@@ -1,3 +1,5 @@
+import type { LanguageCode } from "@/utils/languages";
+
 export interface Message {
   id: string;
   conversation_id: string;
@@ -87,6 +89,10 @@ export interface Message {
   /** Delivery status reported by the channel provider (e.g. WhatsApp). */
   providerStatus?: MessageProviderStatus | null;
   providerError?: MessageProviderError | null;
+  /** Team-facing text by language; `content` is always what the customer saw. */
+  translations?: Partial<Record<LanguageCode, string>> | null;
+  /** Language of `content`. */
+  detectedLanguage?: string | null;
 }
 
 /** What the vision pass read from a customer's photo or PDF (server AttachmentAnalysis). */

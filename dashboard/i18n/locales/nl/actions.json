@@ -1,0 +1,188 @@
+{
+  "aiActions": {
+    "categories": {
+      "refund": "Terugbetalingen",
+      "cancel": "Annuleringen",
+      "discount": "Kortingen en coupons",
+      "exchange": "Omruilingen en artikelwissels",
+      "return": "Retouren",
+      "address_change": "Adreswijzigingen",
+      "customer_update": "Wijzigingen in klantgegevens",
+      "note": "Bestelnotities en opnieuw verstuurde e-mails",
+      "destructive": "Verwijderingen, configuratiewijzigingen en reacties op betwistingen",
+      "other_write": "Overige acties"
+    },
+    "settings": {
+      "title": "Acties",
+      "headTitle": "Instellingen voor acties - Hay.chat",
+      "description": "Kies voor welke acties Hay.chat eerst een mens moet vragen voordat ze in je winkel worden uitgevoerd.",
+      "approval": {
+        "title": "Goedkeuring voordat acties worden uitgevoerd",
+        "description": "Wanneer een actie goedkeuring nodig heeft, laat Hay.chat de klant weten dat die is aangevraagd en wacht. Een mens keurt de actie goed of wijst hem af vanuit het gesprek of de inbox.",
+        "master": "Een mens vragen voordat deze acties worden uitgevoerd",
+        "masterOffHint": "Goedkeuring staat uit. Hay.chat voert elke actie direct uit, behalve acties waarvoor een playbook om goedkeuring vraagt.",
+        "categoriesLabel": "Goedkeuring nodig",
+        "moneyBadge": "Geld",
+        "unclassifiedNote": "Verwijderingen, configuratiewijzigingen en acties van integraties die niet aangeven wat ze doen, hebben altijd goedkeuring nodig zolang goedkeuring aan staat."
+      },
+      "threshold": {
+        "label": "Terugbetalingen en kortingen automatisch goedkeuren tot",
+        "help": "In de valuta van de bestelling. Terugbetalingen en kortingen tot en met dit bedrag worden zonder goedkeuring uitgevoerd. 0 betekent dat ze allemaal goedkeuring nodig hebben. Annuleringen hebben altijd goedkeuring nodig zolang ze zijn ingeschakeld."
+      },
+      "confirmation": {
+        "title": "Bevestiging door de klant",
+        "description": "Voor een actie vertelt Hay.chat de klant precies wat er gaat gebeuren en vraagt \"Zal ik doorgaan?\". Pas nadat de klant antwoordt, gaat Hay.chat verder.",
+        "label": "De klant eerst laten bevestigen",
+        "cancelNote": "Staat altijd aan voor annuleringen, ook als dit is uitgeschakeld."
+      },
+      "approvers": {
+        "title": "Wie kan goedkeuren",
+        "description": "De eigenaar kan altijd goedkeuren. Kies welke andere rollen acties kunnen goedkeuren of afwijzen.",
+        "admin": "Beheerders",
+        "member": "Leden",
+        "contributor": "Bijdragers"
+      },
+      "ownerOnly": "Alleen de eigenaar van de organisatie kan goedkeuring uitschakelen, het bedrag voor automatische goedkeuring verhogen of wijzigen wie goedkeurt. Je kunt goedkeuring wel inschakelen.",
+      "save": "Wijzigingen opslaan",
+      "saved": "Instellingen voor acties opgeslagen",
+      "saveFailed": "Kan instellingen voor acties niet opslaan",
+      "loadFailed": "Kan instellingen voor acties niet laden",
+      "typedConfirm": {
+        "title": "Goedkeuring uitschakelen?",
+        "description": "Deze acties worden uitgevoerd zonder dat iemand ze eerst ziet: {list}.",
+        "instruction": "Typ {word} om te bevestigen.",
+        "word": "UITSCHAKELEN",
+        "confirm": "Goedkeuring uitschakelen"
+      }
+    },
+    "playbook": {
+      "title": "Goedkeuring in dit playbook",
+      "description": "Zolang dit playbook actief is, wachten deze acties altijd op een mens, ook onder het bedrag voor automatische goedkeuring of als goedkeuring uit staat in Instellingen > Acties. Een playbook kan alleen goedkeuring toevoegen, nooit weghalen.",
+      "orgRequired": "Heeft al goedkeuring nodig in Instellingen > Acties",
+      "saved": "Goedkeuringsinstellingen opgeslagen",
+      "saveFailed": "Kan goedkeuringsinstellingen niet opslaan"
+    },
+    "approvals": {
+      "title": "Wacht op je goedkeuring",
+      "description": "Acties die de AI wilde uitvoeren. Er gebeurt niets totdat iemand een beslissing neemt.",
+      "select": "{name} selecteren",
+      "selectHint": "Selecteer verzoeken van één soort om ze samen goed te keuren.",
+      "selected": "{count} geselecteerd",
+      "total": "Totaal {amount}",
+      "noAmountCount": "{count} zonder bedrag",
+      "approveSelected": "{count} goedkeuren",
+      "approve": "Goedkeuren",
+      "approveAmount": "{amount} goedkeuren",
+      "editAmount": "Bedrag verlagen",
+      "amountLabel": "Bedrag (maximaal {max})",
+      "amountHelp": "Je kunt het alleen verlagen, nooit verhogen.",
+      "reject": "Afwijzen",
+      "rejectReason": "Reden (de AI gebruikt deze om het aan de klant uit te leggen)",
+      "confirmReject": "Verzoek afwijzen",
+      "open": "Gesprek openen",
+      "noAmount": "Geen bedrag opgegeven",
+      "untitled": "Gesprek",
+      "approvedDone": "Goedgekeurd en uitgevoerd.",
+      "approvedFailed": "Goedgekeurd, maar de uitvoering is mislukt. De AI laat de klant weten dat het niet is gelukt.",
+      "rejected": "Afgewezen. De AI laat het de klant weten.",
+      "failed": "Kan de beslissing niet opslaan",
+      "conversationClosed": "Dit gesprek is gesloten, dus er is niets uitgevoerd. Heropen het om goed te keuren, of wijs het af.",
+      "invalidAmount": "Het bedrag kan alleen worden verlaagd en moet groter zijn dan nul.",
+      "bulkDone": "{count} goedgekeurd",
+      "bulkPartial": "{done} goedgekeurd, {notDone} niet uitgevoerd. Controleer ze in hun gesprekken.",
+      "loadFailed": "Kan goedkeuringen niet laden"
+    },
+    "graduation": {
+      "message": "Je hebt in de afgelopen 30 dagen {approved} van de {total} verzoeken voor een {category} goedgekeurd, de grootste was {amount}. Terugbetalingen en kortingen tot {amount} automatisch goedkeuren?",
+      "apply": "Automatisch goedkeuren tot {amount}",
+      "dismiss": "Niet nu",
+      "confirmTitle": "Automatisch goedkeuren tot {amount}?",
+      "confirmDescription": "Terugbetalingen en kortingen tot en met {amount} worden uitgevoerd zonder een mens te vragen. Grotere wachten nog steeds op goedkeuring. Je kunt dit wijzigen in Instellingen > Acties.",
+      "confirm": "Automatische goedkeuring inschakelen",
+      "applied": "Terugbetalingen en kortingen tot {amount} worden nu zonder goedkeuring uitgevoerd.",
+      "applyFailed": "Kan het bedrag voor automatische goedkeuring niet wijzigen",
+      "noun": {
+        "refund": "terugbetaling",
+        "discount": "korting"
+      }
+    },
+    "toolErrors": {
+      "generic": "Deze actie is mislukt.",
+      "codes": {
+        "BAD_INPUT": "De AI stuurde gegevens die de winkel niet kon accepteren, zoals een verkeerd bestelnummer of formaat.",
+        "NOT_FOUND": "De winkel kon de bestelling, klant of het artikel waar de AI om vroeg niet vinden.",
+        "PRECONDITION": "De huidige status van de bestelling staat deze actie niet toe.",
+        "PROVIDER_REFUSED": "De winkel heeft het verzoek geweigerd.",
+        "AUTH_FAILED": "De koppeling met deze integratie is verlopen of ingetrokken. Koppel hem opnieuw via Integraties.",
+        "SCOPE_MISSING": "De integratie mist een machtiging die deze actie nodig heeft. Koppel hem opnieuw via Integraties en sta de gevraagde toegang toe.",
+        "RATE_LIMITED": "De winkel krijgt op dit moment te veel verzoeken. Het zou over een paar minuten weer moeten werken.",
+        "PROVIDER_DOWN": "De dienst van de winkel reageerde niet. Probeer het later opnieuw.",
+        "OUTCOME_UNKNOWN": "De winkel heeft niet bevestigd of dit is gelukt. Controleer de bestelling in je winkel voordat je het opnieuw probeert.",
+        "NEEDS_APPROVAL": "Dit ligt boven de limiet die voor de integratie is ingesteld, dus er is goedkeuring van een mens nodig.",
+        "INTERNAL": "Er ging iets onverwachts mis bij het uitvoeren van deze actie.",
+        "APPROVAL_REJECTED": "Een teamlid heeft dit verzoek afgewezen."
+      },
+      "reasons": {
+        "ALREADY_HAS_COUPON": "Deze klant heeft al een ongebruikte coupon.",
+        "GOODWILL_CHECK_INCOMPLETE": "Er kon niet worden bevestigd dat deze klant geen ongebruikte coulancecoupon heeft, dus er is er geen aangemaakt.",
+        "EXCEEDS_REFUNDABLE": "Het bedrag is hoger dan wat er voor deze bestelling nog kan worden terugbetaald.",
+        "CUSTOMER_MISMATCH": "De bestelling hoort niet bij deze klant.",
+        "ALREADY_CANCELLED": "De bestelling was al geannuleerd.",
+        "ALREADY_SHIPPED": "De bestelling is al verzonden.",
+        "NOT_SUPPORTED": "De winkel ondersteunt deze actie niet.",
+        "RECORD_ONLY_NOT_ALLOWED": "Deze bestelling is betaald via een betaalgateway, dus een terugbetaling kan niet alleen worden geregistreerd zonder het geld terug te storten.",
+        "OUT_OF_STOCK": "Het artikel is niet op voorraad.",
+        "NO_EMAIL": "Er is geen e-mailadres om naar te versturen.",
+        "NO_CUSTOMER": "Er is geen klant aan deze bestelling gekoppeld.",
+        "NO_ACCOUNT": "Deze klant heeft geen account in de winkel.",
+        "NOT_PAID": "De bestelling is niet betaald.",
+        "IDENTITY_MISMATCH": "De gegevens van de klant komen niet overeen met de bestelling.",
+        "FULFILLMENT_IN_PROGRESS": "De bestelling wordt al klaargemaakt voor verzending.",
+        "EMAIL_MISMATCH": "Het opgegeven e-mailadres komt niet overeen met de bestelling.",
+        "COUPON_CREATE_FAILED": "De winkel kon de coupon niet aanmaken.",
+        "COUPONS_DISABLED": "Coupons zijn uitgeschakeld in de winkel.",
+        "BALANCE_DUE": "Door de wijziging zou de klant nog een bedrag moeten betalen, dus er is niets gewijzigd.",
+        "ALREADY_REFUNDED": "Dit was al terugbetaald.",
+        "UNSUPPORTED_WC_VERSION": "De softwareversie van de winkel ondersteunt deze actie niet.",
+        "PRICE_HIGHER": "Het nieuwe artikel kost meer dan wat de klant heeft betaald.",
+        "PENDING_REFUND": "Er loopt al een terugbetaling voor deze bestelling.",
+        "NOT_RETURNABLE": "Dit artikel kan niet worden geretourneerd.",
+        "NOT_REFUNDABLE": "Deze bestelling kan niet worden terugbetaald.",
+        "NOT_PRE_DISPATCH": "De bestelling is voorbij het stadium waarin ze nog kan worden gewijzigd.",
+        "NOT_PENDING": "De bestelling wacht niet op betaling, dus er is geen betaallink om te versturen.",
+        "FULLY_REFUNDED": "De bestelling is al volledig terugbetaald.",
+        "EMAIL_FAILED": "De e-mail kon niet worden verstuurd.",
+        "DIFFERENT_PRODUCT": "Een wissel kan alleen de maat of kleur van hetzelfde product wijzigen.",
+        "ALREADY_DISPATCHED": "De bestelling is al verzonden."
+      }
+    },
+    "log": {
+      "title": "Actielogboek",
+      "headTitle": "Actielogboek - Hay.chat",
+      "description": "Elke toolaanroep die de AI in gesprekken deed, nieuwste eerst. Een goedgekeurde actie staat er twee keer in: één keer toen hij ter goedkeuring werd verstuurd en één keer toen hij werd uitgevoerd.",
+      "refresh": "Vernieuwen",
+      "filters": {
+        "tool": "Tool",
+        "platform": "Platform",
+        "outcome": "Uitkomst",
+        "all": "Alle"
+      },
+      "outcomes": {
+        "success": "Uitgevoerd",
+        "error": "Mislukt",
+        "simulated": "Proefrun",
+        "held": "Ter goedkeuring verstuurd",
+        "confirming": "Klant wordt gevraagd"
+      },
+      "builtIn": "Ingebouwd",
+      "readOnly": "Alleen-lezen",
+      "openConversation": "Gesprek openen",
+      "empty": "Nog geen acties. Toolaanroepen van de AI verschijnen hier.",
+      "emptyFiltered": "Geen acties die aan deze filters voldoen.",
+      "previous": "Vorige",
+      "next": "Volgende",
+      "pageOf": "Pagina {page} van {pages}",
+      "loadFailed": "Kan het actielogboek niet laden"
+    }
+  }
+}
