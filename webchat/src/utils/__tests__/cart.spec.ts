@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { addToCart, cartFor, runStoreAction } from "../cart";
+import { addToCart, cartFor, runStoreAction, storePath } from "../cart";
 import type { CartContribution, RecommendedProduct } from "@/types";
 
 const cart: CartContribution = {
@@ -105,17 +105,41 @@ describe("after an add", () => {
   it("tells the page its cart changed, with the plugin's events and ours", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
     const heard: string[] = [];
-    const listen = (name: string) =>
-      document.addEventListener(name, () => heard.push(name), { once: true });
-    ["theme:refresh", "hay:cart-updated", "bad name"].forEach(listen);
+    document.addEventListener("theme:refresh", () => heard.push("theme:refresh"), { once: true });
+    document.addEventListener("hay:cart-updated", () => heard.push("hay:cart-updated"), {
+      once: true,
+    });
+    window.addEventListener(
+      "store:sync",
+      (event) => heard.push(`store:sync ${(event as CustomEvent).detail.type}`),
+      { once: true },
+    );
 
     const withEvents = {
       ...cart,
-      props: { ...cart.props, afterAddEvents: "theme:refresh,bad name" },
+      props: {
+        ...cart.props,
+        afterAddEvents: JSON.stringify([
+          { name: "theme:refresh" },
+          { name: "store:sync", target: "window", detail: { type: "from_data" } },
+          { name: "bad name" },
+        ]),
+      },
     };
     await addToCart(withEvents, { cartItemId: "44" });
 
-    expect(heard).toEqual(["theme:refresh", "hay:cart-updated"]);
+    expect(heard).toEqual(["theme:refresh", "store:sync from_data", "hay:cart-updated"]);
+  });
+
+  it("still fires its own event when the plugin's list is not JSON", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
+    const listener = vi.fn();
+    document.addEventListener("hay:cart-updated", listener, { once: true });
+    await addToCart(
+      { ...cart, props: { ...cart.props, afterAddEvents: "a,b" } },
+      { cartItemId: "44" },
+    );
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it("says nothing when the store refused", async () => {
@@ -168,5 +192,39 @@ describe("runStoreAction (what the assistant asks this browser to do)", () => {
     await expect(
       runStoreAction([cart], "add_to_cart", { source: "other", cartItemId: "44" }, null),
     ).rejects.toThrow();
+  });
+});
+
+describe("storePath (stores served from a locale folder)", () => {
+  const localized = { ...cart, props: { ...cart.props, rootPathGlobal: "Store.routes.root" } };
+  afterEach(() => {
+    delete (window as unknown as Record<string, unknown>).Store;
+    vi.unstubAllGlobals();
+  });
+
+  it("puts the storefront's root in front of the cart paths", async () => {
+    (window as unknown as Record<string, unknown>).Store = { routes: { root: "/en-ca/" } };
+    expect(storePath(localized, "/cart/add.js")).toBe("/en-ca/cart/add.js");
+
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+    await addToCart(localized, { cartItemId: "44" });
+    expect(fetchMock.mock.calls[0][0]).toBe("/en-ca/cart/add.js");
+  });
+
+  it("uses the path as declared when the store is at the root or says nothing", () => {
+    expect(storePath(localized, "/checkout")).toBe("/checkout");
+    (window as unknown as Record<string, unknown>).Store = { routes: { root: "/" } };
+    expect(storePath(localized, "/checkout")).toBe("/checkout");
+    expect(storePath(cart, "/checkout")).toBe("/checkout");
+  });
+
+  it("ignores a root that points at another site", () => {
+    (window as unknown as Record<string, unknown>).Store = { routes: { root: "//evil.test/" } };
+    expect(storePath(localized, "/checkout")).toBe("/checkout");
+    (window as unknown as Record<string, unknown>).Store = {
+      routes: { root: "https://evil.test/" },
+    };
+    expect(storePath(localized, "/checkout")).toBe("/checkout");
   });
 });

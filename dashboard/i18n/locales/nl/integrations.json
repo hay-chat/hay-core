@@ -185,6 +185,12 @@
       "description": "{name} werkt niet meer voor je workspace. De instellingen blijven bewaard voor als je het opnieuw koppelt.",
       "confirm": "Ontkoppelen"
     },
+    "deletePlugin": "Plugin verwijderen",
+    "deleteConfirm": {
+      "title": "Deze plugin verwijderen?",
+      "description": "{name} wordt uit je organisatie verwijderd. Dit kan niet ongedaan worden gemaakt.",
+      "confirm": "Verwijderen"
+    },
     "error": {
       "loadFailed": "Integratie laden mislukt",
       "returnToMarketplace": "Terug naar marketplace"
@@ -276,7 +282,9 @@
       "oauthConnectFailed": "Koppelen met {name} mislukt",
       "oauthConnectedTo": "Gekoppeld met {name}!",
       "oauthDisconnectedFrom": "Ontkoppeld van {name}",
-      "oauthDisconnectFailed": "Ontkoppelen mislukt"
+      "oauthDisconnectFailed": "Ontkoppelen mislukt",
+      "deletedSuccess": "Plugin verwijderd",
+      "deleteFailed": "Plugin verwijderen is niet gelukt"
     },
     "channelHealth": {
       "failingTitle": "Dit kanaal werkt niet goed",
@@ -337,7 +345,6 @@
       "error": "Werkt niet"
     },
     "actions": {
-      "connect": "Koppelen",
       "finishSetup": "Installatie afronden",
       "reviewSetup": "Installatie bekijken",
       "more": "Meer opties",
@@ -359,6 +366,97 @@
       "failedTitle": "We konden de koppeling niet starten",
       "networkError": "Hay.chat reageerde niet op tijd. Controleer je verbinding en probeer het opnieuw.",
       "retry": "Opnieuw proberen"
+    },
+    "preConnect": {
+      "breadcrumb": "Kruimelpad",
+      "tags": "Categorie en mogelijkheden",
+      "connect": "{name} koppelen",
+      "setupGuide": "Lees de installatiegids",
+      "note": "Je kunt het altijd weer verwijderen.",
+      "noteOAuth": "Je keurt de toegang goed in {name}. Je kunt het altijd weer verwijderen.",
+      "abilities": {
+        "title": "Wat je agent kan doen",
+        "handles": {
+          "orders": {
+            "title": "Vragen over bestellingen beantwoorden",
+            "description": "Zoekt de bestellingen van een klant op en vertelt hoe het ervoor staat."
+          },
+          "refunds": {
+            "title": "Terugbetalingen afhandelen",
+            "description": "Betaalt een bestelling of betaling terug aan de klant."
+          },
+          "order_changes": {
+            "title": "Bestellingen wijzigen",
+            "description": "Annuleert een bestelling of past die aan voordat ze wordt verzonden."
+          },
+          "billing": {
+            "title": "Vragen over facturatie beantwoorden",
+            "description": "Zoekt de facturen en betalingen van de klant op."
+          },
+          "subscriptions": {
+            "title": "Abonnementen beheren",
+            "description": "Controleert, wijzigt of annuleert het abonnement van een klant."
+          },
+          "bookings": {
+            "title": "Boekingen aannemen",
+            "description": "Zoekt vrije momenten en boekt, verplaatst of annuleert voor de klant."
+          }
+        }
+      },
+      "how": {
+        "title": "Hoe koppelen werkt",
+        "steps": {
+          "connect": {
+            "title": "Klik op Koppelen",
+            "description": "Hay voegt {name} toe aan je workspace en opent de installatie."
+          },
+          "approve": {
+            "title": "Keur de toegang goed in {name}",
+            "description": "Log in bij {name} en keur goed wat Hay mag gebruiken."
+          },
+          "details": {
+            "title": "Vul je gegevens van {name} in",
+            "description": "De installatie vertelt wat er nodig is en waar je het vindt."
+          },
+          "setup": {
+            "title": "Rond de installatie af",
+            "description": "Volg de stappen die Hay toont. Je ziet wat er nodig is en waar je het vindt."
+          },
+          "verify": {
+            "title": "Test de verbinding",
+            "description": "Hay controleert of het {name} kan bereiken voordat je agent het gebruikt."
+          }
+        }
+      },
+      "details": {
+        "title": "Details",
+        "builtBy": "Gemaakt door",
+        "builtByHay": "Hay",
+        "builtByCustom": "Je organisatie",
+        "category": "Categorie",
+        "signIn": "Inloggen",
+        "signInMethods": {
+          "oauth": "OAuth",
+          "apiKey": "API-sleutel"
+        },
+        "version": "Versie",
+        "documentation": "Documentatie"
+      },
+      "data": {
+        "title": "Gegevens waarmee het werkt",
+        "noteOAuth": "{name} toont de exacte rechten voordat je ze goedkeurt.",
+        "items": {
+          "messages": "Klantberichten",
+          "customers": "Klantprofielen",
+          "orders": "Bestellingen",
+          "products": "Producten en voorraad",
+          "payments": "Betalingen en terugbetalingen",
+          "disputes": "Geschillen",
+          "bookings": "Boekingen",
+          "tickets": "Tickets",
+          "documents": "Pagina's en documenten"
+        }
+      }
     }
   },
   "pluginConnect": {
