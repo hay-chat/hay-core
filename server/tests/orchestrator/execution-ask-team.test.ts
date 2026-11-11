@@ -30,7 +30,7 @@ jest.mock("@server/services/media-analysis/pipeline", () => ({
   waitForMediaAnalysis: async () => undefined,
 }));
 jest.mock("@server/services/core/core-tools", () => ({
-  coreToolRegistry: { list: () => [], has: () => false },
+  coreToolRegistry: { listFor: async () => [], has: () => false },
 }));
 const mockLogger = {
   debug: jest.fn(),

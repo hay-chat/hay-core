@@ -101,4 +101,61 @@ export async function addToCart(
     body,
   });
   if (!response.ok) throw new Error(`The store refused the cart request (${response.status})`);
+  announceCartChange(cart);
+}
+
+/** Always fired after an add, so any theme can refresh its cart with one listener. */
+export const CART_UPDATED_EVENT = "hay:cart-updated";
+const EVENT_NAME = /^[A-Za-z0-9_:.-]{1,64}$/;
+
+/**
+ * Tell the store's page its cart changed: the events the plugin listed for its
+ * platform's themes, then our own. A theme that listens redraws its cart count
+ * or drawer; one that does not is simply not updated until the next page.
+ */
+function announceCartChange(cart: CartContribution): void {
+  const names = (cart.props.afterAddEvents ?? "").split(",").filter((n) => EVENT_NAME.test(n));
+  for (const name of [...names, CART_UPDATED_EVENT]) {
+    try {
+      document.body.dispatchEvent(new CustomEvent(name, { bubbles: true, cancelable: true }));
+    } catch (error) {
+      console.warn(`[Hay Webchat] A "${name}" listener on the page failed:`, error);
+    }
+  }
+}
+
+/** How long the assistant's reply has to arrive before the page changes. */
+const CHECKOUT_DELAY_MS = 1500;
+
+/**
+ * Store actions the assistant asks for (`tool_call` frames marked `builtin`):
+ * the server resolved what to add; this browser sends the request.
+ */
+export async function runStoreAction(
+  contributions: WidgetContribution[],
+  name: string,
+  args: Record<string, unknown>,
+  conversationId: string | null | undefined,
+  page: Location = window.location,
+): Promise<string> {
+  const cart = contributions.find(
+    (c): c is CartContribution => c.type === "cart@1" && c.source === args.source,
+  );
+  if (!cart) throw new Error("This page cannot use the store's cart");
+
+  if (name === "add_to_cart") {
+    await addToCart(cart, {
+      cartItemId: String(args.cartItemId ?? ""),
+      quantity: Number(args.quantity ?? 1),
+      conversationId,
+    });
+    return "Added to the cart.";
+  }
+  if (name === "go_to_checkout") {
+    if (!SAME_ORIGIN_PATH.test(cart.props.checkoutPath)) throw new Error("Invalid checkout path");
+    // Answer first: the reply is on its way while the page changes.
+    setTimeout(() => page.assign(cart.props.checkoutPath), CHECKOUT_DELAY_MS);
+    return "Opening the checkout page.";
+  }
+  throw new Error(`Unknown store action "${name}"`);
 }

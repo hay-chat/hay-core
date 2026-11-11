@@ -123,6 +123,8 @@ export interface CartContribution {
     tokenPath?: string;
     tokenResponseHeader?: string;
     tokenRequestHeader?: string;
+    /** Comma-separated DOM events fired on the page after a successful add. */
+    afterAddEvents?: string;
   };
 }
 

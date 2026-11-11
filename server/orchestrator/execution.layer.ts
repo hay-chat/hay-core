@@ -347,7 +347,7 @@ export class ExecutionLayer {
       // the enabled_tools gate in run.ts exempts core tools so playbooks
       // don't have to opt in.
       const { coreToolRegistry } = await import("@server/services/core/core-tools");
-      const coreTools = coreToolRegistry.list();
+      const coreTools = await coreToolRegistry.listFor(conversation);
       const enabledTools = conversation.enabled_tools ?? [];
       // Page tools (WebMCP): registered by the page the visitor is chatting
       // from, present only while its socket is open. Third tool source, exempt

@@ -2,6 +2,7 @@ import { ref, shallowRef, computed, watch } from "vue";
 import { useWebSocket, type PageToolCall } from "./useWebSocket";
 import { executePageTool, listPageTools, pageToolsVersion } from "./usePageTools";
 import { startActivity, endActivity } from "@/utils/agentActivity";
+import { runStoreAction } from "@/utils/cart";
 import { useConversation, WidgetRequestError } from "./useConversation";
 import { useMessageQueue } from "./useMessageQueue";
 import { initContext, getContext } from "./useWidgetContext";
@@ -21,6 +22,7 @@ import type {
   ProductClickType,
   SendFailure,
   ChallengeContribution,
+  WidgetContribution,
 } from "@/types";
 import { useChallenge } from "./useChallenge";
 import { insertMessage, parseServerTime } from "@/utils/messageOrder";
@@ -38,6 +40,8 @@ export interface UseChatOptions {
   challenge?: ChallengeContribution | null;
   /** The org's pre-chat form, asked before the first message when set. */
   preChatForm?: FormSchema | null;
+  /** The org's plugin contributions: the store's cart requests (cart@1) are run from here. */
+  contributions?: WidgetContribution[];
 }
 
 interface Keypair {
@@ -119,6 +123,8 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
   // Page tools (WebMCP): the host page's tools go up with identify and again
   // whenever the page changes them; a tool_call runs here, under the orange
   // "working" overlay, and its answer goes back on the same socket.
+  const storeContributions = options.contributions ?? [];
+  const canUseStoreCart = storeContributions.some((c) => c.type === "cart@1");
   watch(pageToolsVersion, () => {
     if (isConnected.value && conversationId.value) sendTools(listPageTools());
   });
@@ -126,7 +132,9 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     debugLog("[Webchat] Page tool call", call);
     startActivity(config.agentName || "Hay", describeToolCall(call.name));
     try {
-      const result = await executePageTool(call.name, call.args);
+      const result = call.builtin
+        ? await runStoreAction(storeContributions, call.name, call.args, conversationId.value)
+        : await executePageTool(call.name, call.args);
       sendToolResult(call.callId, { result: result === undefined ? null : result });
     } catch (error) {
       console.warn(`[Hay Webchat] Page tool "${call.name}" failed:`, error);
@@ -480,6 +488,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
         conversationId.value,
         (url) => createDPoPProof("GET", url, key.privateKey, key.publicJwk),
         listPageTools(),
+        canUseStoreCart,
       );
     }
   };
