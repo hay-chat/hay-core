@@ -221,6 +221,10 @@ export const config = {
 
   orchestrator: {
     interval: parseInt(process.env.ORCHESTRATOR_INTERVAL || "5000", 10),
+    // Conversation turns one server process runs at once (RabbitMQ prefetch).
+    // A turn mostly waits on remote LLM calls, so this is bounded by the LLM
+    // provider's rate limits and the DB pool, not by CPU.
+    concurrency: Math.max(1, parseInt(process.env.ORCHESTRATOR_CONCURRENCY || "32", 10) || 32),
   },
 
   // Web Push (VAPID). All three must be set for push alerts to be enabled;
