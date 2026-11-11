@@ -1,4 +1,5 @@
 import { rateLimitService } from "./rate-limit.service";
+import { config } from "@server/config/env";
 
 /**
  * Abuse limits for the public webchat API (publicConversations.* and the
@@ -58,6 +59,9 @@ export async function isPublicWidgetRateLimited(
   options: { failClosed?: boolean } = {},
 ): Promise<boolean> {
   for (const { rule, id } of checks) {
+    if (rule.endsWith("PerIp") && config.server.publicWidgetRateLimitExemptIps.includes(id)) {
+      continue;
+    }
     const { max, windowSeconds } = PUBLIC_WIDGET_LIMITS[rule];
     const result = await rateLimitService.checkKeyRateLimit(
       `public-widget:${rule}:${id}`,
