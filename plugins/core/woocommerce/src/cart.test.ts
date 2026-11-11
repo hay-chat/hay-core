@@ -1,12 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { CART_ADD_BODY, CART_DEFAULTS, cartConfigFields, cartContribution } from "./cart";
+import {
+  CART_ADD_BODY,
+  CART_AFTER_ADD_EVENTS,
+  CART_DEFAULTS,
+  cartConfigFields,
+  cartContribution,
+} from "./cart";
 
 // The checks Core applies to `cart@1` props (cartV1Schema in
 // server/services/webchat/webchat-extensions.service.ts), restated here because
 // a plugin cannot import Core.
 const SAME_ORIGIN_PATH = /^\/(?!\/)[^\s\\]{0,500}$/;
 const HEADER_NAME = /^[A-Za-z0-9-]{1,64}$/;
-const AFTER_ADD_EVENTS = /^[A-Za-z0-9_:.-]{1,64}(,[A-Za-z0-9_:.-]{1,64}){0,7}$/;
+const EVENT_NAME = /^[A-Za-z0-9_:.-]{1,64}$/;
 
 const contribution = cartContribution((name) => ({ name }));
 
@@ -51,9 +57,8 @@ describe("cart@1 contribution", () => {
       tokenPath: "/wp-json/wc/store/v1/cart",
       tokenResponseHeader: "Nonce",
       tokenRequestHeader: "Nonce",
-      afterAddEvents: "wc_fragment_refresh,wc-blocks_added_to_cart",
+      afterAddEvents: CART_AFTER_ADD_EVENTS,
     });
-    expect(props.afterAddEvents).toMatch(AFTER_ADD_EVENTS);
     for (const path of Object.values(CART_DEFAULTS)) expect(path).toMatch(SAME_ORIGIN_PATH);
     expect(props.tokenResponseHeader).toMatch(HEADER_NAME);
     expect(props.tokenRequestHeader).toMatch(HEADER_NAME);
@@ -67,5 +72,20 @@ describe("cart@1 contribution", () => {
   it("fills the body to the JSON the Store API expects, with a numeric id", () => {
     const body = CART_ADD_BODY.replace("{{cartItemId}}", "22").replace("{{quantity}}", "1");
     expect(JSON.parse(body)).toEqual({ id: 22, quantity: 1 });
+  });
+
+  it("refreshes the page's cart: classic fragments, the blocks' store and the Mini-Cart", () => {
+    const events = JSON.parse(CART_AFTER_ADD_EVENTS);
+    expect(events).toEqual([
+      { name: "wc_fragment_refresh" },
+      { name: "wc-blocks_added_to_cart" },
+      {
+        name: "wc-blocks_store_sync_required",
+        target: "window",
+        detail: { type: "from_@wordpress/data" },
+      },
+    ]);
+    expect(events.length).toBeLessThanOrEqual(8);
+    for (const event of events) expect(event.name).toMatch(EVENT_NAME);
   });
 });

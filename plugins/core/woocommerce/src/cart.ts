@@ -40,17 +40,28 @@ export const CART_DEFAULTS = {
 const NONCE_HEADER = "Nonce";
 
 /**
- * Fired on `document.body` after an add so the page redraws its cart:
- *  - `wc_fragment_refresh`: classic themes. cart-fragments.js re-fetches the
- *    mini-cart fragments (when the theme loads that script, i.e. shows the
- *    cart widget).
- *  - `wc-blocks_added_to_cart`: block pages. The blocks' cart data store
+ * Fired after an add so the page redraws its cart (read from WooCommerce's
+ * source; not tested in a browser):
+ *  - `wc_fragment_refresh` on the body: classic themes. cart-fragments.js
+ *    re-fetches the mini-cart fragments (when the theme loads that script,
+ *    i.e. shows the cart widget).
+ *  - `wc-blocks_added_to_cart` on the body: the blocks' cart data store
  *    re-fetches the cart (Cart block and whatever else reads that store).
- * Neither handler needs event arguments. The Mini-Cart block on its own listens
- * only for `wc-blocks_store_sync_required` on `window` with a detail payload,
- * which a plain event cannot carry: there the count updates on the next page.
+ *  - `wc-blocks_store_sync_required` on the window: the Mini-Cart block. Its
+ *    store re-fetches the cart when `detail.type` is `from_@wordpress/data`,
+ *    the value WooCommerce's other cart store sends to ask for a resync. That
+ *    store is private to WooCommerce, so this one may stop working in a
+ *    future release; the count then updates on the next page instead.
  */
-export const CART_AFTER_ADD_EVENTS = "wc_fragment_refresh,wc-blocks_added_to_cart";
+export const CART_AFTER_ADD_EVENTS = JSON.stringify([
+  { name: "wc_fragment_refresh" },
+  { name: "wc-blocks_added_to_cart" },
+  {
+    name: "wc-blocks_store_sync_required",
+    target: "window",
+    detail: { type: "from_@wordpress/data" },
+  },
+]);
 
 export const CART_ADD_BODY = '{"id":{{cartItemId}},"quantity":{{quantity}}}';
 
