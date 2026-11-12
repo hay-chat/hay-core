@@ -909,6 +909,7 @@ export class OAuthService {
         accessToken: tokens.access_token, // Plain text - transformer will encrypt
         refreshToken: tokens.refresh_token || undefined, // Plain text - transformer will encrypt
         expiresAt: tokens.expires_at,
+        issuedAt: Math.floor(Date.now() / 1000),
         connectedAt: Math.floor(Date.now() / 1000),
         tokenType: tokens.token_type || "Bearer",
         scope: tokens.scope || scopes?.join(" "),
@@ -1226,6 +1227,7 @@ export class OAuthService {
           ...instance.authState?.credentials,
           accessToken: newTokens.access_token,
           expiresAt: newTokens.expires_at,
+          issuedAt: Math.floor(Date.now() / 1000),
           connectedAt: instance.authState?.credentials?.connectedAt,
           tokenType: newTokens.token_type,
           scope: newTokens.scope,
@@ -1298,6 +1300,7 @@ export class OAuthService {
         accessToken: newTokens.access_token, // Plain text - transformer will encrypt
         refreshToken: newTokens.refresh_token || undefined, // Plain text - transformer will encrypt
         expiresAt: newTokens.expires_at,
+        issuedAt: Math.floor(Date.now() / 1000),
         connectedAt: instance.authState?.credentials?.connectedAt,
         tokenType: newTokens.token_type || "Bearer",
         scope: newTokens.scope,
