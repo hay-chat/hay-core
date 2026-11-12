@@ -82,6 +82,8 @@ export type {
   LocalMcpOptions,
   ToolRiskSpec,
   ToolWriteCategory,
+  ToolActivityLabels,
+  ToolActivityLabelsMeta,
   HayMcpRuntimeAPI,
 } from "./mcp";
 

@@ -1,6 +1,6 @@
 import { Document } from "../entities/document.entity";
 import { BaseRepository, assertSafeIdentifier } from "./base.repository";
-import { SelectQueryBuilder } from "typeorm";
+import { In, SelectQueryBuilder } from "typeorm";
 import { escapeLike } from "@server/lib/sql-like";
 
 export class DocumentRepository extends BaseRepository<Document> {
@@ -96,6 +96,12 @@ export class DocumentRepository extends BaseRepository<Document> {
       status: row.status,
       count: parseInt(row.count, 10),
     }));
+  }
+
+  /** Documents of the organization with these ids (unknown ids are skipped). */
+  async findByIdsAndOrganization(ids: string[], organizationId: string): Promise<Document[]> {
+    if (ids.length === 0) return [];
+    return await this.getRepository().find({ where: { id: In(ids), organizationId } });
   }
 
   /**

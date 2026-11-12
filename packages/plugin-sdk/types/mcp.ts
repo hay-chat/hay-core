@@ -142,6 +142,44 @@ export interface McpInitializerContext {
 }
 
 /**
+ * What the webchat shows while the AI runs a tool, set on the tool's
+ * definition (optional; keep each under 80 characters, written for the
+ * shopper, in sentence case).
+ *
+ * - `label`: the progress line while the tool runs ("Looking up your order").
+ * - `doneLabel`: the line kept once it finished ("Checked your order").
+ *
+ * Without them the widget says "Working on it…" / "Done". Tools listed as
+ * plain objects (`listTools()` of an in-process server) set `label` /
+ * `doneLabel` on the tool itself; MCP SDK servers, whose `tools/list` only
+ * carries standard fields, set the same in the tool's `_meta`
+ * ({@link ToolActivityLabelsMeta}).
+ *
+ * @example
+ * ```typescript
+ * // listTools() of an in-process server
+ * { name: "get_order", description: "…", inputSchema, label: "Looking up your order", doneLabel: "Checked your order" }
+ *
+ * // MCP SDK server
+ * server.registerTool("get_order", {
+ *   description: "…",
+ *   inputSchema,
+ *   _meta: { "chat.hay/label": "Looking up your order", "chat.hay/doneLabel": "Checked your order" },
+ * }, handler);
+ * ```
+ */
+export interface ToolActivityLabels {
+  label?: string;
+  doneLabel?: string;
+}
+
+/** {@link ToolActivityLabels} as `_meta` keys of an MCP tool definition. */
+export interface ToolActivityLabelsMeta {
+  "chat.hay/label"?: string;
+  "chat.hay/doneLabel"?: string;
+}
+
+/**
  * Write categories Hay.chat core understands (mirrors `@hay/plugin-sdk/tool-risk`).
  * Refunds, cancels, discounts and exchanges move money and are held for approval.
  * `destructive` (deletes, account configuration) is always held while approval is on.

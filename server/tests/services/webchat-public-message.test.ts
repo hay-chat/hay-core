@@ -3,6 +3,7 @@ import { describe, it, expect, jest } from "@jest/globals";
 jest.mock("@server/database/data-source", () => ({ AppDataSource: { isInitialized: false } }));
 
 import {
+  agentAvatarUrl,
   agentFirstName,
   isWidgetVisibleMessage,
   toPublicMessage,
@@ -169,5 +170,57 @@ describe("agent join/leave notices", () => {
     expect((event.data as { attachments: unknown[] }).attachments).toEqual([
       { id: "u1", name: "p.jpg", url: "https://signed", type: "image/jpeg", size: 1 },
     ]);
+  });
+
+  it("passes a person's photo, and null when they have none", () => {
+    expect(
+      toPublicMessageMetadata({
+        agentFirstName: "Marina",
+        agentAvatarUrl: "https://cdn.example/avatars/m.png",
+      }),
+    ).toEqual({ agentFirstName: "Marina", agentAvatarUrl: "https://cdn.example/avatars/m.png" });
+    expect(toPublicMessageMetadata({ agentFirstName: "Marina", agentAvatarUrl: null })).toEqual({
+      agentFirstName: "Marina",
+      agentAvatarUrl: null,
+    });
+    // Only http(s) links leave the server; anything else becomes null.
+    expect(toPublicMessageMetadata({ agentAvatarUrl: "javascript:alert(1)" })).toEqual({
+      agentAvatarUrl: null,
+    });
+    // Messages that never had a person behind them carry no avatar key at all.
+    expect(toPublicMessageMetadata({ isGreeting: true })).toEqual({ isGreeting: true });
+  });
+
+  it("agentAvatarUrl keeps only an http(s) avatar", () => {
+    expect(agentAvatarUrl({ avatarUrl: "https://cdn.example/a.png" })).toBe(
+      "https://cdn.example/a.png",
+    );
+    expect(agentAvatarUrl({ avatarUrl: "/uploads/a.png" })).toBeNull();
+    expect(agentAvatarUrl({})).toBeNull();
+    expect(agentAvatarUrl(null)).toBeNull();
+  });
+
+  it("passes well-formed answer sources and drops the rest", () => {
+    const metadata = toPublicMessageMetadata({
+      ...internalMetadata,
+      sources: [
+        { title: "Returns", url: "https://shop.example/returns" },
+        { title: "  Shipping  ", url: "https://shop.example/shipping" },
+        { title: "Internal", url: "file:///etc/passwd" },
+        { title: "", url: "https://shop.example/empty-title" },
+        "not a source",
+      ],
+    });
+    expect(metadata.sources).toEqual([
+      { title: "Returns", url: "https://shop.example/returns" },
+      { title: "Shipping", url: "https://shop.example/shipping" },
+    ]);
+    // documentsUsed (internal titles, ids) stays on the server.
+    expect(JSON.stringify(metadata)).not.toContain("doc-1");
+  });
+
+  it("omits sources when none is usable", () => {
+    expect(toPublicMessageMetadata({ sources: [] })).toEqual({});
+    expect(toPublicMessageMetadata({ sources: "https://x" })).toEqual({});
   });
 });
