@@ -38,6 +38,10 @@ jest.mock("@server/repositories/conversation-takeover-event.repository", () => (
 jest.mock("@server/services/websocket.service", () => ({
   websocketService: { sendToOrganization: jest.fn() },
 }));
+const mockAnnounceAgentRead = jest.fn<(...args: unknown[]) => Promise<void>>(async () => undefined);
+jest.mock("@server/services/widget-events.service", () => ({
+  announceAgentRead: (...args: unknown[]) => mockAnnounceAgentRead(...args),
+}));
 
 import { conversationsRouter } from "@server/routes/v1/conversations";
 import type { Context } from "@server/trpc/context";
@@ -64,6 +68,7 @@ const marina = {
   firstName: "Marina",
   lastName: "Souza",
   email: "marina@shop.example",
+  avatarUrl: "https://cdn.example/avatars/marina.png",
   getFullName: () => "Marina Souza",
 };
 
@@ -89,7 +94,11 @@ describe("agent join/leave notices", () => {
 
     expect(storedMessage()).toMatchObject({
       type: "System",
-      metadata: { systemEvent: "agent_joined", agentFirstName: "Marina" },
+      metadata: {
+        systemEvent: "agent_joined",
+        agentFirstName: "Marina",
+        agentAvatarUrl: "https://cdn.example/avatars/marina.png",
+      },
     });
   });
 
@@ -139,7 +148,10 @@ describe("agent join/leave notices", () => {
 
     expect(storedMessage()).toMatchObject({
       type: "HumanAgent",
-      metadata: { agentFirstName: "Marina" },
+      metadata: {
+        agentFirstName: "Marina",
+        agentAvatarUrl: "https://cdn.example/avatars/marina.png",
+      },
     });
   });
 
@@ -151,5 +163,51 @@ describe("agent join/leave notices", () => {
         role: "assistant",
       }),
     ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+  });
+
+  it("a person without a photo is stored with agentAvatarUrl null (the widget shows the initial)", async () => {
+    mockFindUser.mockResolvedValue({ ...marina, avatarUrl: undefined });
+
+    await caller().takeover({ conversationId: CONVERSATION_ID });
+
+    const metadata = storedMessage().metadata as Record<string, unknown>;
+    expect(metadata.agentAvatarUrl).toBeNull();
+  });
+});
+
+describe("conversations.get read receipts", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    conversation = {
+      id: CONVERSATION_ID,
+      organization_id: ORG_ID,
+      status: "open",
+      assigned_user_id: null,
+      addMessage: jest.fn(async () => undefined),
+      assignToUser: jest.fn(async () => undefined),
+      releaseFromUser: jest.fn(async () => undefined),
+    };
+    (conversation as unknown as { messages: unknown[] }).messages = [
+      { id: "m1", type: "Customer", created_at: new Date("2026-11-01T10:00:00Z") },
+    ];
+  });
+
+  it("a person opening the conversation in the inbox announces it read", async () => {
+    await conversationsRouter
+      .createCaller({ ...ctx, user: { ...ctx.user, authMethod: "jwt" } } as unknown as Context)
+      .get({ id: CONVERSATION_ID });
+
+    expect(mockAnnounceAgentRead).toHaveBeenCalledWith(
+      expect.objectContaining({ id: CONVERSATION_ID }),
+      expect.arrayContaining([expect.objectContaining({ id: "m1" })]),
+    );
+  });
+
+  it("an API token reading the conversation is not a person reading it", async () => {
+    await conversationsRouter
+      .createCaller({ ...ctx, user: { ...ctx.user, authMethod: "apikey" } } as unknown as Context)
+      .get({ id: CONVERSATION_ID });
+
+    expect(mockAnnounceAgentRead).not.toHaveBeenCalled();
   });
 });

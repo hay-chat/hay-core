@@ -35,10 +35,45 @@ interface MCPTool {
   annotations?: MCPToolAnnotations;
   _meta?: Record<string, unknown>;
   serverId?: string;
+  /** Progress line the webchat shows while the tool runs (see toolActivityLabels). */
+  label?: string;
+  /** Line the webchat keeps once the tool is done. */
+  doneLabel?: string;
+}
+
+/** `_meta` keys a tool can carry its webchat progress labels under (MCP servers). */
+export const TOOL_LABEL_META_KEY = "chat.hay/label";
+export const TOOL_DONE_LABEL_META_KEY = "chat.hay/doneLabel";
+
+const MAX_TOOL_LABEL_LENGTH = 80;
+
+/** What the webchat says while a tool runs and once it is done. */
+export interface ToolActivityLabels {
+  label?: string;
+  doneLabel?: string;
+}
+
+function labelText(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const text = value.replace(/\s+/g, " ").trim();
+  return text ? text.slice(0, MAX_TOOL_LABEL_LENGTH) : undefined;
+}
+
+/**
+ * A tool's progress labels, from its definition: `label` / `doneLabel` on the
+ * listed tool, or the same in `_meta["chat.hay/label"]` /
+ * `_meta["chat.hay/doneLabel"]` (MCP SDK servers can only set `_meta`).
+ */
+export function toolActivityLabels(
+  tool: Pick<MCPTool, "label" | "doneLabel" | "_meta">,
+): ToolActivityLabels {
+  const label = labelText(tool.label) ?? labelText(tool._meta?.[TOOL_LABEL_META_KEY]);
+  const doneLabel = labelText(tool.doneLabel) ?? labelText(tool._meta?.[TOOL_DONE_LABEL_META_KEY]);
+  return { ...(label ? { label } : {}), ...(doneLabel ? { doneLabel } : {}) };
 }
 
 /** A cached tool as core uses it: schema plus its risk class. */
-export interface CachedToolDescriptor {
+export interface CachedToolDescriptor extends ToolActivityLabels {
   serverId: string;
   name: string;
   description: string;
@@ -250,6 +285,7 @@ export function getCachedToolDescriptors(
         annotations: tool.annotations,
         // Read-only, a write category, or an unclassified write (see tool-risk).
         risk: classifyTool(tool),
+        ...toolActivityLabels(tool),
       });
     }
   }

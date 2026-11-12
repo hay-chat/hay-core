@@ -8,7 +8,7 @@
 
 import { ChildProcess } from "child_process";
 import { createInterface, Interface as ReadlineInterface } from "readline";
-import type { HayLogger } from "../types/index.js";
+import type { HayLogger, ToolActivityLabels, ToolActivityLabelsMeta } from "../types/index.js";
 
 export interface StdioMcpClientOptions {
   /**
@@ -35,7 +35,7 @@ export interface McpToolAnnotations {
   openWorldHint?: boolean;
 }
 
-export interface McpTool {
+export interface McpTool extends ToolActivityLabels {
   name: string;
   title?: string;
   description?: string;
@@ -45,6 +45,8 @@ export interface McpTool {
     required?: string[];
   };
   annotations?: McpToolAnnotations;
+  /** Hay.chat extensions (tool risk, webchat progress labels: see ToolActivityLabelsMeta). */
+  _meta?: ToolActivityLabelsMeta & Record<string, unknown>;
 }
 
 interface PendingRequest {

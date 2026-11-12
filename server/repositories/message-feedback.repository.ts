@@ -49,6 +49,10 @@ export class MessageFeedbackRepository {
       query.andWhere("feedback.rating = :rating", { rating: filter.rating });
     }
 
+    if (filter?.source) {
+      query.andWhere("feedback.source = :source", { source: filter.source });
+    }
+
     if (filter?.reviewerId) {
       query.andWhere("feedback.reviewer_id = :reviewerId", {
         reviewerId: filter.reviewerId,

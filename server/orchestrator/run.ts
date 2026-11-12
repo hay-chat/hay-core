@@ -38,6 +38,9 @@ import { checkReplyMedia } from "./reply-media";
 import { decidedActionsLedger } from "./decided-actions";
 import { isToolEnabled } from "@server/services/core/enabled-tools";
 import { isPageTool, PAGE_TOOL_MESSAGE_SOURCE } from "@server/services/webchat/page-tools.service";
+import { markVisitorMessageDelivered } from "@server/services/widget-events.service";
+import { publicAnswerSources } from "./answer-sources";
+import { runToolWithActivity } from "./tool-activity";
 import type { Message } from "@server/database/entities/message.entity";
 import type pino from "pino";
 
@@ -439,6 +442,16 @@ export const runConversation = async (conversationId: string) => {
     organizationId: conversation.organization_id,
     conversationId: conversation.id,
   });
+
+  // The run has the visitor's latest message: the widget shows it delivered.
+  // Every path below leaves it with the AI or in the team's queue.
+  if (conversation.channel === "web" && conversation.needs_processing) {
+    try {
+      await markVisitorMessageDelivered(conversation, await conversation.getLastCustomerMessage());
+    } catch (err) {
+      log.warn({ err }, "Could not mark the visitor's message delivered");
+    }
+  }
 
   // Suspended organizations keep receiving (and storing) messages but get no
   // AI reply. Clear the flag so the sweep stops re-enqueuing this conversation
@@ -1389,10 +1402,10 @@ async function handleExecutionLoop(
       });
 
       // Execute the tool
-      const toolExecResult1 = await toolExecutionService.handleToolExecution(
+      const toolExecResult1 = await runToolWithActivity(
         conversation,
         executionResult.tool,
-        toolMessageId?.id,
+        (tool) => toolExecutionService.handleToolExecution(conversation, tool, toolMessageId?.id),
       );
       toolsCalledThisTurn.push({
         name: executionResult.tool.name,
@@ -1418,10 +1431,10 @@ async function handleExecutionLoop(
       });
 
       // Execute the tool with the message ID for updating
-      const toolExecResult2 = await toolExecutionService.handleToolExecution(
+      const toolExecResult2 = await runToolWithActivity(
         conversation,
         executionResult.tool,
-        toolMessageId?.id,
+        (tool) => toolExecutionService.handleToolExecution(conversation, tool, toolMessageId?.id),
       );
       toolsCalledThisTurn.push({
         name: executionResult.tool.name,
@@ -1664,6 +1677,12 @@ async function handleExecutionLoop(
           );
         }
 
+        // The public documents behind the answer, linked under it in the widget.
+        const sources = await publicAnswerSources(
+          conversation.organization_id,
+          executionResult.confidence?.documentsUsed,
+        );
+
         await sendBotMessage(
           conversation,
           {
@@ -1671,6 +1690,7 @@ async function handleExecutionLoop(
             type: MessageType.BOT_AGENT,
             metadata: {
               ...buildMessageMetadata(executionResult),
+              ...(sources.length > 0 ? { sources } : {}),
               ...(executionResult.tool
                 ? { potentialHallucination: true, claimedTool: executionResult.tool.name }
                 : {}),
