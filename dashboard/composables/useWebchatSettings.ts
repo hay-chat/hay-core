@@ -117,7 +117,7 @@ export function createWebchatSettings() {
 
   // Read-only facts from the server (contract C2).
   const brandPalette = ref<string[]>([]);
-  const brandColorSource = ref<"website" | "custom">("website");
+  const brandColorSource = ref<"website" | "custom" | null>(null);
   const logoUrl = ref<string | null>(null);
   const logoSource = ref<"website" | "custom" | null>(null);
   const lastSeenAt = ref<string | null>(null);
