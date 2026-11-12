@@ -29,18 +29,36 @@ const chat = {
   stopTyping: vi.fn(),
   startNewConversation: vi.fn(),
   resumeActiveConversation: vi.fn(),
+  conversationId: ref<string | null>(null),
+  pendingPreChatForm: ref(false),
+  activity: ref(null),
+  doneLabels: ref({}),
+  ratings: ref({}),
+  readMessageId: ref(null),
+  sendAttachment: vi.fn(),
+  submitPreChatForm: vi.fn(async () => true),
+  rateMessage: vi.fn(),
+  openConversation: vi.fn(async () => true),
+  challengeHost: ref(null),
 };
 
 vi.mock("../composables/useChat", () => ({ useChat: () => chat }));
 
 const config = { organizationId: "org-1", baseUrl: "https://api.example.test" };
-const launcher = () => ({ setOpen: vi.fn(), setUnread: vi.fn(), focus: vi.fn() });
+const launcher = () => ({
+  setOpen: vi.fn(),
+  setUnread: vi.fn(),
+  focus: vi.fn(),
+  setSheet: vi.fn(),
+});
 
 describe("Widget", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     chat.isOpen.value = false;
     chat.unreadCount.value = 0;
+    chat.conversationId.value = null;
+    chat.pendingPreChatForm.value = false;
   });
 
   it("resumes this tab's conversation on mount without opening", () => {
@@ -185,5 +203,94 @@ describe("Widget", () => {
     chat.currentAgentType.value = null;
     chat.conversationStatus.value = null;
     vi.unstubAllGlobals();
+  });
+
+  describe("home view (question first)", () => {
+    const mountOpen = async (publicConfig: Record<string, unknown> | null = null) => {
+      const wrapper = shallowMount(Widget, {
+        props: { config, publicConfig, launcher: launcher() },
+      });
+      chat.isOpen.value = true;
+      await nextTick();
+      return { wrapper, window: () => wrapper.findComponent({ name: "ChatWindow" }) };
+    };
+
+    it("opens on home when there is no conversation, with no back arrow", async () => {
+      const { window } = await mountOpen();
+      expect(window().props("home")).toBe(true);
+      expect(window().props("showBack")).toBe(false);
+    });
+
+    it("opens straight into the conversation in this tab", async () => {
+      chat.conversationId.value = "conv-1";
+      const { window } = await mountOpen();
+      expect(window().props("home")).toBe(false);
+      expect(window().props("showBack")).toBe(true);
+    });
+
+    it("goes back home from the header arrow", async () => {
+      chat.conversationId.value = "conv-1";
+      const { window } = await mountOpen();
+      window().vm.$emit("back");
+      await nextTick();
+      expect(window().props("home")).toBe(true);
+    });
+
+    it("starts over on home after the end card", async () => {
+      chat.conversationId.value = "conv-1";
+      const { window } = await mountOpen();
+      window().vm.$emit("startNewConversation");
+      await vi.waitFor(() => expect(window().props("home")).toBe(true));
+      expect(chat.startNewConversation).toHaveBeenCalled();
+    });
+
+    it('shows the shop name after "Support team" (C1 organizationName)', async () => {
+      const { window } = await mountOpen({ organizationName: "Acme" });
+      expect(window().props("organizationName")).toBe("Acme");
+    });
+  });
+
+  describe("preview (C4)", () => {
+    it("shows the preview's sample chat, open, with the forced device", async () => {
+      const { createPreviewChat, PREVIEW_AVAILABILITY } = await import("../preview");
+      const sample = createPreviewChat({ state: "ended", device: "mobile" });
+      const bridge = launcher();
+      const window = shallowMount(Widget, {
+        props: {
+          config: { ...config, preview: { state: "ended", device: "mobile" } },
+          publicConfig: null,
+          launcher: bridge,
+          preview: { chat: sample, availability: PREVIEW_AVAILABILITY, conversations: [] },
+        },
+      }).findComponent({ name: "ChatWindow" });
+
+      expect(window.exists()).toBe(true);
+      expect(window.props("home")).toBe(false);
+      expect(window.props("isConversationClosed")).toBe(true);
+      expect(window.props("autofocus")).toBe(false);
+      expect(window.props("isSheet")).toBe(true);
+      expect(window.props("status")).toEqual({ text: "Typically replies in ~2 min", online: true });
+      expect(bridge.setSheet).toHaveBeenCalledWith(true);
+      expect(bridge.setOpen).toHaveBeenCalledWith(true);
+      expect(chat.resumeActiveConversation).not.toHaveBeenCalled();
+    });
+
+    it("starts on home for the home state", async () => {
+      const { createPreviewChat, PREVIEW_AVAILABILITY } = await import("../preview");
+      const window = shallowMount(Widget, {
+        props: {
+          config: { ...config, preview: { state: "home", device: "desktop" } },
+          publicConfig: null,
+          launcher: launcher(),
+          preview: {
+            chat: createPreviewChat({ state: "home", device: "desktop" }),
+            availability: PREVIEW_AVAILABILITY,
+            conversations: [],
+          },
+        },
+      }).findComponent({ name: "ChatWindow" });
+      expect(window.props("home")).toBe(true);
+      expect(window.props("isSheet")).toBe(false);
+    });
   });
 });

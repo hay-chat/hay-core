@@ -75,6 +75,22 @@ export interface HayChatConfig {
    * straight away, so replies show on the badge.
    */
   loading?: LoadingMode;
+  /** The shop's logo; overrides the one in Settings > Webchat (the dashboard preview sets it). */
+  logoUrl?: string | null;
+  /** Home view heading; overrides the one in Settings > Webchat (the dashboard preview sets it). */
+  homeHeading?: string | null;
+  /**
+   * The dashboard's live preview (C4): the widget opens straight away on sample
+   * content, and never calls the server, stores anything or opens a socket.
+   */
+  preview?: PreviewOptions;
+}
+
+/** What the dashboard's live preview shows. */
+export interface PreviewOptions {
+  state: "home" | "chat" | "ended";
+  /** "mobile" forces the full-screen sheet, "desktop" the floating window. */
+  device: "desktop" | "mobile";
 }
 
 export type LoadingMode = "eager" | "idle" | "interaction";
@@ -91,6 +107,8 @@ export interface TeamMember {
 export interface PublicConfig {
   enabled?: boolean;
   widgetTitle?: string | null;
+  /** The organization's display name ("Support team · {name}"). */
+  organizationName?: string | null;
   position?: "left" | "right";
   showGreeting?: boolean;
   greetingMessage?: string | null;
@@ -134,6 +152,8 @@ export interface LauncherBridge {
   setUnread(count: number): void;
   /** Focus the button (the chat was closed). */
   focus(): void;
+  /** The chat is a full-screen sheet (phones, or the mobile preview): the button hides while it is open. */
+  setSheet(sheet: boolean): void;
 }
 
 /**
@@ -210,6 +230,35 @@ export interface Message {
   /** Human agent name when message is from a HumanAgent */
   senderName?: string;
   attachments?: Attachment[];
+}
+
+/** A row of the home view's "Your conversations" (`publicConversations.listMine`). */
+export interface VisitorConversation {
+  id: string;
+  status: "open" | "closed";
+  lastMessagePreview: string;
+  /** ISO time. */
+  lastMessageAt: string;
+  /** The assistant's or a team member's name; null when the visitor wrote last. */
+  lastSenderName: string | null;
+  /** False for a signed-in customer's conversation from another browser: listed, not openable. */
+  resumable: boolean;
+}
+
+/** How far a visitor message got (`message_ack`). */
+export type DeliveryStatus = "received" | "delivered";
+
+/** A link the AI used for its answer (`metadata.sources`). */
+export interface AnswerSource {
+  title: string;
+  url: string;
+}
+
+/** The AI is running a tool (`agent_activity`): the label while it runs, then the done label. */
+export interface AgentActivity {
+  running: boolean;
+  label: string;
+  doneLabel: string;
 }
 
 /** Shown under the input when the server refuses a message; `text` goes back into the input. */

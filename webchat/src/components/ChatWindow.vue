@@ -11,197 +11,222 @@
     tabindex="-1"
     @keydown.esc.stop="$emit('close')"
   >
-    <header class="hay-chat-header">
-      <!-- Back to the home view (wave 2); hidden until there is one -->
-      <button
-        v-if="showBack"
-        type="button"
-        class="hay-chat-header__btn hay-chat-header__back"
-        :aria-label="t('chat.back')"
-        @click="$emit('back')"
-      >
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+    <!-- The home view (question first) takes the whole window -->
+    <slot v-if="home" name="home"></slot>
+
+    <template v-else>
+      <header class="hay-chat-header">
+        <!-- Back to the home view -->
+        <button
+          v-if="showBack"
+          type="button"
+          class="hay-chat-header__btn hay-chat-header__back"
+          :aria-label="t('chat.back')"
+          @click="$emit('back')"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+
+        <!-- A person who took over shows as themselves; otherwise the shop's logo -->
+        <Avatar
+          v-if="human"
+          kind="human"
+          class="hay-chat-header__avatar hay-chat-header__avatar--human"
+          :name="human.name"
+          :src="human.avatarUrl"
+        />
+        <span
+          v-else
+          class="hay-chat-header__avatar hay-chat-header__avatar--logo"
           aria-hidden="true"
         >
-          <path d="M15 18l-6-6 6-6" />
-        </svg>
-      </button>
-
-      <!-- A person who took over shows as themselves; otherwise the shop's logo -->
-      <Avatar
-        v-if="human"
-        kind="human"
-        class="hay-chat-header__avatar hay-chat-header__avatar--human"
-        :name="human.name"
-        :src="human.avatarUrl"
-      />
-      <span v-else class="hay-chat-header__avatar hay-chat-header__avatar--logo" aria-hidden="true">
-        <img v-if="logoUrl && !logoFailed" :src="logoUrl" alt="" @error="logoFailed = true" />
-        <template v-else>{{ title.trim().charAt(0).toUpperCase() }}</template>
-      </span>
-
-      <div class="hay-chat-header__info">
-        <span class="hay-chat-header__title">{{ human ? human.name : title }}</span>
-        <span class="hay-chat-header__subtitle">
-          <span
-            v-if="!human"
-            class="hay-chat-header__dot"
-            :class="{ 'hay-chat-header__dot--away': status && !status.online }"
-            aria-hidden="true"
-          ></span>
-          {{ human ? t("chat.supportTeam") : (status?.text ?? t("widget.defaultSubtitle")) }}
+          <img v-if="logoUrl && !logoFailed" :src="logoUrl" alt="" @error="logoFailed = true" />
+          <template v-else>{{ title.trim().charAt(0).toUpperCase() }}</template>
         </span>
+
+        <div class="hay-chat-header__info">
+          <span class="hay-chat-header__title">{{ human ? human.name : title }}</span>
+          <span class="hay-chat-header__subtitle">
+            <span
+              v-if="!human"
+              class="hay-chat-header__dot"
+              :class="{ 'hay-chat-header__dot--away': status && !status.online }"
+              aria-hidden="true"
+            ></span>
+            {{ human ? supportTeam : (status?.text ?? t("widget.defaultSubtitle")) }}
+          </span>
+        </div>
+
+        <span
+          v-if="!human && team.length"
+          class="hay-chat-header__team"
+          role="img"
+          :aria-label="
+            t('chat.teamLabel').replace('{names}', team.map((m) => m.firstName).join(', '))
+          "
+        >
+          <Avatar
+            v-for="member in team"
+            :key="member.firstName"
+            kind="human"
+            class="hay-chat-header__team-avatar"
+            :name="member.firstName"
+            :src="member.avatarUrl"
+          />
+        </span>
+
+        <button
+          type="button"
+          class="hay-chat-header__btn hay-chat-header__expand"
+          :aria-label="isExpanded ? t('chat.collapse') : t('chat.expand')"
+          @click="$emit('toggleExpand')"
+        >
+          <svg
+            width="17"
+            height="17"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path v-if="!isExpanded" d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+            <path v-else d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="hay-chat-header__btn"
+          :aria-label="t('chat.close')"
+          @click="$emit('close')"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </header>
+
+      <!-- Skeleton while the chat prepares (resuming a conversation can take a moment) -->
+      <div v-if="!isReady" class="hay-chat-skeleton" aria-hidden="true">
+        <div class="hay-chat-skeleton__line" style="width: 62%"></div>
+        <div
+          class="hay-chat-skeleton__line hay-chat-skeleton__line--visitor"
+          style="width: 44%"
+        ></div>
+        <div class="hay-chat-skeleton__line" style="width: 70%; height: 58px"></div>
       </div>
 
-      <span
-        v-if="!human && team.length"
-        class="hay-chat-header__team"
-        role="img"
-        :aria-label="
-          t('chat.teamLabel').replace('{names}', team.map((m) => m.firstName).join(', '))
-        "
-      >
-        <Avatar
-          v-for="member in team"
-          :key="member.firstName"
-          kind="human"
-          class="hay-chat-header__team-avatar"
-          :name="member.firstName"
-          :src="member.avatarUrl"
+      <!-- Pre-chat form: shown before the conversation is created when configured -->
+      <div v-if="pendingPreChatForm && preChatFormSchema" class="hay-chat-pre-chat">
+        <PreChatForm
+          :schema="preChatFormSchema"
+          :context="context"
+          @submit="$emit('submitPreChatForm', $event)"
         />
-      </span>
+      </div>
 
-      <button
-        type="button"
-        class="hay-chat-header__btn hay-chat-header__expand"
-        :aria-label="isExpanded ? t('chat.collapse') : t('chat.expand')"
-        @click="$emit('toggleExpand')"
-      >
-        <svg
-          width="17"
-          height="17"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <path v-if="!isExpanded" d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-          <path v-else d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" />
-        </svg>
-      </button>
-      <button
-        type="button"
-        class="hay-chat-header__btn"
-        :aria-label="t('chat.close')"
-        @click="$emit('close')"
-      >
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          aria-hidden="true"
-        >
-          <path d="M18 6 6 18M6 6l12 12" />
-        </svg>
-      </button>
-    </header>
-
-    <!-- Skeleton while the chat prepares (resuming a conversation can take a moment) -->
-    <div v-if="!isReady" class="hay-chat-skeleton" aria-hidden="true">
-      <div class="hay-chat-skeleton__line" style="width: 62%"></div>
-      <div
-        class="hay-chat-skeleton__line hay-chat-skeleton__line--visitor"
-        style="width: 44%"
-      ></div>
-      <div class="hay-chat-skeleton__line" style="width: 70%; height: 58px"></div>
-    </div>
-
-    <!-- Pre-chat form: shown before the conversation is created when configured -->
-    <div v-if="pendingPreChatForm && preChatFormSchema" class="hay-chat-pre-chat">
-      <PreChatForm
-        :schema="preChatFormSchema"
-        :context="context"
-        @submit="$emit('submitPreChatForm', $event)"
+      <MessageList
+        v-else-if="isReady"
+        :messages="messages"
+        :is-typing="isTyping"
+        :greeting-message="greetingMessage"
+        :assistant-name="assistantName"
+        :assistant-avatar-url="assistantAvatarUrl"
+        :ai-label="aiLabel"
+        :disclosure="aiLabel ? t('chat.aiDisclosure') : null"
+        :typing-human="human"
+        :locale="locale"
+        :team="team"
+        :activity="activity"
+        :done-labels="doneLabels"
+        :ratings="ratings"
+        :read-message-id="readMessageId"
+        :rate="rate"
+        @submit-form="
+          (messageId, response) => $emit('submitInConversationForm', messageId, response)
+        "
       />
-    </div>
 
-    <MessageList
-      v-else-if="isReady"
-      :messages="messages"
-      :is-typing="isTyping"
-      :greeting-message="greetingMessage"
-      :assistant-name="assistantName"
-      :assistant-avatar-url="assistantAvatarUrl"
-      :ai-label="aiLabel"
-      :disclosure="aiLabel ? t('chat.aiDisclosure') : null"
-      :typing-human="human"
-      :locale="locale"
-      @submit-form="(messageId, response) => $emit('submitInConversationForm', messageId, response)"
-    />
-
-    <WaitingBanner
-      v-if="isWaitingForHuman && !isConversationClosed && saveContactEmail"
-      :typical="waitingTypical ?? null"
-      :detail="waitingDetail ?? null"
-      :contact-saved="contactSaved ?? false"
-      :save-email="saveContactEmail"
-      :visitor-message-count="visitorMessageCount"
-    />
-
-    <ChallengeFrame
-      v-if="setChallengeHost"
-      :interactive="challengeInteractive ?? false"
-      :set-host="setChallengeHost"
-    />
-
-    <!-- End of conversation: one card in place of the composer -->
-    <div v-if="isConversationClosed && !pendingPreChatForm" class="hay-chat-end">
-      <span class="hay-chat-end__label">{{ t("chat.conversationEnded") }}</span>
-      <CsatRating
-        v-if="csatEnabled"
-        :question="csatQuestion"
-        :submitted="csatSubmitted"
-        :submit="submitCsat"
+      <WaitingBanner
+        v-if="isWaitingForHuman && !isConversationClosed && saveContactEmail"
+        :typical="waitingTypical ?? null"
+        :detail="waitingDetail ?? null"
+        :contact-saved="contactSaved ?? false"
+        :save-email="saveContactEmail"
+        :visitor-message-count="visitorMessageCount"
       />
-      <button type="button" class="hay-chat-end__restart" @click="$emit('startNewConversation')">
-        {{ t("chat.startNew") }}
-      </button>
-      <PoweredBy />
-    </div>
 
-    <div v-else class="hay-chat-footer">
-      <MessageInput
-        v-if="!pendingPreChatForm"
-        ref="inputRef"
-        :is-ready="isReady"
-        :failure="sendFailure"
-        @send="$emit('send', $event)"
-        @attach="(file, caption) => $emit('attach', file, caption)"
-        @start-typing="$emit('startTyping')"
-        @stop-typing="$emit('stopTyping')"
+      <ChallengeFrame
+        v-if="setChallengeHost"
+        :interactive="challengeInteractive ?? false"
+        :set-host="setChallengeHost"
       />
-      <PoweredBy />
-    </div>
+
+      <!-- End of conversation: one card in place of the composer -->
+      <div v-if="isConversationClosed && !pendingPreChatForm" class="hay-chat-end">
+        <span class="hay-chat-end__label">{{ t("chat.conversationEnded") }}</span>
+        <CsatRating
+          v-if="csatEnabled"
+          :question="csatQuestion"
+          :submitted="csatSubmitted"
+          :submit="submitCsat"
+        />
+        <button type="button" class="hay-chat-end__restart" @click="$emit('startNewConversation')">
+          {{ t("chat.startNew") }}
+        </button>
+        <PoweredBy />
+      </div>
+
+      <div v-else class="hay-chat-footer">
+        <MessageInput
+          v-if="!pendingPreChatForm"
+          ref="inputRef"
+          :is-ready="isReady"
+          :failure="sendFailure"
+          @send="$emit('send', $event)"
+          @attach="(file, caption) => $emit('attach', file, caption)"
+          @start-typing="$emit('startTyping')"
+          @stop-typing="$emit('stopTyping')"
+        />
+        <PoweredBy />
+      </div>
+    </template>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import MessageList from "./MessageList.vue";
 import MessageInput from "./MessageInput.vue";
 import WaitingBanner from "./WaitingBanner.vue";
@@ -212,7 +237,7 @@ import PoweredBy from "./PoweredBy.vue";
 import { useI18n } from "@/i18n";
 import { currentHuman } from "@/utils/thread";
 import type { HeaderStatus } from "@/utils/availability";
-import type { Message, SendFailure, TeamMember } from "@/types";
+import type { AgentActivity, Message, SendFailure, TeamMember } from "@/types";
 import type { FormResponse, FormSchema } from "@hay/form-schema";
 
 // Loaded on demand: most organizations never ask for a pre-chat form.
@@ -220,51 +245,68 @@ const PreChatForm = defineAsyncComponent(() => import("./PreChatForm.vue"));
 
 const t = useI18n();
 
-const props = defineProps<{
-  /** The shop's name for the chat, e.g. "Acme Support". */
-  title: string;
-  position: "left" | "right";
-  /** The first AI message of a new chat; undefined shows none. */
-  greetingMessage?: string;
-  messages: Message[];
-  isTyping: boolean;
-  isReady: boolean;
-  isConversationClosed: boolean;
-  csatEnabled: boolean;
-  csatQuestion: string;
-  csatSubmitted: boolean;
-  submitCsat: (rating: number) => Promise<boolean>;
-  isExpanded: boolean;
-  /** The AI's name on its messages. */
-  assistantName: string;
-  assistantAvatarUrl?: string;
-  /** The shop's logo in the header; its initial on the brand colour otherwise. */
-  logoUrl?: string;
-  /** People who can take over, shown in the header (max 2). */
-  team: TeamMember[];
-  currentAgentType?: string;
-  currentAgentName?: string;
-  sendFailure?: SendFailure | null;
-  aiLabel?: string | null;
-  /** "Typically replies in ~5 min", "Back Mon 09:00"… (D5-7). */
-  status?: HeaderStatus | null;
-  /** The conversation waits for a person (D5-10). */
-  isWaitingForHuman?: boolean;
-  waitingTypical?: string | null;
-  waitingDetail?: string | null;
-  contactSaved?: boolean;
-  saveContactEmail?: (email: string) => Promise<boolean>;
-  /** Mount point for the Hay.chat security check frame (challenge@1). */
-  setChallengeHost?: (el: HTMLElement | null) => void;
-  /** The security check needs the shopper to interact. */
-  challengeInteractive?: boolean;
-  pendingPreChatForm?: boolean;
-  preChatFormSchema?: FormSchema | null;
-  context?: Record<string, unknown>;
-  locale?: string;
-  /** Show the back arrow to the home view. */
-  showBack?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    /** The shop's name for the chat, e.g. "Acme Support". */
+    title: string;
+    position: "left" | "right";
+    /** The first AI message of a new chat; undefined shows none. */
+    greetingMessage?: string;
+    messages: Message[];
+    isTyping: boolean;
+    isReady: boolean;
+    isConversationClosed: boolean;
+    csatEnabled: boolean;
+    csatQuestion: string;
+    csatSubmitted: boolean;
+    submitCsat: (rating: number) => Promise<boolean>;
+    isExpanded: boolean;
+    /** The AI's name on its messages. */
+    assistantName: string;
+    assistantAvatarUrl?: string;
+    /** The shop's logo in the header; its initial on the brand colour otherwise. */
+    logoUrl?: string;
+    /** People who can take over, shown in the header (max 2). */
+    team: TeamMember[];
+    currentAgentType?: string;
+    currentAgentName?: string;
+    sendFailure?: SendFailure | null;
+    aiLabel?: string | null;
+    /** "Typically replies in ~5 min", "Back Mon 09:00"… (D5-7). */
+    status?: HeaderStatus | null;
+    /** The conversation waits for a person (D5-10). */
+    isWaitingForHuman?: boolean;
+    waitingTypical?: string | null;
+    waitingDetail?: string | null;
+    contactSaved?: boolean;
+    saveContactEmail?: (email: string) => Promise<boolean>;
+    /** Mount point for the Hay.chat security check frame (challenge@1). */
+    setChallengeHost?: (el: HTMLElement | null) => void;
+    /** The security check needs the shopper to interact. */
+    challengeInteractive?: boolean;
+    pendingPreChatForm?: boolean;
+    preChatFormSchema?: FormSchema | null;
+    context?: Record<string, unknown>;
+    locale?: string;
+    /** Show the back arrow to the home view. */
+    showBack?: boolean;
+    /** Show the home view (the `home` slot) instead of the conversation. */
+    home?: boolean;
+    /** A full-screen sheet (phones, or the mobile preview). */
+    isSheet?: boolean;
+    /** Move focus into the chat when it opens; off in the dashboard preview. */
+    autofocus?: boolean;
+    /** "Support team · {name}" while a person has taken over. */
+    organizationName?: string | null;
+    /** The AI's progress line and done labels, thumbs, "Seen" (C3). */
+    activity?: AgentActivity | null;
+    doneLabels?: Record<string, string>;
+    ratings?: Record<string, "up" | "down">;
+    readMessageId?: string | null;
+    rate?: (messageId: string, rating: "up" | "down") => void;
+  }>(),
+  { autofocus: true },
+);
 
 defineEmits<{
   close: [];
@@ -283,8 +325,18 @@ const windowRef = ref<HTMLElement | null>(null);
 const inputRef = ref<InstanceType<typeof MessageInput> | null>(null);
 const logoFailed = ref(false);
 
-const human = computed(() =>
-  currentHuman(props.messages, props.currentAgentType, props.currentAgentName),
+const human = computed(() => {
+  const person = currentHuman(props.messages, props.currentAgentType, props.currentAgentName);
+  if (!person) return null;
+  // Their photo from the message, else from the team in the settings.
+  const teamPhoto = props.team.find((member) => member.firstName === person.name)?.avatarUrl;
+  return { ...person, avatarUrl: person.avatarUrl ?? teamPhoto ?? null };
+});
+
+const supportTeam = computed(() =>
+  props.organizationName
+    ? `${t("chat.supportTeam")} · ${props.organizationName}`
+    : t("chat.supportTeam"),
 );
 
 const visitorMessageCount = computed(
@@ -292,11 +344,28 @@ const visitorMessageCount = computed(
 );
 
 // Phones get a full-screen sheet: the page behind it must not scroll.
-const isPhone = () => window.matchMedia?.("(max-width: 480px)").matches ?? false;
 let restoreScroll: (() => void) | null = null;
 
+// Focus moves into the chat: the message field on desktop, the window on
+// phones (focusing the field would pop the keyboard over the conversation).
+const focusChat = () => {
+  if (!props.autofocus) return;
+  void nextTick(() => {
+    if (!props.isSheet && inputRef.value) inputRef.value.focus();
+    else windowRef.value?.focus({ preventScroll: true });
+  });
+};
+
+// From the home view into a conversation.
+watch(
+  () => props.home,
+  (home) => {
+    if (!home) focusChat();
+  },
+);
+
 onMounted(() => {
-  if (isPhone()) {
+  if (props.isSheet) {
     const { documentElement: html, body } = document;
     const before = [html.style.overflow, body.style.overflow];
     html.style.overflow = "hidden";
@@ -305,12 +374,12 @@ onMounted(() => {
       [html.style.overflow, body.style.overflow] = before;
     };
   }
-  // Focus moves into the chat: the message field on desktop, the window on
-  // phones (focusing the field would pop the keyboard over the conversation).
-  void nextTick(() => {
-    if (!isPhone() && inputRef.value) inputRef.value.focus();
-    else windowRef.value?.focus({ preventScroll: true });
-  });
+  // The home view focuses its own message box.
+  if (props.home) {
+    if (props.isSheet && props.autofocus) windowRef.value?.focus({ preventScroll: true });
+  } else {
+    focusChat();
+  }
 });
 
 onBeforeUnmount(() => restoreScroll?.());
@@ -337,6 +406,11 @@ onBeforeUnmount(() => restoreScroll?.());
   transition:
     width 0.3s ease,
     height 0.3s ease;
+}
+
+/* The dashboard preview re-renders on every settings change: no entrance. */
+#hay-webchat-root[data-preview] .hay-chat-window {
+  animation: none;
 }
 
 #hay-webchat-root .hay-chat-window:focus-visible {
@@ -568,38 +642,39 @@ onBeforeUnmount(() => restoreScroll?.());
   border-color: var(--hay-meta);
 }
 
-/* Phones: a full-screen sheet; the button hides while it is open */
-@media (max-width: 480px) {
-  .hay-chat-window,
-  .hay-chat-window--expanded {
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    max-height: none;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-    z-index: 1000000;
-    padding-left: env(safe-area-inset-left, 0px);
-    padding-right: env(safe-area-inset-right, 0px);
-  }
+/* Phones (and the mobile preview): a full-screen sheet; the button hides while it is open */
+#hay-webchat-root[data-sheet] .hay-chat-window {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  z-index: 1000000;
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
 
-  .hay-chat-header {
-    padding: calc(18px + env(safe-area-inset-top, 0px)) 12px 14px 14px;
-  }
+#hay-webchat-root[data-sheet] .hay-chat-header {
+  padding: calc(18px + env(safe-area-inset-top, 0px)) 12px 14px 14px;
+}
 
-  .hay-chat-header__btn {
-    width: 44px;
-    height: 44px;
-  }
+#hay-webchat-root[data-sheet] .hay-chat-header:has(.hay-chat-header__back) {
+  padding-left: 6px;
+}
 
-  .hay-chat-header__expand {
-    display: none;
-  }
+#hay-webchat-root[data-sheet] .hay-chat-header__btn {
+  width: 44px;
+  height: 44px;
+}
 
-  .hay-chat-footer,
-  .hay-chat-end {
-    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
-  }
+#hay-webchat-root[data-sheet] .hay-chat-header__expand {
+  display: none;
+}
+
+#hay-webchat-root[data-sheet] .hay-chat-footer,
+#hay-webchat-root[data-sheet] .hay-chat-end {
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
 }
 </style>

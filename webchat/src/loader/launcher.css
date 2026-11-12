@@ -106,11 +106,10 @@
   visibility: hidden;
 }
 
-/* Phones: the chat is a full-screen sheet with its own close button. */
-@media (max-width: 480px) {
-  .hay-chat-button[aria-expanded="true"] {
-    display: none;
-  }
+/* Phones: the chat is a full-screen sheet with its own close button (the chat
+   sets data-sheet; the mobile preview forces it). */
+#hay-webchat-root[data-sheet] .hay-chat-button[aria-expanded="true"] {
+  display: none;
 }
 
 .hay-chat-button--left {

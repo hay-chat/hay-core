@@ -48,6 +48,8 @@ export interface WebchatTeamMember {
 /** What the widget loads (C1); the route adds `enabled`, contributions and the AI label. */
 export interface WebchatPublicConfig {
   widgetTitle: string;
+  /** The organization's display name ("Support team · {name}" when a person has taken over). */
+  organizationName: string | null;
   position: WebchatPosition;
   brandColor: string;
   themeMode: WebchatThemeMode;
@@ -282,6 +284,7 @@ export class WebchatSettingsService {
 
     return {
       widgetTitle: settings.widgetTitle,
+      organizationName: organization?.name?.trim() || null,
       position: settings.position,
       brandColor: settings.brandColor,
       themeMode: settings.themeMode,

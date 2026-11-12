@@ -1,6 +1,6 @@
 // The chat button, in plain DOM so it paints without Vue. Once the chat chunk
 // mounts, it drives the button through the LauncherBridge.
-import type { HayChatConfig, LauncherBridge, ThemeMode } from "@/types";
+import type { HayChatConfig, LauncherBridge, PublicConfig, ThemeMode } from "@/types";
 import { brandTokens } from "@/utils/brandColor";
 import type { LauncherLabels } from "./labels";
 import css from "./launcher.css?inline";
@@ -23,6 +23,8 @@ export interface Launcher extends LauncherBridge {
   setAppearance(brandColor: string | null | undefined, themeMode: ThemeMode | undefined): void;
   /** Hide the button until the merchant's colour is known (see boot.ts). */
   setPending(pending: boolean): void;
+  /** The corner from the settings, when the page set none. */
+  setPosition(position: NonNullable<PublicConfig["position"]>): void;
   /**
    * Show a message next to the button, until the visitor opens the chat or
    * dismisses it. Does nothing once either has happened, unless `force` (the
@@ -41,6 +43,9 @@ export function createLauncher(config: HayChatConfig, labels: LauncherLabels): L
 
   const root = document.createElement("div");
   root.id = "hay-webchat-root";
+  // The dashboard's live preview (C4).
+  if (config.preview) root.setAttribute("data-preview", "");
+  let position = config.position ?? "right";
   const setAppearance: Launcher["setAppearance"] = (brandColor, themeMode) => {
     for (const [name, value] of Object.entries(brandTokens(brandColor))) {
       root.style.setProperty(name, value);
@@ -57,8 +62,11 @@ export function createLauncher(config: HayChatConfig, labels: LauncherLabels): L
 
   const button = document.createElement("button");
   button.type = "button";
-  button.className =
-    config.position === "left" ? "hay-chat-button hay-chat-button--left" : "hay-chat-button";
+  const placeButton = () => {
+    button.className =
+      position === "left" ? "hay-chat-button hay-chat-button--left" : "hay-chat-button";
+  };
+  placeButton();
   button.setAttribute("aria-label", labels.open);
   button.setAttribute("aria-expanded", "false");
   button.innerHTML =
@@ -99,6 +107,14 @@ export function createLauncher(config: HayChatConfig, labels: LauncherLabels): L
     setPending(pending) {
       root.toggleAttribute("data-pending", pending);
     },
+    setPosition(next) {
+      position = next;
+      placeButton();
+      teaser?.classList.toggle("hay-chat-teaser--left", position === "left");
+    },
+    setSheet(sheet) {
+      root.toggleAttribute("data-sheet", sheet);
+    },
     setBusy(busy) {
       if (busy) button.setAttribute("aria-busy", "true");
       else button.removeAttribute("aria-busy");
@@ -113,7 +129,7 @@ export function createLauncher(config: HayChatConfig, labels: LauncherLabels): L
 
       teaser = document.createElement("div");
       teaser.className =
-        config.position === "left" ? "hay-chat-teaser hay-chat-teaser--left" : "hay-chat-teaser";
+        position === "left" ? "hay-chat-teaser hay-chat-teaser--left" : "hay-chat-teaser";
 
       // The message opens the chat, exactly like the button.
       const open = document.createElement("button");

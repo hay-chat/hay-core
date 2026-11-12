@@ -1,7 +1,7 @@
 import { ref, onUnmounted } from "vue";
 import { safeStorage } from "./useConsent";
 import { debugLog } from "@/utils/debug";
-import type { Message } from "@/types";
+import type { DeliveryStatus, Message } from "@/types";
 import type { PageToolDescriptor } from "./usePageTools";
 import { insertMessage, parseServerTime } from "@/utils/messageOrder";
 
@@ -17,6 +17,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
   const maxReconnectAttempts = 5;
   let statusChangeCallback: ((status: string, payload: any) => void) | null = null;
   let toolCallCallback: ((call: PageToolCall) => void) | null = null;
+  let widgetEventCallback: ((event: WidgetEvent) => void) | null = null;
 
   // The identify proof is signed for the socket endpoint itself (no query).
   const socketUrl = new URL("/ws", baseUrl.replace("http", "ws")).toString();
@@ -140,6 +141,14 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
         }
         break;
 
+      case "message_ack":
+      case "message_read":
+      case "agent_activity": {
+        const event = toWidgetEvent(data);
+        if (event) widgetEventCallback?.(event);
+        break;
+      }
+
       case "error":
         console.error("[Webchat] Server error:", data.error);
         break;
@@ -212,6 +221,11 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
     toolCallCallback = callback;
   };
 
+  /** Delivery ticks, "Seen" and the AI's progress line. */
+  const setWidgetEventHandler = (callback: (event: WidgetEvent) => void) => {
+    widgetEventCallback = callback;
+  };
+
   const sendTypingIndicator = (isTypingValue: boolean) => {
     if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
       return;
@@ -261,8 +275,41 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
     sendToolResult,
     setStatusChangeCallback,
     setToolCallHandler,
+    setWidgetEventHandler,
     disconnect,
   };
+}
+
+/** Live conversation events besides messages (C3), already checked. */
+export type WidgetEvent =
+  | { type: "message_ack"; messageId: string; clientMessageId?: string; status: DeliveryStatus }
+  | { type: "message_read"; messageId: string; readAt: string }
+  | { type: "agent_activity"; state: "start" | "end"; label: string; doneLabel: string };
+
+const str = (value: unknown): value is string => typeof value === "string" && value.length > 0;
+
+function toWidgetEvent(data: Record<string, unknown>): WidgetEvent | null {
+  if (data.type === "message_ack" && str(data.messageId)) {
+    if (data.status !== "received" && data.status !== "delivered") return null;
+    return {
+      type: "message_ack",
+      messageId: data.messageId,
+      status: data.status,
+      ...(str(data.clientMessageId) ? { clientMessageId: data.clientMessageId } : {}),
+    };
+  }
+  if (data.type === "message_read" && str(data.messageId) && str(data.readAt)) {
+    return { type: "message_read", messageId: data.messageId, readAt: data.readAt };
+  }
+  if (data.type === "agent_activity" && (data.state === "start" || data.state === "end")) {
+    return {
+      type: "agent_activity",
+      state: data.state,
+      label: str(data.label) ? data.label : "",
+      doneLabel: str(data.doneLabel) ? data.doneLabel : "",
+    };
+  }
+  return null;
 }
 
 /** Signs a DPoP proof (method GET) for the given socket URL. */

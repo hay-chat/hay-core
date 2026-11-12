@@ -45,6 +45,7 @@ export function boot(
 ): { chatReady: () => Promise<ChatHandle | null> } {
   if (!config.organizationId) console.error("[Hay Webchat] organizationId is required in config");
   if (!config.baseUrl) console.error("[Hay Webchat] baseUrl is required in config");
+  if (config.preview) return bootPreview(config, loadChat);
 
   const hostCalls = installHostApi();
   const launcher = createLauncher(config, launcherLabels[resolveLocale(config.locale)]);
@@ -78,11 +79,12 @@ export function boot(
   let publicConfig: Promise<PublicConfig | null> | null = null;
   const getPublicConfig = () =>
     (publicConfig ??= fetchPublicConfig(config).then((settings) => {
-      // The page's own colour and theme win over the settings.
+      // The page's own colour, theme and corner win over the settings.
       launcher.setAppearance(
         config.brandColor ?? settings?.brandColor,
         config.themeMode ?? settings?.themeMode,
       );
+      if (!config.position && settings?.position) launcher.setPosition(settings.position);
       clearTimeout(appearanceTimer);
       launcher.setPending(false);
       if (wantsTeaser && !pageSetTeaser && settings?.teaserMessage) {
@@ -157,4 +159,35 @@ export function boot(
   // "interaction": nothing is fetched until the visitor reaches for the button.
 
   return { chatReady: () => chat ?? Promise.resolve(null) };
+}
+
+/**
+ * The dashboard's live preview (C4), in a sandboxed iframe with no origin of
+ * its own: the chat opens straight away on the config it was given. Nothing
+ * is fetched but the chat's own files, and nothing is stored.
+ */
+function bootPreview(
+  config: HayChatConfig,
+  loadChat: () => Promise<ChatModule>,
+): { chatReady: () => Promise<ChatHandle | null> } {
+  const launcher = createLauncher(config, launcherLabels[resolveLocale(config.locale)]);
+  let handle: ChatHandle | null = null;
+  const chat = loadChat()
+    .then((module) =>
+      module.mountChat({
+        container: launcher.chatContainer,
+        config,
+        publicConfig: null,
+        launcher,
+        hostCalls: [],
+        open: true,
+      }),
+    )
+    .then((mounted) => (handle = mounted))
+    .catch((error) => {
+      console.error("[Hay Webchat] Failed to load the chat preview:", error);
+      return null;
+    });
+  launcher.button.addEventListener("click", () => handle?.toggle());
+  return { chatReady: () => chat };
 }

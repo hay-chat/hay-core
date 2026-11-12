@@ -1,0 +1,98 @@
+/* Sources pill and thumbs under an AI answer. AnswerExtras.vue adds it when it loads. */
+
+.hay-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-self: stretch;
+  padding: 2px 2px 0 4px;
+}
+
+.hay-answer__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hay-answer__sources {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border: 1px solid var(--hay-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--hay-meta);
+  font-size: 12px;
+}
+
+.hay-answer__sources:hover,
+.hay-answer__sources[aria-expanded="true"] {
+  color: var(--hay-text);
+  border-color: var(--hay-meta);
+}
+
+.hay-answer__rate {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.hay-answer__thumb {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--hay-meta);
+}
+
+.hay-answer__thumb:hover {
+  color: var(--hay-text);
+  background: var(--hay-bubble);
+}
+
+.hay-answer__thumb--chosen,
+.hay-answer__thumb--chosen:hover {
+  color: var(--hay-accent);
+  background: transparent;
+}
+
+.hay-answer__links {
+  margin: 0;
+  padding: 8px 12px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--hay-line);
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.hay-answer__links a {
+  color: var(--hay-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+
+#hay-webchat-root[data-sheet] .hay-answer__thumb {
+  width: 44px;
+  height: 44px;
+}
+
+/* A 44px touch target around the small pill. */
+#hay-webchat-root[data-sheet] .hay-answer__sources {
+  position: relative;
+}
+
+#hay-webchat-root[data-sheet] .hay-answer__sources::after {
+  content: "";
+  position: absolute;
+  inset: -11px -4px;
+}
