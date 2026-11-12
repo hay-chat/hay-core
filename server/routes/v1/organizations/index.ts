@@ -814,6 +814,14 @@ export const organizationsRouter = t.router({
               ),
             ),
         );
+        // The webchat logo and brand colour follow the site (unless set by hand).
+        if (input.website) {
+          const website = input.website;
+          void import("@server/services/branding-import/branding-import.service").then(
+            ({ brandingImportService }) =>
+              brandingImportService.startImport(organizationId, website),
+          );
+        }
       }
 
       // Drop any cached LLM provider bundle so settings changes take effect immediately.

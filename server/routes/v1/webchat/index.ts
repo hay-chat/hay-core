@@ -10,7 +10,12 @@ import { z } from "zod";
 import { webchatSettingsService } from "@server/services/webchat/webchat-settings.service";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { customAiLabel, isAiLabelShown } from "@server/services/ai-disclosure";
-import { WebchatPosition, WebchatTheme } from "@server/database/entities/webchat-settings.entity";
+import {
+  WEBCHAT_THEME_MODES,
+  WebchatPosition,
+} from "@server/database/entities/webchat-settings.entity";
+import { handleUpload } from "@server/lib/upload-helper";
+import { isDashboardHost } from "@server/lib/webchat-origin";
 import { getAvailability, typicalFirstReplyMinutes } from "@server/services/business-hours.service";
 import {
   revealIdentitySecret,
@@ -57,17 +62,67 @@ async function widgetAvailability(organizationId: string): Promise<WidgetAvailab
 }
 import { formSchemaSchema } from "@hay/form-schema";
 
+/**
+ * Origin ("https://shop.com") of the page that loaded the widget, from Origin,
+ * falling back to Referer. Null for opaque origins (the dashboard preview's
+ * srcdoc frame sends "null") and for the Hay.chat dashboard itself.
+ */
+export function widgetPageOrigin(
+  headers: Record<string, string | string[] | undefined>,
+): string | null {
+  for (const name of ["origin", "referer"]) {
+    const value = headers[name];
+    if (typeof value !== "string" || !value) continue;
+    try {
+      const url = new URL(value);
+      if (url.protocol !== "http:" && url.protocol !== "https:") continue;
+      return isDashboardHost(url.hostname.toLowerCase()) ? null : url.origin;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+const hexColorSchema = z
+  .string()
+  .trim()
+  .regex(/^#[0-9a-fA-F]{6}$/, "Enter a colour like #001df5");
+
 export const webchatRouter = router({
   /**
    * Get webchat settings for the current organization
    */
   getSettings: scopedProcedure("webchat", "read").query(async ({ ctx }) => {
     const settings = await webchatSettingsService.getSettings(ctx.organizationId!);
+    webchatSettingsService.importBrandingIfNeverDone(settings);
     return {
-      ...settings,
+      ...(await webchatSettingsService.toView(settings)),
       underAttack: stateOf(settings),
       underAttackHours: config.underAttack.hours,
     };
+  }),
+
+  /**
+   * Upload the widget logo (base64 data URI, like the organization logo). The
+   * website import never replaces it.
+   */
+  uploadLogo: scopedProcedure("webchat", "write")
+    .input(z.object({ logo: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const result = await handleUpload(
+        input.logo,
+        "organizations",
+        ctx.organizationId!,
+        ctx.user!.id,
+        { maxSize: 2 * 1024 * 1024 }, // 2MB, as for the organization logo
+      );
+      return await webchatSettingsService.setCustomLogo(ctx.organizationId!, result.upload.id);
+    }),
+
+  /** Remove the widget logo; the widget falls back to the organization logo. */
+  removeLogo: scopedProcedure("webchat", "write").mutation(async ({ ctx }) => {
+    return await webchatSettingsService.removeLogo(ctx.organizationId!);
   }),
 
   /**
@@ -87,9 +142,16 @@ export const webchatRouter = router({
     .input(
       z.object({
         widgetTitle: z.string().min(1).max(100).optional(),
-        widgetSubtitle: z.string().max(200).nullable().optional(),
         position: z.nativeEnum(WebchatPosition).optional(),
-        theme: z.nativeEnum(WebchatTheme).optional(),
+        themeMode: z.enum(WEBCHAT_THEME_MODES).optional(),
+        brandColor: hexColorSchema.optional(),
+        homeHeading: z
+          .string()
+          .trim()
+          .max(120)
+          .nullable()
+          .optional()
+          .transform((value) => (value === "" ? null : value)),
         showGreeting: z.boolean().optional(),
         greetingMessage: z.string().max(2000).nullable().optional(),
         teaserMessage: z.string().trim().max(200).nullable().optional(),
@@ -147,7 +209,7 @@ export const webchatRouter = router({
         supports: z.array(z.string().max(40)).max(20).optional(),
       }),
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       // A disabled webchat or a suspended organization is not an error for the
       // widget: it answers `{ enabled: false }` and the widget renders nothing.
       const [isEnabled, organization] = await Promise.all([
@@ -157,6 +219,14 @@ export const webchatRouter = router({
 
       if (!isEnabled || !organization || organization.suspendedAt) {
         return { enabled: false as const };
+      }
+
+      // Install detection (C2): which site loads the widget, and when.
+      const pageOrigin = widgetPageOrigin(ctx.req.headers);
+      if (pageOrigin) {
+        webchatSettingsService
+          .recordWidgetLoad(input.organizationId, pageOrigin)
+          .catch((error) => logger.warn({ err: error }, "Could not record the widget load"));
       }
 
       const underAttack = await isUnderAttack(input.organizationId);
