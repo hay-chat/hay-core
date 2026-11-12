@@ -267,6 +267,39 @@ describe("oauthService.handleCallback", () => {
   });
 });
 
+describe("oauthService.handleCallback tokenExchange failure", () => {
+  it("fails the connect and stores nothing when the long-lived exchange fails", async () => {
+    findByPluginId.mockResolvedValue(
+      registryPlugin({
+        tokenExchange: {
+          url: "https://graph.instagram.com/access_token",
+          grantType: "ig_exchange_token",
+          tokenParam: "access_token",
+          includeClientSecret: true,
+        },
+      }),
+    );
+    retrieveState.mockResolvedValue({
+      pluginId: "p",
+      organizationId: "org-1",
+      userId: "u-1",
+      nonce: "nonce",
+      codeVerifier: "verifier",
+      createdAt: Date.now(),
+    });
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ access_token: "short-lived", token_type: "bearer" }))
+      .mockResolvedValueOnce(jsonResponse({ error: { code: 190 } }, false, 400));
+
+    const result = await oauthService.handleCallback("auth-code", "nonce");
+
+    expect(result).toMatchObject({ success: false });
+    expect(result.error).toMatch(/long-lived/);
+    expect(updateAuthState).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("oauthService onConnected credentials", () => {
   it("merges sanitized credentials and account into authState in one write", async () => {
     fetchMock
