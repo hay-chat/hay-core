@@ -142,7 +142,11 @@ const emit = defineEmits<{
   open: [conversationId: string];
 }>();
 
-const uid = Math.random().toString(36).slice(2, 8);
+const randomPart = globalThis.crypto.getRandomValues(new Uint32Array(1))[0]
+  .toString(36)
+  .slice(0, 6)
+  .padEnd(6, "0");
+const uid = randomPart;
 const listId = `hay-home-list-${uid}`;
 const noteId = `hay-home-note-${uid}`;
 const logoFailed = ref(false);
