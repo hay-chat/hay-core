@@ -232,6 +232,7 @@ describe("getPublicConfig", () => {
     stored = settingsRow({ logoUploadId: "logo-1", homeHeading: "Ask us anything" });
     mockFindOrganization.mockResolvedValue({
       id: ORG,
+      name: " Acme ",
       assistantName: "Ava",
       logoUpload: { id: "org-logo" },
       settings: {},
@@ -251,6 +252,7 @@ describe("getPublicConfig", () => {
     const config = await webchatSettingsService.getPublicConfig(ORG);
     expect(config).toEqual({
       widgetTitle: "Chat with us",
+      organizationName: "Acme",
       position: "right",
       brandColor: "#001df5",
       themeMode: "light",
@@ -280,6 +282,7 @@ describe("getPublicConfig", () => {
     members = [member("Ann")];
     const config = await webchatSettingsService.getPublicConfig(ORG);
     expect(config.logoUrl).toBe("https://cdn.example/org-logo.png");
+    expect(config.organizationName).toBeNull();
     expect(config.team).toEqual([]);
     expect(mockFindMembers).not.toHaveBeenCalled();
   });
