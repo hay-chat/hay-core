@@ -360,6 +360,25 @@ async function saveConfidenceLog(
  * message yet (widget just opened) only has its needs_processing flag cleared,
  * so no greeting is sent and the sweep stops.
  */
+/**
+ * The visitor's latest message reached Hay, with the AI or in the team's queue:
+ * the widget shows it delivered. Best effort; pass the message when the caller
+ * already read it, so the run's input read stays the only one under the lock.
+ */
+async function ackVisitorMessageDelivered(
+  conversation: Conversation,
+  log: pino.Logger,
+  message?: Message | null,
+): Promise<void> {
+  if (conversation.channel !== "web") return;
+  try {
+    const latest = message === undefined ? await conversation.getLastCustomerMessage() : message;
+    await markVisitorMessageDelivered(conversation, latest);
+  } catch (err) {
+    log.warn({ err }, "Could not mark the visitor's message delivered");
+  }
+}
+
 async function parkForPausedAgent(conversation: Conversation, log: pino.Logger): Promise<void> {
   const lastCustomerMessage = await conversation.getLastCustomerMessage();
   const shouldQueue = !!lastCustomerMessage && conversation.status !== "pending-human";
@@ -443,16 +462,6 @@ export const runConversation = async (conversationId: string) => {
     conversationId: conversation.id,
   });
 
-  // The run has the visitor's latest message: the widget shows it delivered.
-  // Every path below leaves it with the AI or in the team's queue.
-  if (conversation.channel === "web" && conversation.needs_processing) {
-    try {
-      await markVisitorMessageDelivered(conversation, await conversation.getLastCustomerMessage());
-    } catch (err) {
-      log.warn({ err }, "Could not mark the visitor's message delivered");
-    }
-  }
-
   // Suspended organizations keep receiving (and storing) messages but get no
   // AI reply. Clear the flag so the sweep stops re-enqueuing this conversation
   // and the stale-message recovery never escalates it to a human. An open
@@ -465,6 +474,7 @@ export const runConversation = async (conversationId: string) => {
       "Skipping - organization suspended",
     );
     if (conversation.needs_processing) {
+      await ackVisitorMessageDelivered(conversation, log);
       const updates: Partial<Conversation> = { needs_processing: false };
       if (conversation.status === "open") updates.status = "pending-human";
       await conversationRepository.update(conversation.id, conversation.organization_id, updates);
@@ -504,6 +514,7 @@ export const runConversation = async (conversationId: string) => {
     if (withinHours && readHandoffTicket(conversation)?.status !== "requested") {
       log.debug("Skipping - waiting for the team within business hours");
       if (conversation.needs_processing) {
+        await ackVisitorMessageDelivered(conversation, log);
         await conversationRepository.update(conversation.id, conversation.organization_id, {
           needs_processing: false,
         });
@@ -518,6 +529,7 @@ export const runConversation = async (conversationId: string) => {
   // as pending-human so the team sees it, and needs_processing is cleared so
   // the sweep stops re-enqueuing it.
   if (isOrganizationAiPaused(conversation.organization)) {
+    if (conversation.needs_processing) await ackVisitorMessageDelivered(conversation, log);
     await parkForPausedAgent(conversation, log);
     return;
   }
@@ -525,6 +537,7 @@ export const runConversation = async (conversationId: string) => {
   // AI switched off on this channel (D7-14, "start on Web Chat only"): the
   // team answers. No notice to the shopper; test conversations still run.
   if (await isChannelAiOff(conversation)) {
+    if (conversation.needs_processing) await ackVisitorMessageDelivered(conversation, log);
     await parkForTeam(conversation, log);
     return;
   }
@@ -603,6 +616,9 @@ export const runConversation = async (conversationId: string) => {
       await conversation.markProcessed(null);
       throw new Error("Last customer message not found");
     }
+
+    // The run holds the visitor's latest message: the widget shows it delivered.
+    await ackVisitorMessageDelivered(conversation, log, lastCustomerMessage);
 
     // Update processing state to perceiving
     await updateProcessingState(conversation, "perceiving", "Analyzing your message");
