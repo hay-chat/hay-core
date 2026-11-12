@@ -65,7 +65,9 @@
               :class="{ 'hay-chat-header__dot--away': status && !status.online }"
               aria-hidden="true"
             ></span>
-            {{ human ? supportTeam : (status?.text ?? t("widget.defaultSubtitle")) }}
+            <span class="hay-chat-header__subtitle-text">{{
+              human ? supportTeam : (status?.text ?? t("widget.defaultSubtitle"))
+            }}</span>
           </span>
         </div>
 
@@ -527,16 +529,26 @@ onBeforeUnmount(() => restoreScroll?.());
 
 .hay-chat-header__subtitle {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   font-size: 12.5px;
-  white-space: nowrap;
+  min-width: 0;
+}
+
+/* A crowded header (back, team, expand, close) wraps the status to two
+   lines instead of cutting off the reply time. */
+.hay-chat-header__subtitle-text {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .hay-chat-header__dot {
   flex: none;
+  margin-top: 0.4em;
   width: 8px;
   height: 8px;
   border-radius: 50%;
