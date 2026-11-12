@@ -15,7 +15,6 @@
     "users": "Users",
     "sso": "Single sign-on",
     "apiTokens": "API Tokens",
-    "webchat": "Webchat",
     "gitConnections": "Git Connections",
     "llmProviders": "AI Models",
     "customerPrivacy": "Customer Privacy",

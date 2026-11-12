@@ -7,7 +7,7 @@
           <CardDescription>{{ $t("webchat.preChatFormDescription") }}</CardDescription>
         </div>
         <div class="flex items-center gap-2">
-          <Switch id="preChatFormEnabled" v-model:checked="enabled" />
+          <Switch id="preChatFormEnabled" v-model="enabled" />
           <Label for="preChatFormEnabled">{{ $t("common.enabled") }}</Label>
         </div>
       </div>
@@ -50,11 +50,16 @@ const enabled = ref<boolean>(props.modelValue !== null);
 const schema = ref<FormSchema>(props.modelValue ?? emptySchema());
 const errorMessage = ref<string | null>(null);
 
+// The parent echoes every emitted form back as a new object; only a real change (a discard, a
+// reload) replaces the draft, or the two watchers would feed each other forever.
+const same = (a: FormSchema | null, b: FormSchema | null) =>
+  JSON.stringify(a) === JSON.stringify(b);
+
 watch(
   () => props.modelValue,
   (next) => {
     enabled.value = next !== null;
-    if (next) schema.value = next;
+    if (next && !same(next, schema.value)) schema.value = next;
   },
 );
 
@@ -65,14 +70,16 @@ watch(
   () => {
     if (!enabled.value) {
       errorMessage.value = null;
-      emit("update:modelValue", null);
+      if (props.modelValue !== null) emit("update:modelValue", null);
       return;
     }
     const parsed = formSchemaSchema.safeParse(schema.value);
     errorMessage.value = parsed.success
       ? null
       : (parsed.error.issues[0]?.message ?? "Invalid form");
-    if (parsed.success) emit("update:modelValue", parsed.data as FormSchema);
+    if (parsed.success && !same(parsed.data as FormSchema, props.modelValue)) {
+      emit("update:modelValue", parsed.data as FormSchema);
+    }
   },
   { deep: true },
 );

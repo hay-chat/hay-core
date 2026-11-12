@@ -2,9 +2,7 @@ export interface WebchatSnippetInput {
   organizationId: string;
   baseUrl: string;
   widgetTitle: string;
-  widgetSubtitle: string;
   position: string;
-  theme: string;
   /** With Web Chat off there is no greeting to show, so the snippet leaves it out. */
   isEnabled: boolean;
   showGreeting: boolean;
@@ -40,9 +38,7 @@ export function buildWebchatSnippet(input: WebchatSnippetInput): string {
     organizationId: ${jsString(input.organizationId)},
     baseUrl: ${jsString(input.baseUrl)},
     widgetTitle: ${jsString(input.widgetTitle)},
-    widgetSubtitle: ${jsString(input.widgetSubtitle)},
-    position: ${jsString(input.position)},
-    theme: ${jsString(input.theme)}${greetingConfig}
+    position: ${jsString(input.position)}${greetingConfig}
   };
 </${"script"}>
 <${"script"} src="${input.baseUrl}/v1/webchat/widget.js" async></${"script"}>`;

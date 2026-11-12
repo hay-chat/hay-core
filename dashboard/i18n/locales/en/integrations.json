@@ -1,17 +1,18 @@
 {
   "channels": {
     "title": "Channels",
-    "description": "Active communication channels connecting your customers to Hay.chat",
+    "description": "Where your customers can reach you. Each channel brings its conversations to the same inbox.",
     "headTitle": "Channels - Hay.chat",
     "browseMarketplace": "Browse Marketplace",
-    "loading": "Loading channels...",
-    "empty": {
-      "title": "No active channels",
-      "description": "Install a channel integration from the marketplace to start receiving conversations.",
-      "action": "Browse Marketplace"
+    "add": {
+      "title": "Add a channel",
+      "description": "WhatsApp, Instagram, email and more"
     },
-    "actions": {
-      "configure": "Configure"
+    "webchat": {
+      "description": "The chat for your website.",
+      "liveOn": "The chat on your website, {host}.",
+      "notInstalled": "The chat for your website. Add one line of code to go live.",
+      "off": "The chat for your website. It is switched off."
     }
   },
   "marketplace": {

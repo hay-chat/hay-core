@@ -31,7 +31,7 @@ export const board = (overrides: Partial<SetupBoard> = {}): SetupBoard => {
 export const hasRouteAccess = (path: string, role: string | undefined): boolean => {
   const protectedRoutes: Record<string, string[]> = {
     "/setup": ["owner", "admin"],
-    "/settings/webchat": ["owner", "admin"],
+    "/channels": ["owner", "admin"],
     "/integrations/plugins": ["owner", "admin"],
   };
   const match = Object.keys(protectedRoutes).find((route) => path.startsWith(route));

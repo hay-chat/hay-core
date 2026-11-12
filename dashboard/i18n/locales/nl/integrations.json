@@ -1,17 +1,18 @@
 {
   "channels": {
     "title": "Kanalen",
-    "description": "Actieve communicatiekanalen die je klanten met Hay.chat verbinden",
+    "description": "Waar je klanten je kunnen bereiken. Elk kanaal brengt zijn gesprekken naar dezelfde inbox.",
     "headTitle": "Kanalen - Hay.chat",
     "browseMarketplace": "Marketplace bekijken",
-    "loading": "Kanalen laden...",
-    "empty": {
-      "title": "Geen actieve kanalen",
-      "description": "Installeer een kanaalintegratie uit de marketplace om gesprekken te ontvangen.",
-      "action": "Marketplace bekijken"
+    "add": {
+      "title": "Kanaal toevoegen",
+      "description": "WhatsApp, Instagram, e-mail en meer"
     },
-    "actions": {
-      "configure": "Instellen"
+    "webchat": {
+      "description": "De chat voor je website.",
+      "liveOn": "De chat op je website, {host}.",
+      "notInstalled": "De chat voor je website. Voeg één regel code toe om live te gaan.",
+      "off": "De chat voor je website. Hij staat uit."
     }
   },
   "marketplace": {

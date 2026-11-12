@@ -5,9 +5,7 @@ const base = {
   organizationId: "org-1",
   baseUrl: "https://api.hay.test",
   widgetTitle: "Chat with us",
-  widgetSubtitle: "",
   position: "right",
-  theme: "blue",
   isEnabled: true,
   showGreeting: true,
   greetingMessage: "Hello!",
@@ -38,7 +36,7 @@ describe("buildWebchatSnippet", () => {
   it("leaves the greeting out when web chat is off", () => {
     const config = evalConfig(buildWebchatSnippet({ ...base, isEnabled: false }));
     expect(config).not.toHaveProperty("greetingMessage");
-    expect(config.theme).toBe("blue");
+    expect(config.position).toBe("right");
   });
 
   it("loads the widget from the base url", () => {

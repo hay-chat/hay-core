@@ -17,3 +17,23 @@ describe("single sign-on settings", () => {
     expect(roleProtectedRoutes["/settings/sso"]).toEqual(["owner"]);
   });
 });
+
+describe("channels and workspace settings", () => {
+  const tabs = (id: string) =>
+    visibleSettingsTabs(
+      SETTINGS_NAV.find((section) => section.id === id)!,
+      true,
+      true,
+    ).map((tab) => tab.path);
+
+  it("keeps only the channel list under Channels; Webchat has its own page", () => {
+    expect(tabs("channels")).toEqual(["/channels"]);
+    expect(SETTINGS_NAV.flatMap((s) => s.tabs).map((t) => t.path)).not.toContain(
+      "/settings/webchat",
+    );
+  });
+
+  it("lists business hours under Workspace", () => {
+    expect(tabs("workspace")).toContain("/settings/business-hours");
+  });
+});
