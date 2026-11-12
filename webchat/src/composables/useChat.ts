@@ -1,21 +1,23 @@
 import { ref, shallowRef, computed, watch } from "vue";
-import { useWebSocket, type PageToolCall } from "./useWebSocket";
+import { useWebSocket, type PageToolCall, type WidgetEvent } from "./useWebSocket";
 import { executePageTool, listPageTools, pageToolsVersion } from "./usePageTools";
 import { startActivity, endActivity } from "@/utils/agentActivity";
 import { useConversation, WidgetRequestError } from "./useConversation";
 import { useMessageQueue } from "./useMessageQueue";
 import { initContext, getContext } from "./useWidgetContext";
-import {
-  generateKeypair,
-  storeKeypair,
-  getKeypair,
-  createDPoPProof,
-  clearKeypair,
-} from "./useDPoP";
+import { generateKeypair, storeKeypair, getKeypair, createDPoPProof } from "./useDPoP";
 import { safeStorage, useConsent } from "./useConsent";
 import { debugLog } from "@/utils/debug";
 import { resumeConversationId } from "@/utils/resume";
-import type { HayChatConfig, Message, SendFailure, WidgetContribution } from "@/types";
+import type {
+  AgentActivity,
+  HayChatConfig,
+  Message,
+  SendFailure,
+  VisitorConversation,
+  WidgetContribution,
+} from "@/types";
+import type { WidgetAvailability } from "@/utils/availability";
 import { useChallenge } from "./useChallenge";
 import { insertMessage, parseServerTime } from "@/utils/messageOrder";
 import {
@@ -72,6 +74,14 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
   // Server status of the conversation ("pending-human" while it waits for a person).
   const conversationStatus = ref<string | null>(null);
   const contactEmailSaved = ref(false);
+  // What the AI is doing while it runs a tool (agent_activity): the progress
+  // line, then "✓ {done label}" above the reply it led to (keyed by message id).
+  const activity = ref<AgentActivity | null>(null);
+  const doneLabels = ref<Record<string, string>>({});
+  // The visitor's thumbs on AI answers, by message id.
+  const ratings = ref<Record<string, "up" | "down">>({});
+  // The visitor message a person has seen in the inbox (message_read).
+  const readMessageId = ref<string | null>(null);
 
   // Pre-chat form (from the public config): shown instead of the input until
   // the shopper fills it, unless the host context already carries every
@@ -108,7 +118,53 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     disconnect,
     setStatusChangeCallback,
     setToolCallHandler,
+    setWidgetEventHandler,
   } = useWebSocket(config.baseUrl, config.organizationId);
+
+  // Delivery ticks, "Seen" and the AI's progress line (C3).
+  const findVisitorMessage = (serverId: string, clientMessageId?: string) =>
+    messages.value.find(
+      (m) =>
+        m.sender === "user" &&
+        (m.id === serverId ||
+          m.metadata?.serverId === serverId ||
+          (clientMessageId !== undefined && m.metadata?.clientMessageId === clientMessageId)),
+    );
+  const onWidgetEvent = (event: WidgetEvent) => {
+    if (event.type === "agent_activity") {
+      if (event.state === "start") {
+        activity.value = { running: true, label: event.label, doneLabel: event.doneLabel };
+      } else if (activity.value) {
+        activity.value = {
+          ...activity.value,
+          running: false,
+          doneLabel: event.doneLabel || activity.value.doneLabel,
+        };
+      }
+      return;
+    }
+    if (event.type === "message_read") {
+      readMessageId.value = event.messageId;
+      return;
+    }
+    const message = findVisitorMessage(event.messageId, event.clientMessageId);
+    // Never step back from "delivered" when a late "received" arrives.
+    if (!message || message.metadata?.delivery === "delivered") return;
+    message.metadata = { ...message.metadata, serverId: event.messageId, delivery: event.status };
+  };
+  setWidgetEventHandler(onWidgetEvent);
+
+  // The AI's reply after a tool run carries the run's done label.
+  watch(
+    () => messages.value.length,
+    () => {
+      const done = activity.value;
+      const last = messages.value[messages.value.length - 1];
+      if (!done || last?.sender !== "agent" || last.agentType !== "BotAgent") return;
+      if (done.doneLabel) doneLabels.value = { ...doneLabels.value, [last.id]: done.doneLabel };
+      activity.value = null;
+    },
+  );
 
   // Page tools (WebMCP): the host page's tools go up with identify and again
   // whenever the page changes them; a tool_call runs here, under the orange
@@ -573,6 +629,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     // Handle conversation closure
     if (status === "closed" || status === "resolved" || status === "unresolved") {
       isConversationClosed.value = true;
+      activity.value = null;
     }
 
     // Handle conversation reopening
@@ -603,7 +660,11 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
       if (nextMessage) {
         try {
           // Try to send the message again via HTTP
-          await sendMessageInternal(nextMessage.content, nextMessage.conversationId);
+          await sendMessageInternal(
+            nextMessage.content,
+            nextMessage.conversationId,
+            nextMessage.id,
+          );
 
           // Success - remove from queue
           messageQueue.dequeue(nextMessage.id);
@@ -700,29 +761,53 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     isOpen.value = false;
   };
 
-  // Clear conversation and create new one
-  const clearConversation = async () => {
-    if (conversationId.value) {
-      await clearKeypair(conversationId.value);
-    }
-    safeStorage.session.removeItem("hay-conversation-id");
+  // Forget the conversation on screen (not its key).
+  const resetConversationState = () => {
     safeStorage.session.removeItem("hay-last-read-message-id");
     existingConversationId.value = null;
     conversationId.value = null;
     keypair.value = null;
     nonce.value = "";
     messages.value = [];
+    isTyping.value = false;
     isConversationClosed.value = false;
     csatSubmitted.value = false;
     lastReadMessageId.value = null;
     conversationStatus.value = null;
     contactEmailSaved.value = false;
+    currentAgentType.value = "BotAgent";
+    currentAgentName.value = null;
+    activity.value = null;
+    doneLabels.value = {};
+    ratings.value = {};
+    readMessageId.value = null;
+  };
+
+  // Leave the conversation for a new one. Its key stays (behind consent), so
+  // it is listed under "Your conversations" on the home view.
+  const clearConversation = () => {
+    safeStorage.session.removeItem("hay-conversation-id");
+    resetConversationState();
+  };
+
+  // Open one of the visitor's earlier conversations (the home view's list).
+  // Its key is in IndexedDB, so this only works once storage is allowed.
+  const openConversation = async (id: string): Promise<boolean> => {
+    if (id === conversationId.value) return true;
+    await initialize();
+    resetConversationState();
+    safeStorage.session.setItem("hay-conversation-id", id);
+    existingConversationId.value = id;
+    if (!(await loadExistingConversation(id))) return false;
+    // The socket follows the newly opened conversation (identify replaces the old one).
+    await startRealtime();
+    return true;
   };
 
   // Start over after a closed conversation. The new conversation is created
   // when the shopper sends its first message.
-  const startNewConversation = async () => {
-    await clearConversation();
+  const startNewConversation = () => {
+    clearConversation();
     pinGreeting(Date.now());
   };
 
@@ -765,16 +850,22 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
       // destroy and recreate the DOM element, which triggers a visual flash.
       // Just skip the server duplicate; the temp message already shows correctly.
       if (sender === "user") {
+        const clientMessageId = msg.metadata?.clientMessageId;
         const fileNames = (msg.attachments ?? []).map((a: { name: string }) => a.name);
-        const hasTempMatch = messages.value.some(
+        const tempMatch = messages.value.find(
           (m) =>
             m.id.startsWith("temp-") &&
             m.sender === "user" &&
-            (fileNames.length
-              ? (m.attachments ?? []).some((a) => fileNames.includes(a.name))
-              : m.content === msg.content),
+            (typeof clientMessageId === "string"
+              ? m.metadata?.clientMessageId === clientMessageId
+              : fileNames.length
+                ? (m.attachments ?? []).some((a) => fileNames.includes(a.name))
+                : m.content === msg.content),
         );
-        if (hasTempMatch) {
+        if (tempMatch) {
+          if (!tempMatch.metadata?.serverId) {
+            tempMatch.metadata = { ...tempMatch.metadata, serverId: msg.id };
+          }
           continue;
         }
       }
@@ -857,7 +948,11 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
   };
 
   // Internal send function (used by both public sendMessage and retry loop)
-  const sendMessageInternal = async (text: string, convId: string): Promise<void> => {
+  const sendMessageInternal = async (
+    text: string,
+    convId: string,
+    clientMessageId: string,
+  ): Promise<void> => {
     if (!keypair.value) {
       throw new Error("No keypair available");
     }
@@ -882,6 +977,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
       text.trim(),
       proof,
       getContext(),
+      clientMessageId,
     );
 
     if (!result) {
@@ -908,12 +1004,16 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
   // second message must wait for it rather than race it.
   let sendChain: Promise<unknown> = Promise.resolve();
   const sendMessage = (text: string): Promise<void> => {
-    const run = sendChain.then(() => sendMessageNow(text));
+    const run = sendChain.then(() => sendMessageNow(text, 0, newClientMessageId()));
     sendChain = run.catch(() => {});
     return run;
   };
 
-  const sendMessageNow = async (text: string, retryCount: number = 0): Promise<void> => {
+  const sendMessageNow = async (
+    text: string,
+    retryCount: number,
+    tempMessageId: string,
+  ): Promise<void> => {
     if (!text.trim()) return;
 
     // Sending a message is the ePrivacy "service explicitly requested" signal.
@@ -924,14 +1024,13 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
       sendFailure.value = null;
     }
 
-    const tempMessageId = `temp-${Date.now()}`;
     let stage: "create" | "send" = "create";
 
     try {
       // A closed conversation is not reused: the message starts a new one.
       if (isConversationClosed.value && retryCount === 0) {
         debugLog("[Webchat] Conversation closed, starting a new one...");
-        await clearConversation();
+        clearConversation();
         pinGreeting(Date.now());
       }
 
@@ -943,6 +1042,8 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
           sender: "user",
           content: text.trim(),
           timestamp: Date.now(),
+          // Sent along, so the server's acks find this bubble.
+          metadata: { clientMessageId: tempMessageId },
         });
       }
 
@@ -956,7 +1057,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
 
       stage = "send";
 
-      await sendMessageInternal(text.trim(), conversationId.value!);
+      await sendMessageInternal(text.trim(), conversationId.value!, tempMessageId);
 
       // Don't call refreshMessages() here — the bot hasn't responded yet so it's
       // wasted work. The 10-second polling loop and WebSocket handle new messages.
@@ -970,7 +1071,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
         debugLog("[Webchat] Nonce expired, retrying...");
         nonce.value = error.nonce;
         // Retry once with new nonce
-        return sendMessageNow(text, retryCount + 1);
+        return sendMessageNow(text, retryCount + 1, tempMessageId);
       }
 
       console.error("[Webchat] Failed to send message:", error);
@@ -1040,7 +1141,12 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     return run;
   };
 
-  const postAttachment = async (file: File, data: string, caption: string) => {
+  const postAttachment = async (
+    file: File,
+    data: string,
+    caption: string,
+    clientMessageId: string,
+  ) => {
     const url = `${config.baseUrl}/v1/publicConversations.sendAttachment`;
     const proof = await createDPoPProof(
       "POST",
@@ -1058,6 +1164,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
       caption,
       proof,
       context: getContext(),
+      clientMessageId,
     });
     if (result.nonce) nonce.value = result.nonce;
     return result;
@@ -1079,11 +1186,11 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     }
 
     if (isConversationClosed.value) {
-      await clearConversation();
+      clearConversation();
       pinGreeting(Date.now());
     }
 
-    const tempMessageId = `temp-${Date.now()}`;
+    const tempMessageId = newClientMessageId();
     // Photos show from the shopper's own copy straight away (and keep doing
     // so: swapping in the server link would reload the image).
     const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : "";
@@ -1092,7 +1199,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
       sender: "user",
       content: caption,
       timestamp: Date.now(),
-      metadata: { pending: true },
+      metadata: { pending: true, clientMessageId: tempMessageId },
       attachments: [
         { id: tempMessageId, name: file.name, url: previewUrl, type: file.type, size: file.size },
       ],
@@ -1106,18 +1213,20 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
       isSending.value = true;
 
       const data = await readFileAsBase64(file);
-      let result = await postAttachment(file, data, caption);
+      let result = await postAttachment(file, data, caption, tempMessageId);
       if (result.error === "NONCE_EXPIRED") {
-        result = await postAttachment(file, data, caption);
+        result = await postAttachment(file, data, caption, tempMessageId);
       }
       if (result.error || !result.messageId) throw new Error("Failed to send file");
 
       const index = messages.value.findIndex((m) => m.id === tempMessageId);
       if (index !== -1) {
         const stored = result.attachment;
+        // An ack may have come first: keep what it set.
+        const { pending: _pending, ...metadata } = messages.value[index].metadata ?? {};
         messages.value[index] = {
           ...messages.value[index],
-          metadata: { serverId: result.messageId },
+          metadata: { ...metadata, serverId: result.messageId },
           attachments: stored ? [{ ...stored, url: previewUrl || stored.url }] : [],
         };
       }
@@ -1279,6 +1388,41 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     }
   };
 
+  // Thumbs up/down on an AI answer. Shown straight away; taken back if the
+  // server did not save it.
+  const rateMessage = async (
+    messageId: string,
+    rating: "up" | "down",
+    retried = false,
+  ): Promise<boolean> => {
+    if (!conversationId.value || !keypair.value) return false;
+    const before = ratings.value[messageId];
+    ratings.value = { ...ratings.value, [messageId]: rating };
+    const restore = () => {
+      const { [messageId]: _rating, ...rest } = ratings.value;
+      ratings.value = before ? { ...rest, [messageId]: before } : rest;
+    };
+    const url = `${config.baseUrl}/v1/publicConversations.rateMessage`;
+    try {
+      const proof = await createDPoPProof(
+        "POST",
+        url,
+        keypair.value.privateKey,
+        keypair.value.publicJwk,
+        nonce.value || "initial",
+      );
+      const result = await conversation.rateMessage(conversationId.value, messageId, rating, proof);
+      if (result.nonce) nonce.value = result.nonce;
+      if (result.error === "NONCE_EXPIRED" && !retried) return rateMessage(messageId, rating, true);
+      if (!result.saved) restore();
+      return result.saved;
+    } catch (error) {
+      console.error("[Webchat] Failed to rate the answer:", error);
+      restore();
+      return false;
+    }
+  };
+
   // Enhanced disconnect that also stops retry loop and polling
   const disconnectAll = () => {
     disconnect();
@@ -1308,6 +1452,10 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     contactEmailSaved,
     pendingPreChatForm,
     preChatFormSchema,
+    activity,
+    doneLabels,
+    ratings,
+    readMessageId,
 
     // Actions
     initialize,
@@ -1326,7 +1474,62 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     saveContactEmail,
     submitPreChatForm,
     submitInConversationForm,
+    rateMessage,
+    openConversation,
   };
+}
+
+/** What the widget uses of the chat; the dashboard preview stands in a sample one (src/preview.ts). */
+export type WidgetChat = Pick<
+  ReturnType<typeof useChat>,
+  | "isOpen"
+  | "isInitialized"
+  | "conversationId"
+  | "messages"
+  | "isTyping"
+  | "unreadCount"
+  | "isConversationClosed"
+  | "csatSubmitted"
+  | "currentAgentType"
+  | "currentAgentName"
+  | "conversationStatus"
+  | "contactEmailSaved"
+  | "sendFailure"
+  | "challengeHost"
+  | "isChallengeInteractive"
+  | "pendingPreChatForm"
+  | "preChatFormSchema"
+  | "activity"
+  | "doneLabels"
+  | "ratings"
+  | "readMessageId"
+  | "toggleChat"
+  | "openChat"
+  | "closeChat"
+  | "sendMessage"
+  | "sendAttachment"
+  | "submitCsat"
+  | "startTyping"
+  | "stopTyping"
+  | "startNewConversation"
+  | "resumeActiveConversation"
+  | "saveContactEmail"
+  | "submitPreChatForm"
+  | "submitInConversationForm"
+  | "rateMessage"
+  | "openConversation"
+>;
+
+/** Sample content for the dashboard's live preview (src/preview.ts). */
+export interface WidgetPreview {
+  chat: WidgetChat;
+  availability: WidgetAvailability;
+  conversations: VisitorConversation[];
+}
+
+/** A visitor message's id until the server's comes back; also sent as its clientMessageId. */
+function newClientMessageId(): string {
+  return `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 /** "open_conversation" → "Open conversation", for the overlay pill. */

@@ -69,4 +69,21 @@ export default {
   "contact.prompt":
     "Hinterlassen Sie Ihre E-Mail-Adresse, dann antworten wir dort, falls Sie gehen.",
   "attachment.sending": "Wird gesendet…",
+  "home.heading": "Wie können wir helfen?",
+  "home.placeholder": "Stellen Sie uns Ihre Frage…",
+  "home.yourConversations": "Ihre Unterhaltungen",
+  "home.open": "Offen",
+  "home.you": "Sie",
+  "home.otherDevice":
+    "Diese Unterhaltung wurde auf einem anderen Gerät begonnen. Sie können sie dort fortsetzen.",
+  "answer.source": "1 Quelle",
+  "answer.sources": "{n} Quellen",
+  "answer.rate": "War diese Antwort hilfreich?",
+  "answer.helpful": "Hilfreich",
+  "answer.notHelpful": "Nicht hilfreich",
+  "activity.working": "Wird bearbeitet…",
+  "activity.done": "Erledigt",
+  "delivery.received": "Gesendet",
+  "delivery.delivered": "Zugestellt",
+  "delivery.seen": "Gelesen",
 } as const;

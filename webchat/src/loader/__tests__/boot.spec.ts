@@ -376,4 +376,36 @@ describe("widget loader", () => {
     expect(sessionStorage.length).toBe(0);
     expect(localStorage.length).toBe(0);
   });
+
+  it("puts the button in the settings' corner when the page sets none", async () => {
+    mockPublicConfig({ enabled: true, position: "left" });
+    boot({ ...config, loading: "eager" }, fakeChunk().loadChat);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(button()?.classList.contains("hay-chat-button--left")).toBe(true);
+  });
+
+  it("keeps the page's own corner over the settings'", async () => {
+    mockPublicConfig({ enabled: true, position: "left" });
+    boot({ ...config, position: "right", loading: "eager" }, fakeChunk().loadChat);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(button()?.classList.contains("hay-chat-button--left")).toBe(false);
+  });
+
+  it("preview (C4): opens at once on the given config, fetching and storing nothing", async () => {
+    const fetchMock = mockPublicConfig({ enabled: true });
+    const chunk = fakeChunk();
+    const preview = { state: "home", device: "mobile" } as const;
+    const loader = boot({ ...config, brandColor: "#14532d", preview }, chunk.loadChat);
+
+    expect(chunk.loadChat).toHaveBeenCalledTimes(1);
+    await loader.chatReady();
+    expect(chunk.mountChat).toHaveBeenCalledWith(
+      expect.objectContaining({ open: true, publicConfig: null, hostCalls: [] }),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(window.HayChat?.grantConsent).toBeUndefined();
+    expect(document.getElementById("hay-webchat-root")?.hasAttribute("data-preview")).toBe(true);
+    expect(sessionStorage.length).toBe(0);
+    expect(localStorage.length).toBe(0);
+  });
 });

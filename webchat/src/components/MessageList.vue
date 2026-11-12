@@ -20,7 +20,7 @@
           kind="human"
           class="hay-notice__avatar"
           :name="agentFirstName(item.message)"
-          :src="agentAvatarUrl(item.message)"
+          :src="agentAvatarUrl(item.message) ?? teamAvatar(agentFirstName(item.message))"
         />
         <span class="hay-notice__text"
           >{{ notice(item.message).before }}<b>{{ notice(item.message).name }}</b
@@ -37,13 +37,37 @@
           v-if="item.author.kind !== 'visitor'"
           :kind="item.author.kind"
           :name="item.author.kind === 'human' ? item.author.name : assistantName"
-          :src="item.author.kind === 'human' ? item.author.avatarUrl : assistantAvatarUrl"
-          :style="{ marginBottom: lastPartIsBubble(item.messages) ? undefined : '18px' }"
+          :src="
+            item.author.kind === 'human'
+              ? (item.author.avatarUrl ?? teamAvatar(item.author.name))
+              : assistantAvatarUrl
+          "
+          :style="{ marginBottom: avatarLift(item) }"
         />
         <div class="hay-group__body">
           <span v-if="item.author.kind !== 'visitor'" class="hay-group__name">{{
             item.author.kind === "human" ? item.author.name : aiName
           }}</span>
+          <!-- What the AI did before answering (agent_activity) -->
+          <span
+            v-if="item.author.kind === 'ai' && groupDone(item.messages)"
+            class="hay-group__done"
+          >
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+            {{ groupDone(item.messages) }}
+          </span>
           <template v-for="(part, i) in groupParts(item.messages)" :key="part.key">
             <div
               v-if="part.kind === 'text'"
@@ -64,9 +88,15 @@
                 "
               ></div>
               <template v-else>{{ part.text }}</template>
-              <span v-if="part.last" class="hay-bubble__time">{{
-                formatTime(part.message.timestamp)
-              }}</span>
+              <span v-if="part.last" class="hay-bubble__time"
+                >{{ formatTime(part.message.timestamp)
+                }}<template v-if="ticksFor(part.message)"
+                  ><span class="hay-ticks" aria-hidden="true">{{
+                    ticksFor(part.message)!.marks
+                  }}</span
+                  ><span class="hay-sr-only">{{ ticksFor(part.message)!.label }}</span></template
+                ></span
+              >
             </div>
 
             <!-- A markdown image on its own: the image is the bubble -->
@@ -150,14 +180,57 @@
             </div>
           </template>
           <!-- The group ends in something other than a text bubble: its time goes below -->
-          <span v-if="!lastPartIsBubble(item.messages)" class="hay-group__time">{{
-            formatTime(item.messages[item.messages.length - 1].timestamp)
-          }}</span>
+          <span v-if="!lastPartIsBubble(item.messages)" class="hay-group__time"
+            >{{ formatTime(lastOf(item.messages).timestamp)
+            }}<template v-if="ticksFor(lastOf(item.messages))"
+              ><span class="hay-ticks" aria-hidden="true">{{
+                ticksFor(lastOf(item.messages))!.marks
+              }}</span
+              ><span class="hay-sr-only">{{
+                ticksFor(lastOf(item.messages))!.label
+              }}</span></template
+            ></span
+          >
+          <span
+            v-if="item.author.kind === 'visitor' && seenIn(item.messages)"
+            class="hay-group__seen"
+            >{{ t("delivery.seen") }}</span
+          >
+          <AnswerExtras
+            v-if="hasExtras(item)"
+            :sources="groupSources(item.messages)"
+            :rateable="isRateable(item.messages)"
+            :rating="latestAiId ? ratings?.[latestAiId] : null"
+            @rate="(rating) => latestAiId && rate?.(latestAiId, rating)"
+            @vue:mounted="onMediaLoad"
+            @vue:updated="onMediaLoad"
+          />
         </div>
       </div>
     </template>
 
-    <div v-if="isTyping" class="hay-group hay-group--agent">
+    <!-- The AI is running a tool: what it is doing, in place of the typing dots -->
+    <div v-if="activity?.running" class="hay-group hay-group--agent">
+      <Avatar kind="ai" :name="assistantName" :src="assistantAvatarUrl" />
+      <div class="hay-bubble hay-progress">
+        <svg
+          class="hay-progress__spinner"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          aria-hidden="true"
+        >
+          <path d="M21 12a9 9 0 1 1-6.2-8.56" />
+        </svg>
+        <span class="hay-progress__label">{{ activityLabel(activity.label, "working") }}</span>
+      </div>
+    </div>
+
+    <div v-else-if="isTyping" class="hay-group hay-group--agent">
       <Avatar
         :kind="typingHuman ? 'human' : 'ai'"
         :name="typingHuman?.name ?? assistantName"
@@ -177,7 +250,7 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref, watch, nextTick, type Directive } from "vue";
-import type { Message } from "@/types";
+import type { AgentActivity, AnswerSource, Message, TeamMember } from "@/types";
 import {
   parseMarkdown,
   safeHttpUrl,
@@ -187,12 +260,14 @@ import {
 import { useI18n } from "@/i18n";
 import { agentAvatarUrl, agentFirstName, agentNotice, type AgentNotice } from "@/utils/agentNotice";
 import { formatFileSize, isImageAttachment } from "@/utils/attachments";
-import { buildThread } from "@/utils/thread";
+import { buildThread, type ThreadItem } from "@/utils/thread";
 import Avatar from "./Avatar.vue";
 import type { FormResponse, FormSchema } from "@hay/form-schema";
 
 // Forms are rare on a first open, so their code loads only when one shows.
 const FormMessage = defineAsyncComponent(() => import("./FormMessage.vue"));
+// Sources and thumbs: their own chunk too, loaded with the first AI answer.
+const AnswerExtras = defineAsyncComponent(() => import("./AnswerExtras.vue"));
 
 const t = useI18n();
 
@@ -211,6 +286,18 @@ const props = defineProps<{
   typingHuman?: { name: string; avatarUrl: string | null } | null;
   /** BCP 47 locale for the day dividers. */
   locale?: string;
+  /** People who can take over: their photos when a message carries none. */
+  team?: TeamMember[];
+  /** The AI's tool run (agent_activity): the progress line while it runs. */
+  activity?: AgentActivity | null;
+  /** "✓ {done label}" above the AI reply that followed a tool run, by message id. */
+  doneLabels?: Record<string, string>;
+  /** The visitor's thumbs, by message id. */
+  ratings?: Record<string, "up" | "down">;
+  /** The visitor message a person has seen ("Seen" under it). */
+  readMessageId?: string | null;
+  /** Thumbs up/down on the latest AI answer; no thumbs without it. */
+  rate?: (messageId: string, rating: "up" | "down") => void;
 }>();
 
 defineEmits<{
@@ -333,6 +420,94 @@ const displayMessages = computed<Message[]>(() =>
 
 const items = computed(() => buildThread(displayMessages.value));
 
+const lastOf = (messages: Message[]) => messages[messages.length - 1];
+
+const teamAvatar = (name: string | undefined) =>
+  props.team?.find((member) => member.firstName === name)?.avatarUrl ?? null;
+
+// The server's generic labels are English; the widget words them itself.
+const SERVER_DEFAULT_LABELS = { working: "Working on it…", done: "Done" } as const;
+const activityLabel = (label: string, kind: "working" | "done") =>
+  !label || label === SERVER_DEFAULT_LABELS[kind]
+    ? t(kind === "working" ? "activity.working" : "activity.done")
+    : label;
+
+const groupDone = (messages: Message[]): string | null => {
+  const ids = messages.map((m) => props.doneLabels?.[m.id]).filter(Boolean);
+  const label = ids[ids.length - 1];
+  return label ? activityLabel(label, "done") : null;
+};
+
+/** The pages the group's answers used, each once. */
+const groupSources = (messages: Message[]): AnswerSource[] => {
+  const seen = new Set<string>();
+  const sources: AnswerSource[] = [];
+  for (const message of messages) {
+    const list = message.metadata?.sources;
+    if (!Array.isArray(list)) continue;
+    for (const entry of list as Partial<AnswerSource>[]) {
+      const url = safeHttpUrl(entry?.url);
+      if (!url || typeof entry.title !== "string" || seen.has(url)) continue;
+      seen.add(url);
+      sources.push({ title: entry.title, url });
+    }
+  }
+  return sources;
+};
+
+// Thumbs go on the latest AI answer only (not the greeting).
+const latestAiId = computed(() => {
+  for (let i = props.messages.length - 1; i >= 0; i--) {
+    const message = props.messages[i];
+    if (message.agentType === "BotAgent" && !message.isGreeting && message.content?.trim()) {
+      return message.id;
+    }
+  }
+  return null;
+});
+
+const isRateable = (messages: Message[]) =>
+  Boolean(props.rate && latestAiId.value && messages.some((m) => m.id === latestAiId.value));
+
+const hasExtras = (item: Extract<ThreadItem, { type: "group" }>) =>
+  item.author.kind === "ai" &&
+  (groupSources(item.messages).length > 0 || isRateable(item.messages));
+
+// Keep the avatar beside the last bubble, above the time or the extras row.
+const avatarLift = (item: Extract<ThreadItem, { type: "group" }>) => {
+  if (hasExtras(item)) return lastPartIsBubble(item.messages) ? "34px" : "52px";
+  return lastPartIsBubble(item.messages) ? undefined : "18px";
+};
+
+// Delivery of the visitor's last message: ✓ the server has it, ✓✓ delivered.
+const lastVisitorMessage = computed(() => {
+  for (let i = props.messages.length - 1; i >= 0; i--) {
+    if (props.messages[i].sender === "user") return props.messages[i];
+  }
+  return null;
+});
+
+const isSeen = (message: Message) =>
+  props.readMessageId != null &&
+  (message.id === props.readMessageId || message.metadata?.serverId === props.readMessageId);
+
+const seenIn = (messages: Message[]) => {
+  const last = lastVisitorMessage.value;
+  return last !== null && messages.includes(last) && isSeen(last);
+};
+
+const ticksFor = (message: Message): { marks: string; label: string } | null => {
+  if (message !== lastVisitorMessage.value || isSeen(message) || message.metadata?.pending) {
+    return null;
+  }
+  const delivery =
+    message.metadata?.delivery ??
+    (!message.id.startsWith("temp-") || message.metadata?.serverId ? "received" : null);
+  if (delivery === "delivered") return { marks: "✓✓", label: t("delivery.delivered") };
+  if (delivery === "received") return { marks: "✓", label: t("delivery.received") };
+  return null;
+};
+
 const aiName = computed(() =>
   props.aiLabel ? `${props.assistantName} · ${props.aiLabel}` : props.assistantName,
 );
@@ -427,8 +602,9 @@ const formatPrice = (amount?: string | number, currency?: string): string => {
   }
 };
 
-// Images load after the list first scrolls, which would push the newest message out of view.
-// Stay pinned to the bottom while they load, unless the shopper has scrolled up to read.
+// Images (and the answer extras, which load on demand) arrive after the list first scrolls,
+// which would push the newest message out of view. Stay pinned to the bottom while they
+// load, unless the shopper has scrolled up to read.
 const pinnedToBottom = ref(true);
 const onScroll = () => {
   const el = messageListRef.value;
@@ -479,9 +655,9 @@ watch(
   { immediate: true },
 );
 
-// Also scroll when typing indicator changes
+// Also scroll when the typing dots or the progress line come and go
 watch(
-  () => props.isTyping,
+  () => [props.isTyping, props.activity?.running],
   () => {
     scrollToBottom();
   },
@@ -585,6 +761,77 @@ watch(
   padding: 0 4px;
   font-size: 11px;
   color: var(--hay-meta);
+}
+
+.hay-ticks {
+  margin-left: 3px;
+  letter-spacing: -0.12em;
+}
+
+.hay-group__seen {
+  padding: 0 4px;
+  font-size: 11.5px;
+  color: var(--hay-meta);
+}
+
+.hay-group__done {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-left: 4px;
+  font-size: 12px;
+  color: var(--hay-meta);
+}
+
+/* The AI's progress line: spinner arc and a label with a shimmer */
+.hay-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hay-progress__spinner {
+  flex: none;
+  color: var(--hay-ai-fg);
+  animation: hay-spin 0.9s linear infinite;
+}
+
+.hay-progress__label {
+  font-weight: 500;
+  background: linear-gradient(90deg, var(--hay-meta) 0%, var(--hay-text) 45%, var(--hay-meta) 90%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: hay-shimmer 1.6s linear infinite;
+}
+
+@keyframes hay-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes hay-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+/* Reduced motion: a still arc and plain text */
+@media (prefers-reduced-motion: reduce) {
+  .hay-progress__spinner {
+    animation: none;
+  }
+
+  .hay-progress__label {
+    animation: none;
+    background: none;
+    color: var(--hay-text);
+  }
 }
 
 /* Bubbles */

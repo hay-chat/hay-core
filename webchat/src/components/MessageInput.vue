@@ -1,5 +1,5 @@
 <template>
-  <div class="hay-composer">
+  <div class="hay-composer" :class="{ 'hay-composer--home': home }">
     <p v-if="failure" class="hay-composer__error" role="alert">
       {{ t(FAILURE_KEYS[failure.reason]) }}
     </p>
@@ -89,9 +89,9 @@
           v-model="messageText"
           @keydown="handleKeydown"
           @input="handleInput"
-          :placeholder="t('input.placeholder')"
-          :aria-label="t('input.placeholder')"
-          rows="1"
+          :placeholder="placeholder ?? t('input.placeholder')"
+          :aria-label="placeholder ?? t('input.placeholder')"
+          :rows="home ? 2 : 1"
           ref="textareaRef"
           :disabled="!isReady"
           :maxlength="MAX_LENGTH"
@@ -135,6 +135,9 @@ const t = useI18n();
 const props = defineProps<{
   isReady: boolean;
   failure?: SendFailure | null;
+  /** The home view's two-line message box: the buttons sit under the text. */
+  home?: boolean;
+  placeholder?: string;
 }>();
 
 const emit = defineEmits<{
@@ -450,22 +453,36 @@ defineExpose({ focus: () => textareaRef.value?.focus() });
   color: var(--hay-text);
 }
 
+/* Home view: two lines of text, the buttons underneath */
+.hay-composer--home .hay-composer__field {
+  padding: 12px 10px 10px 14px;
+}
+
+.hay-composer--home .hay-composer__row {
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.hay-composer--home .hay-composer__textarea {
+  order: -1;
+  flex-basis: 100%;
+  padding: 0;
+}
+
+.hay-composer--home .hay-composer__attach {
+  margin-left: -6px;
+}
+
 /* Phones: 44px targets */
-@media (max-width: 480px) {
-  .hay-composer__attach,
-  .hay-composer__send {
-    width: 44px;
-    height: 44px;
-  }
+#hay-webchat-root[data-sheet] .hay-composer__attach,
+#hay-webchat-root[data-sheet] .hay-composer__send,
+#hay-webchat-root[data-sheet] .hay-composer__chip-remove {
+  width: 44px;
+  height: 44px;
+}
 
-  .hay-composer__textarea {
-    padding: 12px 0;
-    max-height: 104px;
-  }
-
-  .hay-composer__chip-remove {
-    width: 44px;
-    height: 44px;
-  }
+#hay-webchat-root[data-sheet] .hay-composer:not(.hay-composer--home) .hay-composer__textarea {
+  padding: 12px 0;
+  max-height: 104px;
 }
 </style>

@@ -246,10 +246,8 @@ async function submit() {
   font-size: 11px;
 }
 
-@media (max-width: 480px) {
-  .hay-waiting__button,
-  .hay-waiting__input {
-    min-height: 44px;
-  }
+#hay-webchat-root[data-sheet] .hay-waiting__button,
+#hay-webchat-root[data-sheet] .hay-waiting__input {
+  min-height: 44px;
 }
 </style>
