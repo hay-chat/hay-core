@@ -4,9 +4,11 @@ export interface HayChatConfig {
   organizationId: string;
   baseUrl: string;
   widgetTitle?: string;
-  widgetSubtitle?: string;
   position?: "left" | "right";
-  theme?: "blue" | "green" | "purple" | "black";
+  /** Brand colour ("#rrggbb"); overrides the one in Settings > Webchat (the dashboard preview sets it). */
+  brandColor?: string;
+  /** Light, dark, or following the visitor's system; overrides the one in Settings > Webchat. */
+  themeMode?: ThemeMode;
   showGreeting?: boolean;
   greetingMessage?: string;
   /**
@@ -46,10 +48,8 @@ export interface HayChatConfig {
   onConversationStarted?: (conversation: { id: string }) => void | Promise<void>;
   /** Agent name displayed in the header. Populated from public config. */
   agentName?: string;
-  /** Agent avatar image URL (relative path). Falls back to organizationLogoUrl. */
+  /** The AI assistant's avatar image URL (relative path). Populated from public config. */
   agentAvatarUrl?: string;
-  /** Organization logo URL (relative path). Used as fallback for agent avatar. */
-  organizationLogoUrl?: string;
   /**
    * ePrivacy consent mode for device storage.
    * - `'implicit'` (default): persistent storage (localStorage, IndexedDB) is
@@ -79,12 +79,32 @@ export interface HayChatConfig {
 
 export type LoadingMode = "eager" | "idle" | "interaction";
 
+export type ThemeMode = "light" | "dark" | "system";
+
+/** A person who can take over the conversation, shown in the header. */
+export interface TeamMember {
+  firstName: string;
+  avatarUrl: string | null;
+}
+
 /** `webchat.getPublicConfig` response, fetched by the loader. */
 export interface PublicConfig {
   enabled?: boolean;
+  widgetTitle?: string | null;
+  position?: "left" | "right";
+  showGreeting?: boolean;
+  greetingMessage?: string | null;
   agentName?: string | null;
   agentAvatarUrl?: string | null;
-  organizationLogoUrl?: string | null;
+  /** Hex "#rrggbb"; the widget applies the brand-colour rule (utils/brandColor). */
+  brandColor?: string;
+  themeMode?: ThemeMode;
+  /** The webchat logo, else the organization logo, else null. */
+  logoUrl?: string | null;
+  /** Home view heading; null = the localized default. */
+  homeHeading?: string | null;
+  /** Up to 2 people who can take over (only when handoff is on). */
+  team?: TeamMember[];
   /** Whether AI replies carry the AI label (D14-6). Missing = shown. */
   aiLabelShown?: boolean;
   /** The org's label text; null = the localized default. */
@@ -112,6 +132,8 @@ export interface WidgetContribution {
 export interface LauncherBridge {
   setOpen(open: boolean): void;
   setUnread(count: number): void;
+  /** Focus the button (the chat was closed). */
+  focus(): void;
 }
 
 /**

@@ -1,33 +1,26 @@
 <template>
-  <div class="hay-message-input">
-    <p v-if="failure" class="hay-message-input__error" role="alert">
+  <div class="hay-composer">
+    <p v-if="failure" class="hay-composer__error" role="alert">
       {{ t(FAILURE_KEYS[failure.reason]) }}
     </p>
     <Transition name="hay-counter">
       <span
         v-if="messageText.length > 750"
-        class="hay-message-input__counter"
+        class="hay-composer__counter"
         :class="{
-          'hay-message-input__counter--danger': messageText.length > 900,
-          'hay-message-input__counter--shake': isShaking,
+          'hay-composer__counter--danger': messageText.length > 900,
+          'hay-composer__counter--shake': isShaking,
         }"
       >
         {{ messageText.length }}/{{ MAX_LENGTH }}
       </span>
     </Transition>
-    <div class="hay-message-input__wrapper">
-      <button
-        type="button"
-        @click="fileInputRef?.click()"
-        :disabled="!isReady"
-        class="hay-message-input__attach"
-        :aria-label="t('input.attach')"
-        :title="t('input.attach')"
-      >
+    <div class="hay-composer__field">
+      <!-- The picked file waits here and goes with the next send, the text as its caption -->
+      <div v-if="pendingFile" class="hay-composer__chip">
         <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
+          width="14"
+          height="14"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -36,62 +29,106 @@
           stroke-linejoin="round"
           aria-hidden="true"
         >
-          <path
-            d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"
-          ></path>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <path d="M14 2v6h6" />
         </svg>
-      </button>
-      <input
-        ref="fileInputRef"
-        type="file"
-        :accept="WIDGET_ATTACHMENT_ACCEPT"
-        class="hay-message-input__file"
-        tabindex="-1"
-        aria-hidden="true"
-        @change="handleFile"
-      />
-      <textarea
-        v-model="messageText"
-        @keydown="handleKeydown"
-        @input="handleInput"
-        :placeholder="t('input.placeholder')"
-        rows="1"
-        ref="textareaRef"
-        :disabled="!isReady"
-        :maxlength="MAX_LENGTH"
-        class="hay-message-input__textarea"
-      ></textarea>
-      <button
-        @click="handleSend"
-        :disabled="!messageText.trim() || !isReady"
-        class="hay-message-input__button"
-        :aria-label="t('input.send')"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+        <span class="hay-composer__chip-name">{{ pendingFile.name }}</span>
+        <span class="hay-composer__chip-size">{{ formatFileSize(pendingFile.size) }}</span>
+        <button
+          type="button"
+          class="hay-composer__chip-remove"
+          :aria-label="`${t('input.removeFile')}: ${pendingFile.name}`"
+          @click="removeFile"
         >
-          <line x1="12" y1="19" x2="12" y2="5"></line>
-          <polyline points="5 12 12 5 19 12"></polyline>
-        </svg>
-      </button>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="hay-composer__row">
+        <button
+          type="button"
+          @click="fileInputRef?.click()"
+          :disabled="!isReady"
+          class="hay-composer__attach"
+          :aria-label="t('input.attach')"
+          :title="t('input.attach')"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+        <input
+          ref="fileInputRef"
+          type="file"
+          :accept="WIDGET_ATTACHMENT_ACCEPT"
+          class="hay-composer__file"
+          tabindex="-1"
+          aria-hidden="true"
+          @change="handleFile"
+        />
+        <textarea
+          v-model="messageText"
+          @keydown="handleKeydown"
+          @input="handleInput"
+          :placeholder="t('input.placeholder')"
+          :aria-label="t('input.placeholder')"
+          rows="1"
+          ref="textareaRef"
+          :disabled="!isReady"
+          :maxlength="MAX_LENGTH"
+          class="hay-composer__textarea"
+        ></textarea>
+        <button
+          type="button"
+          @click="handleSend"
+          :disabled="!canSend"
+          class="hay-composer__send"
+          :aria-label="t('input.send')"
+        >
+          <svg
+            width="17"
+            height="17"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 19V5M5 12l7-7 7 7" />
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, watch } from "vue";
+import { computed, ref, nextTick, watch } from "vue";
 import { useI18n } from "@/i18n";
 import type { SendFailure } from "@/types";
 import type { TranslationKey } from "@/i18n";
-import { WIDGET_ATTACHMENT_ACCEPT } from "@/utils/attachments";
+import { WIDGET_ATTACHMENT_ACCEPT, formatFileSize } from "@/utils/attachments";
 
 const t = useI18n();
 
@@ -110,8 +147,13 @@ const emit = defineEmits<{
 
 const MAX_LENGTH = 1000;
 const messageText = ref("");
+const pendingFile = ref<File | null>(null);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
+
+const canSend = computed(
+  () => props.isReady && (pendingFile.value !== null || messageText.value.trim() !== ""),
+);
 
 const FAILURE_KEYS: Record<SendFailure["reason"], TranslationKey> = {
   sendFailed: "error.sendFailed",
@@ -124,6 +166,7 @@ const FAILURE_KEYS: Record<SendFailure["reason"], TranslationKey> = {
 const isShaking = ref(false);
 let shakeTimeout: ReturnType<typeof setTimeout> | null = null;
 
+// Grows with the text up to four lines (max-height in CSS), then scrolls.
 const resizeTextarea = () => {
   if (textareaRef.value) {
     textareaRef.value.style.height = "auto";
@@ -180,65 +223,57 @@ const handleKeydown = (event: KeyboardEvent) => {
   }
 };
 
-// The typed text goes with the file as its caption.
 const handleFile = (event: Event) => {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   input.value = ""; // picking the same file again fires change again
   if (!file || !props.isReady) return;
+  pendingFile.value = file;
+  textareaRef.value?.focus();
+};
 
-  emit("attach", file, messageText.value);
+const removeFile = () => {
+  pendingFile.value = null;
+  textareaRef.value?.focus();
+};
+
+const handleSend = () => {
+  if (!canSend.value) return;
+
+  if (pendingFile.value) emit("attach", pendingFile.value, messageText.value);
+  else emit("send", messageText.value);
   emit("stopTyping");
   messageText.value = "";
+  pendingFile.value = null;
+
   nextTick(() => {
     if (textareaRef.value) textareaRef.value.style.height = "auto";
   });
 };
 
-const handleSend = () => {
-  if (!messageText.value.trim() || !props.isReady) return;
-
-  emit("send", messageText.value);
-  emit("stopTyping");
-  messageText.value = "";
-
-  // Reset textarea height
-  nextTick(() => {
-    if (textareaRef.value) {
-      textareaRef.value.style.height = "auto";
-    }
-  });
-};
+defineExpose({ focus: () => textareaRef.value?.focus() });
 </script>
 
-<style scoped>
-.hay-message-input {
-  padding-inline: 16px;
+<style>
+.hay-composer {
   position: relative;
 }
 
-.hay-message-input__counter {
+.hay-composer__counter {
   position: absolute;
   top: -18px;
-  right: 16px;
+  right: 4px;
   font-size: 11px;
-  color: var(--color-neutral-400);
+  color: var(--hay-meta);
   line-height: 1;
 }
 
-.hay-message-input__error {
-  margin: 0 0 6px;
-  font-size: 12px;
-  line-height: 1.4;
-  color: #b91c1c;
-}
-
-.hay-message-input__counter--danger {
-  color: #ef4444;
+.hay-composer__counter--danger {
+  color: var(--hay-danger);
   font-weight: 600;
 }
 
-.hay-message-input__counter--shake {
+.hay-composer__counter--shake {
   animation: hay-shake 0.4s ease;
 }
 
@@ -274,95 +309,163 @@ const handleSend = () => {
   transform: translateY(100%);
 }
 
-.hay-message-input__wrapper {
+.hay-composer__error {
+  margin: 0 4px 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--hay-danger);
+}
+
+.hay-composer__field {
   display: flex;
-  align-items: center;
-  background: var(--color-neutral-100);
-  border-radius: 8px;
-  padding: 4px 4px 4px 4px;
-  transition: border-color 0.2s;
-  gap: 4px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 6px 6px 8px;
+  border: 1px solid var(--hay-line);
+  border-radius: 16px;
+  background: var(--hay-surface);
 }
 
-.hay-message-input__wrapper:focus-within {
-  border-color: var(--hay-primary);
-  box-shadow: 0 0 0 2px var(--hay-primary);
-  background: transparent;
+.hay-composer__field:focus-within {
+  border-color: var(--hay-accent);
 }
 
-.hay-message-input__textarea {
+.hay-composer__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.hay-composer__textarea {
   flex: 1;
-  border: none;
-  padding: 6px 0;
-  font-size: 14px;
-  font-family: inherit;
+  min-width: 0;
+  /* Four 20px lines at most; centred against the 34px buttons on one line. */
+  max-height: 94px;
+  padding: 7px 0;
+  border: 0;
+  outline: 0;
   resize: none;
-  max-height: 120px;
   overflow-y: auto;
+  background: transparent;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+#hay-webchat-root .hay-composer__textarea:focus-visible {
   outline: none;
-  background: transparent;
 }
 
-.hay-message-input__textarea:focus {
-  outline: none !important;
+.hay-composer__textarea::placeholder {
+  color: var(--hay-meta);
 }
 
-.hay-message-input__textarea:disabled {
-  background: transparent;
+.hay-composer__textarea:disabled {
   cursor: not-allowed;
 }
 
-.hay-message-input__button {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  background: var(--hay-primary);
-  border: none;
-  color: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  flex-shrink: 0;
-  align-self: flex-end;
+.hay-composer__attach,
+.hay-composer__send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
 }
 
-.hay-message-input__button:hover:not(:disabled) {
-  background: var(--hay-primary-dark);
-}
-
-.hay-message-input__attach {
+.hay-composer__attach {
   width: 32px;
-  height: 32px;
-  border-radius: 6px;
+  height: 34px;
+  border-radius: 8px;
   background: transparent;
-  border: none;
-  color: var(--color-neutral-500, #64748b);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  align-self: flex-end;
+  color: var(--hay-meta);
 }
 
-.hay-message-input__attach:hover:not(:disabled) {
-  color: var(--hay-primary);
+.hay-composer__attach:hover:not(:disabled) {
+  color: var(--hay-text);
 }
 
-.hay-message-input__attach:disabled {
-  color: var(--color-neutral-400);
+.hay-composer__send {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: var(--hay-brand);
+  color: var(--hay-on-brand);
+  transition: opacity 0.15s ease;
+}
+
+.hay-composer__send:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.hay-composer__attach:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.hay-message-input__file {
+.hay-composer__file {
   display: none;
 }
 
-.hay-message-input__button:disabled {
+.hay-composer__chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 4px 4px 4px 9px;
+  border-radius: 10px;
+  background: var(--hay-bubble);
+  color: var(--hay-text);
+  font-size: 12.5px;
+}
+
+.hay-composer__chip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.hay-composer__chip-size {
+  flex: none;
+  color: var(--hay-meta);
+}
+
+.hay-composer__chip-remove {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
   background: transparent;
-  color: var(--color-neutral-400);
-  cursor: not-allowed;
+  color: var(--hay-meta);
+}
+
+.hay-composer__chip-remove:hover {
+  color: var(--hay-text);
+}
+
+/* Phones: 44px targets */
+@media (max-width: 480px) {
+  .hay-composer__attach,
+  .hay-composer__send {
+    width: 44px;
+    height: 44px;
+  }
+
+  .hay-composer__textarea {
+    padding: 12px 0;
+    max-height: 104px;
+  }
+
+  .hay-composer__chip-remove {
+    width: 44px;
+    height: 44px;
+  }
 }
 </style>

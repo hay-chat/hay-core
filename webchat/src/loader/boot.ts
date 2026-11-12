@@ -5,6 +5,9 @@ import { launcherLabels } from "./labels";
 import { createLauncher } from "./launcher";
 import { fetchPublicConfig } from "./publicConfig";
 
+/** Longest the button stays hidden waiting for the merchant's colour. */
+const APPEARANCE_WAIT_MS = 2000;
+
 export interface ChatModule {
   mountChat(options: ChatMountOptions): Promise<ChatHandle>;
 }
@@ -58,9 +61,30 @@ export function boot(
     launcher.showTeaser(String(message ?? ""), true);
   };
 
+  const mode = hasConversationInTab() ? "eager" : (config.loading ?? "idle");
+
+  // The button takes the merchant's colour from the settings. When the settings
+  // are fetched straight away (idle, eager) and the page set no colour, the
+  // button waits for them (or APPEARANCE_WAIT_MS) instead of flashing the
+  // default colour first. "interaction" fetches nothing up front, so it paints
+  // at once, in the page's colour or the default.
+  const waitForAppearance = mode !== "interaction" && !config.brandColor;
+  let appearanceTimer: ReturnType<typeof setTimeout> | undefined;
+  if (waitForAppearance) {
+    launcher.setPending(true);
+    appearanceTimer = setTimeout(() => launcher.setPending(false), APPEARANCE_WAIT_MS);
+  }
+
   let publicConfig: Promise<PublicConfig | null> | null = null;
   const getPublicConfig = () =>
     (publicConfig ??= fetchPublicConfig(config).then((settings) => {
+      // The page's own colour and theme win over the settings.
+      launcher.setAppearance(
+        config.brandColor ?? settings?.brandColor,
+        config.themeMode ?? settings?.themeMode,
+      );
+      clearTimeout(appearanceTimer);
+      launcher.setPending(false);
       if (wantsTeaser && !pageSetTeaser && settings?.teaserMessage) {
         launcher.showTeaser(settings.teaserMessage);
       }
@@ -124,7 +148,6 @@ export function boot(
   launcher.button.addEventListener("focus", onIntent, { once: true });
   launcher.button.addEventListener("touchstart", onIntent, { once: true, passive: true });
 
-  const mode = hasConversationInTab() ? "eager" : (config.loading ?? "idle");
   if (mode === "eager") {
     void startChat(true);
   } else if (mode === "idle") {

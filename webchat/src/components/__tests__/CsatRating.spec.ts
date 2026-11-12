@@ -5,7 +5,7 @@ import CsatRating from "../CsatRating.vue";
 import { provideI18n } from "@/i18n";
 
 /**
- * CSAT: the shopper rates the support 1-5 once the conversation has ended.
+ * CSAT: the shopper rates the support 1-5 (five faces) once the conversation has ended.
  */
 
 function mountRating(submit: (rating: number) => Promise<boolean>, submitted = false) {
@@ -25,6 +25,18 @@ describe("CsatRating", () => {
     expect(wrapper.text()).toContain("How did we do?");
     await wrapper.findAll(".hay-csat__option")[3].trigger("click");
     expect(submit).toHaveBeenCalledWith(4);
+  });
+
+  it("labels the faces in words for screen readers", () => {
+    const wrapper = mountRating(vi.fn(async () => true));
+    expect(wrapper.findAll(".hay-csat__option").map((o) => o.attributes("aria-label"))).toEqual([
+      "Very bad",
+      "Bad",
+      "Okay",
+      "Good",
+      "Great",
+    ]);
+    expect(wrapper.find("svg").exists()).toBe(true);
   });
 
   it("lets the shopper pick again when the submit fails", async () => {

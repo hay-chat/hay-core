@@ -28,13 +28,27 @@ export function agentSystemEvent(
   return typeof event === "string" && event in EVENT_KEYS ? (event as AgentSystemEvent) : null;
 }
 
-/** "Marina joined the chat", or null when the message is not an agent event. */
-export function agentNoticeText(
+/** The team member's photo on a HumanAgent reply or an agent event (C3), if any. */
+export function agentAvatarUrl(message: Pick<Message, "metadata">): string | null {
+  const url = message.metadata?.agentAvatarUrl;
+  return typeof url === "string" && url ? url : null;
+}
+
+/** "Marina joined the chat" split around the name, so the name can be bold. */
+export interface AgentNotice {
+  before: string;
+  name: string;
+  after: string;
+}
+
+/** The words of an agent event, or null when the message is not one. */
+export function agentNotice(
   message: Pick<Message, "agentType" | "metadata">,
   t: (key: TranslationKey) => string,
-): string | null {
+): AgentNotice | null {
   const event = agentSystemEvent(message);
   if (!event) return null;
   const name = agentFirstName(message) ?? t("chat.teamMember");
-  return t(EVENT_KEYS[event]).replace("{name}", name);
+  const [before, after = ""] = t(EVENT_KEYS[event]).split("{name}");
+  return { before, name, after };
 }
