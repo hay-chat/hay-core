@@ -34,7 +34,7 @@ const chat = {
 vi.mock("../composables/useChat", () => ({ useChat: () => chat }));
 
 const config = { organizationId: "org-1", baseUrl: "https://api.example.test" };
-const launcher = () => ({ setOpen: vi.fn(), setUnread: vi.fn() });
+const launcher = () => ({ setOpen: vi.fn(), setUnread: vi.fn(), focus: vi.fn() });
 
 describe("Widget", () => {
   beforeEach(() => {
@@ -68,6 +68,17 @@ describe("Widget", () => {
     expect(bridge.setOpen).toHaveBeenLastCalledWith(true);
   });
 
+  it("gives focus back to the button when the chat closes", async () => {
+    const bridge = launcher();
+    shallowMount(Widget, { props: { config, publicConfig: null, launcher: bridge } });
+    chat.isOpen.value = true;
+    await nextTick();
+    expect(bridge.focus).not.toHaveBeenCalled();
+    chat.isOpen.value = false;
+    await nextTick();
+    expect(bridge.focus).toHaveBeenCalledTimes(1);
+  });
+
   it("exposes toggle() for the button", () => {
     const wrapper = shallowMount(Widget, {
       props: { config, publicConfig: null, launcher: launcher() },
@@ -81,7 +92,45 @@ describe("Widget", () => {
     const wrapper = shallowMount(Widget, {
       props: { config, publicConfig: { agentName: "Ana" }, launcher: launcher() },
     });
-    expect(wrapper.findComponent({ name: "ChatWindow" }).props("agentName")).toBe("Ana");
+    expect(wrapper.findComponent({ name: "ChatWindow" }).props("assistantName")).toBe("Ana");
+  });
+
+  it("reads the title, logo and team from the public config (C1)", () => {
+    chat.isOpen.value = true;
+    const window = shallowMount(Widget, {
+      props: {
+        config,
+        publicConfig: {
+          widgetTitle: "Acme Support",
+          logoUrl: "/uploads/logo.png",
+          team: [
+            { firstName: "Marina", avatarUrl: "https://cdn.test/m.png" },
+            { firstName: "Jonas", avatarUrl: null },
+            { firstName: "Third", avatarUrl: null },
+          ],
+        },
+        launcher: launcher(),
+      },
+    }).findComponent({ name: "ChatWindow" });
+    expect(window.props("title")).toBe("Acme Support");
+    expect(window.props("logoUrl")).toBe("https://api.example.test/uploads/logo.png");
+    expect(window.props("team")).toEqual([
+      { firstName: "Marina", avatarUrl: "https://cdn.test/m.png" },
+      { firstName: "Jonas", avatarUrl: null },
+    ]);
+    expect(window.props("assistantName")).toBe("Assistant");
+  });
+
+  it("the page's own title wins over the settings", () => {
+    chat.isOpen.value = true;
+    const window = shallowMount(Widget, {
+      props: {
+        config: { ...config, widgetTitle: "From the page" },
+        publicConfig: { widgetTitle: "From settings" },
+        launcher: launcher(),
+      },
+    }).findComponent({ name: "ChatWindow" });
+    expect(window.props("title")).toBe("From the page");
   });
 
   it("labels AI replies by default, with the org's text, or not at all when hidden", () => {
@@ -91,8 +140,8 @@ describe("Widget", () => {
         .findComponent({ name: "ChatWindow" })
         .props("aiLabel");
 
-    expect(aiLabel(null)).toBe("AI assistant");
-    expect(aiLabel({ aiLabelShown: true, aiLabelText: null })).toBe("AI assistant");
+    expect(aiLabel(null)).toBe("AI");
+    expect(aiLabel({ aiLabelShown: true, aiLabelText: null })).toBe("AI");
     expect(aiLabel({ aiLabelShown: true, aiLabelText: "Aurora bot" })).toBe("Aurora bot");
     expect(aiLabel({ aiLabelShown: false, aiLabelText: "Aurora bot" })).toBeNull();
   });
@@ -120,15 +169,15 @@ describe("Widget", () => {
     });
     chat.isOpen.value = true;
     await vi.waitFor(() =>
-      expect(wrapper.findComponent({ name: "ChatWindow" }).props("availabilityStatus")).toBe(
-        "Open now",
-      ),
+      expect(wrapper.findComponent({ name: "ChatWindow" }).props("status")).toEqual({
+        text: "Typically replies in ~12 min",
+        online: true,
+      }),
     );
     const window = wrapper.findComponent({ name: "ChatWindow" });
     expect(window.props("isWaitingForHuman")).toBe(true);
-    expect(window.props("waitingDetail")).toBe(
-      "We've alerted the team. Usually replies in ~12 min",
-    );
+    expect(window.props("waitingTypical")).toBe("usually ~12 min");
+    expect(window.props("waitingDetail")).toBe("We've alerted the team.");
 
     chat.currentAgentType.value = "HumanAgent" as never;
     await nextTick();

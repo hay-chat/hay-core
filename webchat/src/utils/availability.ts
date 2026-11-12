@@ -42,19 +42,43 @@ export function formatWait(minutes: number, t: Translate): string {
   return t("waiting.hours").replace("{n}", String(Math.round(minutes / 60)));
 }
 
-/** Header line: "Open now" / "Back Mon 09:00". Only for orgs that set business hours. */
+/** The header's status line, with whether the status dot shows "online". */
+export interface HeaderStatus {
+  text: string;
+  online: boolean;
+}
+
+/**
+ * "Typically replies in ~5 min", "Open now" or "Back Mon 09:00"; null when
+ * there is nothing to say (no business hours and no reply-time data).
+ */
 export function headerStatus(
   availability: WidgetAvailability | null,
   t: Translate,
   locale: string,
+): HeaderStatus | null {
+  if (!availability) return null;
+  if (availability.hasSchedule && availability.state === "closed") {
+    const text = availability.nextOpening
+      ? t("availability.backAt").replace("{when}", formatOpening(availability.nextOpening, locale))
+      : t("availability.closed");
+    return { text, online: false };
+  }
+  if (availability.typicalReplyMinutes) {
+    const time = formatWait(availability.typicalReplyMinutes, t);
+    return { text: t("availability.typically").replace("{time}", time), online: true };
+  }
+  if (availability.hasSchedule) return { text: t("availability.open"), online: true };
+  return null;
+}
+
+/** "usually ~5 min" beside "Waiting for a person"; null without data or outside hours. */
+export function waitingTypical(
+  availability: WidgetAvailability | null,
+  t: Translate,
 ): string | null {
-  if (!availability?.hasSchedule) return null;
-  if (availability.state !== "closed") return t("availability.open");
-  if (!availability.nextOpening) return t("availability.closed");
-  return t("availability.backAt").replace(
-    "{when}",
-    formatOpening(availability.nextOpening, locale),
-  );
+  if (!availability?.typicalReplyMinutes || availability.state === "closed") return null;
+  return t("waiting.usually").replace("{time}", formatWait(availability.typicalReplyMinutes, t));
 }
 
 /** The line under "Waiting for a person"; null when there is nothing worth saying. */
@@ -67,12 +91,5 @@ export function waitingDetail(
   if (availability.state === "closed" && availability.nextOpening) {
     return t("waiting.closed").replace("{when}", formatOpening(availability.nextOpening, locale));
   }
-  const typical =
-    availability.state !== "closed" && availability.typicalReplyMinutes
-      ? t("waiting.typical").replace("{time}", formatWait(availability.typicalReplyMinutes, t))
-      : null;
-  if (availability.state === "open_nobody_online") {
-    return typical ? `${t("waiting.alerted")} ${typical}` : t("waiting.alerted");
-  }
-  return typical;
+  return availability.state === "open_nobody_online" ? t("waiting.alerted") : null;
 }

@@ -198,14 +198,14 @@ function formatSubmittedValue(field: FormField): string {
   flex-direction: column;
   gap: 12px;
   padding: 16px;
-  background: #fff;
-  border: 1px solid var(--color-neutral-200);
-  border-radius: 12px;
+  background: var(--hay-surface);
+  border: 1px solid var(--hay-line);
+  border-radius: 16px;
   font-size: 14px;
-  color: var(--color-neutral-900);
+  color: var(--hay-text);
 }
 .hay-form--submitted {
-  background: var(--color-neutral-50);
+  background: var(--hay-raised);
 }
 .hay-form__title {
   font-weight: 600;
@@ -214,7 +214,7 @@ function formatSubmittedValue(field: FormField): string {
 .hay-form__description,
 .hay-form__summary-label {
   font-size: 13px;
-  color: var(--color-neutral-500);
+  color: var(--hay-meta);
 }
 .hay-form__body,
 .hay-form__summary {
@@ -233,11 +233,11 @@ function formatSubmittedValue(field: FormField): string {
 .hay-form__label {
   font-size: 13px;
   font-weight: 500;
-  color: var(--color-neutral-700);
+  color: var(--hay-text);
 }
 .hay-form__required,
 .hay-form__error {
-  color: #ef4444;
+  color: var(--hay-danger);
 }
 .hay-form__error {
   font-size: 12px;
@@ -245,17 +245,17 @@ function formatSubmittedValue(field: FormField): string {
 .hay-form__input {
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid var(--color-neutral-300);
+  border: 1px solid var(--hay-line);
   border-radius: 8px;
   font: inherit;
-  background: #fff;
+  background: var(--hay-surface);
   color: inherit;
   box-sizing: border-box;
 }
 .hay-form__input:focus {
   outline: none;
-  border-color: var(--hay-primary);
-  box-shadow: 0 0 0 2px var(--hay-primary);
+  border-color: var(--hay-accent);
+  box-shadow: 0 0 0 1px var(--hay-accent);
 }
 .hay-form__input--textarea {
   resize: vertical;
@@ -263,7 +263,7 @@ function formatSubmittedValue(field: FormField): string {
 }
 .hay-form__input--error,
 .hay-form__input--error:focus {
-  border-color: #ef4444;
+  border-color: var(--hay-danger);
   box-shadow: none;
 }
 .hay-form__checkbox-row {
@@ -275,10 +275,10 @@ function formatSubmittedValue(field: FormField): string {
 .hay-form__submit {
   margin-top: 4px;
   padding: 10px 16px;
-  background: var(--hay-primary);
-  color: #fff;
+  background: var(--hay-brand);
+  color: var(--hay-on-brand);
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   font: inherit;
   font-weight: 500;
   cursor: pointer;

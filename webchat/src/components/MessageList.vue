@@ -1,152 +1,182 @@
 <template>
-  <div class="hay-message-list" ref="messageListRef" @scroll="onScroll" @load.capture="onMediaLoad">
-    <!-- Greeting Message -->
-    <div v-if="greetingMessage && messages.length === 0" class="hay-message hay-message--agent">
-      <div class="hay-message__content hay-message__content--rich">{{ greetingMessage }}</div>
-    </div>
+  <div
+    ref="messageListRef"
+    class="hay-thread"
+    role="log"
+    aria-live="polite"
+    @scroll="onScroll"
+    @load.capture="onMediaLoad"
+  >
+    <!-- AI disclosure for a new chat (EU AI Act art. 50); hidden when the org hid the AI label -->
+    <p v-if="disclosure" class="hay-thread__disclosure">{{ disclosure }}</p>
 
-    <div
-      v-for="message in messages"
-      :key="message.id"
-      v-height-animate="animateEntranceIds.has(message.id)"
-      class="hay-message"
-      :class="{
-        'hay-message--user': message.sender === 'user',
-        'hay-message--agent': message.sender === 'agent',
-        'hay-message--closure': message.metadata?.isClosureMessage,
-        'hay-message--system': agentNoticeText(message, t) !== null,
-        'hay-message--form': formUi(message) !== null,
-      }"
-    >
-      <!-- A team member joined or left: a centred line, no bubble or time -->
-      <div v-if="agentNoticeText(message, t) !== null" class="hay-message__system">
-        {{ agentNoticeText(message, t) }}
-      </div>
-      <!-- FORM messages: the form itself, or the answers once submitted -->
-      <FormMessage
-        v-else-if="formUi(message)"
-        :schema="formUi(message)!.schema!"
-        :submitted="formUi(message)!.status === 'SUBMITTED'"
-        :submitted-response="formUi(message)!.response"
-        @submit="(response) => $emit('submitForm', message.id, response)"
-      />
-      <template v-else>
-        <!-- AI disclosure (EU AI Act art. 50): label on every AI reply unless the org hid it -->
-        <div v-if="aiLabel && message.agentType === 'BotAgent'" class="hay-message__ai-badge">
-          {{ aiLabel }}
-        </div>
-        <div v-if="message.metadata?.isClosureMessage" class="hay-message__closure-badge">
-          {{ t("chat.conversationClosed") }}
-        </div>
-        <!-- Product recommendation cards -->
-        <template
-          v-if="
-            message.agentType === 'ProductRecommendation' &&
-            message.metadata &&
-            Array.isArray((message.metadata as any).productRecommendation?.products)
-          "
+    <template v-for="item in items" :key="item.key">
+      <div v-if="item.type === 'day'" class="hay-thread__day">{{ dayLabel(item.timestamp) }}</div>
+
+      <!-- A team member joined or left: a centred pill -->
+      <div v-else-if="item.type === 'notice'" class="hay-notice">
+        <Avatar
+          v-if="agentFirstName(item.message) || agentAvatarUrl(item.message)"
+          kind="human"
+          class="hay-notice__avatar"
+          :name="agentFirstName(item.message)"
+          :src="agentAvatarUrl(item.message)"
+        />
+        <span class="hay-notice__text"
+          >{{ notice(item.message).before }}<b>{{ notice(item.message).name }}</b
+          >{{ notice(item.message).after }}</span
         >
-          <div class="hay-message__content hay-message__content--rich">
-            <div class="hay-product-recs">
-              <a
-                v-for="p in (message.metadata as any).productRecommendation.products as any[]"
-                :key="p.id || p.externalId"
-                :href="safeHttpUrl(p.sourceUrl) ?? '#'"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="hay-product-card"
-              >
-                <div class="hay-product-card__image">
-                  <img v-if="p.imageUrl" :src="p.imageUrl" :alt="p.title" loading="lazy" />
-                </div>
-                <div class="hay-product-card__body">
-                  <div class="hay-product-card__title">{{ p.title }}</div>
-                  <div v-if="p.topVariant?.price" class="hay-product-card__price">
-                    {{ formatPrice(p.topVariant.price, p.topVariant.currency) }}
-                  </div>
-                  <div v-if="p.available === false" class="hay-product-card__oos">Out of stock</div>
-                </div>
-              </a>
-            </div>
-          </div>
-        </template>
-        <!-- Agent messages: one bubble per image segment (word-reveal only when a
-           single, image-free segment). -->
-        <template v-else-if="message.sender === 'agent'">
-          <div
-            v-for="(segment, i) in showsText(message) ? splitMarkdownImages(message.content) : []"
-            :key="i"
-            class="hay-message__content hay-message__content--rich"
-            :class="{ 'hay-message__content--image': isImageSegment(segment) }"
-          >
-            <div
-              v-if="
-                animatingIds.has(message.id) && splitMarkdownImages(message.content).length === 1
-              "
-              v-html="getAnimatedHtml(segment, approvedImages(message))"
-            ></div>
-            <div v-else v-html="renderMarkdown(segment, approvedImages(message))"></div>
-          </div>
-        </template>
-        <!-- User messages: plain text -->
-        <template v-else-if="showsText(message)">
-          <div class="hay-message__content">{{ message.content }}</div>
-        </template>
-        <!-- Files: photos inline, other files as a link (signed, expiring URLs) -->
-        <div v-if="message.attachments?.length" class="hay-message__attachments">
-          <template v-for="attachment in message.attachments" :key="attachment.id">
-            <a
-              v-if="isImageAttachment(attachment.type) && attachment.url"
-              :href="attachment.url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="hay-message__attachment-image"
-              :class="{ 'hay-message__attachment--pending': message.metadata?.pending }"
-            >
-              <img :src="attachment.url" :alt="attachment.name || t('attachment.photo')" />
-            </a>
-            <a
-              v-else-if="attachment.url"
-              :href="attachment.url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="hay-message__attachment-file"
-            >
-              <span class="hay-message__attachment-name">{{
-                attachment.name || t("attachment.file")
-              }}</span>
-              <span class="hay-message__attachment-size">{{
-                formatFileSize(attachment.size)
-              }}</span>
-            </a>
-            <span v-else class="hay-message__attachment-file">
-              <span class="hay-message__attachment-name">{{
-                attachment.name || t("attachment.file")
-              }}</span>
-              <span class="hay-message__attachment-size">{{
-                message.metadata?.pending
-                  ? t("attachment.sending")
-                  : formatFileSize(attachment.size)
-              }}</span>
-            </span>
-          </template>
-        </div>
-        <div class="hay-message__time">{{ timeLabel(message) }}</div>
-      </template>
-    </div>
+      </div>
 
-    <div v-if="isTyping" class="hay-message hay-message--agent">
-      <div class="hay-message__content hay-message__typing">
-        <span></span>
-        <span></span>
-        <span></span>
+      <div
+        v-else
+        class="hay-group"
+        :class="item.author.kind === 'visitor' ? 'hay-group--visitor' : 'hay-group--agent'"
+      >
+        <Avatar
+          v-if="item.author.kind !== 'visitor'"
+          :kind="item.author.kind"
+          :name="item.author.kind === 'human' ? item.author.name : assistantName"
+          :src="item.author.kind === 'human' ? item.author.avatarUrl : assistantAvatarUrl"
+          :style="{ marginBottom: lastPartIsBubble(item.messages) ? undefined : '18px' }"
+        />
+        <div class="hay-group__body">
+          <span v-if="item.author.kind !== 'visitor'" class="hay-group__name">{{
+            item.author.kind === "human" ? item.author.name : aiName
+          }}</span>
+          <template v-for="(part, i) in groupParts(item.messages)" :key="part.key">
+            <div
+              v-if="part.kind === 'text'"
+              v-height-animate="animateEntranceIds.has(part.message.id)"
+              class="hay-bubble"
+              :class="{
+                'hay-bubble--follow': i > 0,
+                'hay-bubble--rich': part.message.sender === 'agent',
+              }"
+            >
+              <div
+                v-if="part.message.sender === 'agent'"
+                class="hay-bubble__text"
+                v-html="
+                  animatingIds.has(part.message.id) && part.single
+                    ? getAnimatedHtml(part.text, approvedImages(part.message))
+                    : parseMarkdown(part.text, approvedImages(part.message))
+                "
+              ></div>
+              <template v-else>{{ part.text }}</template>
+              <span v-if="part.last" class="hay-bubble__time">{{
+                formatTime(part.message.timestamp)
+              }}</span>
+            </div>
+
+            <!-- A markdown image on its own: the image is the bubble -->
+            <div
+              v-else-if="part.kind === 'image'"
+              v-height-animate="animateEntranceIds.has(part.message.id)"
+              class="hay-bubble hay-bubble--rich hay-bubble--image"
+              v-html="parseMarkdown(part.text, approvedImages(part.message))"
+            ></div>
+
+            <!-- Product recommendation cards -->
+            <div
+              v-else-if="part.kind === 'products'"
+              class="hay-bubble hay-bubble--rich hay-bubble--follow"
+            >
+              <div class="hay-product-recs">
+                <a
+                  v-for="p in part.products"
+                  :key="p.id || p.externalId"
+                  :href="safeHttpUrl(p.sourceUrl) ?? '#'"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="hay-product-card"
+                >
+                  <div class="hay-product-card__image">
+                    <img v-if="p.imageUrl" :src="p.imageUrl" :alt="p.title" loading="lazy" />
+                  </div>
+                  <div class="hay-product-card__body">
+                    <div class="hay-product-card__title">{{ p.title }}</div>
+                    <div v-if="p.topVariant?.price" class="hay-product-card__price">
+                      {{ formatPrice(p.topVariant.price, p.topVariant.currency) }}
+                    </div>
+                    <div v-if="p.available === false" class="hay-product-card__oos">
+                      Out of stock
+                    </div>
+                  </div>
+                </a>
+              </div>
+            </div>
+
+            <!-- FORM messages: the form itself, or the answers once submitted -->
+            <FormMessage
+              v-else-if="part.kind === 'form'"
+              :schema="part.form.schema!"
+              :submitted="part.form.status === 'SUBMITTED'"
+              :submitted-response="part.form.response"
+              @submit="(response) => $emit('submitForm', part.message.id, response)"
+            />
+
+            <!-- Files: photos inline, other files as a link (signed, expiring URLs) -->
+            <div v-else class="hay-message__attachments">
+              <template v-for="attachment in part.message.attachments" :key="attachment.id">
+                <a
+                  v-if="isImageAttachment(attachment.type) && attachment.url"
+                  :href="attachment.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="hay-message__attachment-image"
+                  :class="{ 'hay-message__attachment--pending': part.message.metadata?.pending }"
+                >
+                  <img :src="attachment.url" :alt="attachment.name || t('attachment.photo')" />
+                </a>
+                <component
+                  :is="attachment.url ? 'a' : 'span'"
+                  v-else
+                  :href="attachment.url || undefined"
+                  :target="attachment.url ? '_blank' : undefined"
+                  :rel="attachment.url ? 'noopener noreferrer' : undefined"
+                  class="hay-message__attachment-file"
+                >
+                  <span class="hay-message__attachment-name">{{
+                    attachment.name || t("attachment.file")
+                  }}</span>
+                  <span class="hay-message__attachment-size">{{
+                    part.message.metadata?.pending && !attachment.url
+                      ? t("attachment.sending")
+                      : formatFileSize(attachment.size)
+                  }}</span>
+                </component>
+              </template>
+            </div>
+          </template>
+          <!-- The group ends in something other than a text bubble: its time goes below -->
+          <span v-if="!lastPartIsBubble(item.messages)" class="hay-group__time">{{
+            formatTime(item.messages[item.messages.length - 1].timestamp)
+          }}</span>
+        </div>
+      </div>
+    </template>
+
+    <div v-if="isTyping" class="hay-group hay-group--agent">
+      <Avatar
+        :kind="typingHuman ? 'human' : 'ai'"
+        :name="typingHuman?.name ?? assistantName"
+        :src="typingHuman ? typingHuman.avatarUrl : assistantAvatarUrl"
+      />
+      <div class="hay-bubble hay-typing">
+        <span class="hay-typing__dot" aria-hidden="true"></span>
+        <span class="hay-typing__dot" aria-hidden="true"></span>
+        <span class="hay-typing__dot" aria-hidden="true"></span>
+        <span class="hay-sr-only">{{
+          t("chat.typing").replace("{name}", typingHuman?.name ?? assistantName)
+        }}</span>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, ref, watch, nextTick, type Directive } from "vue";
+import { computed, defineAsyncComponent, ref, watch, nextTick, type Directive } from "vue";
 import type { Message } from "@/types";
 import {
   parseMarkdown,
@@ -155,8 +185,10 @@ import {
   splitMarkdownImages,
 } from "@/utils/markdown";
 import { useI18n } from "@/i18n";
-import { agentFirstName, agentNoticeText } from "@/utils/agentNotice";
+import { agentAvatarUrl, agentFirstName, agentNotice, type AgentNotice } from "@/utils/agentNotice";
 import { formatFileSize, isImageAttachment } from "@/utils/attachments";
+import { buildThread } from "@/utils/thread";
+import Avatar from "./Avatar.vue";
 import type { FormResponse, FormSchema } from "@hay/form-schema";
 
 // Forms are rare on a first open, so their code loads only when one shows.
@@ -168,8 +200,17 @@ const props = defineProps<{
   messages: Message[];
   isTyping: boolean;
   greetingMessage?: string;
-  /** Label on AI replies; null or empty hides it. */
+  /** The AI's name on its message groups, e.g. "Acme assistant". */
+  assistantName: string;
+  assistantAvatarUrl?: string | null;
+  /** Label after the AI's name ("· AI"); null or empty hides it. */
   aiLabel?: string | null;
+  /** Line above a new chat saying the AI answers; null hides it. */
+  disclosure?: string | null;
+  /** The person who has taken over, for the typing bubble; null while the AI answers. */
+  typingHuman?: { name: string; avatarUrl: string | null } | null;
+  /** BCP 47 locale for the day dividers. */
+  locale?: string;
 }>();
 
 defineEmits<{
@@ -183,11 +224,132 @@ interface FormUi {
   response?: FormResponse;
 }
 
+interface ProductCard {
+  id?: string;
+  externalId?: string;
+  title?: string;
+  imageUrl?: string;
+  sourceUrl?: string;
+  available?: boolean;
+  topVariant?: { price?: string | number; currency?: string };
+}
+
+type Part =
+  | {
+      kind: "text" | "image";
+      key: string;
+      message: Message;
+      text: string;
+      /** The message is this one segment (the word reveal runs only then). */
+      single: boolean;
+      /** The group's last bubble: it carries the time. */
+      last?: boolean;
+    }
+  | { kind: "products"; key: string; message: Message; products: ProductCard[] }
+  | { kind: "form"; key: string; message: Message; form: FormUi }
+  | { kind: "files"; key: string; message: Message };
+
 /** The form carried by a FORM message (server `metadata.ui`), or null. */
 function formUi(message: Message): FormUi | null {
   const ui = message.metadata?.ui as FormUi | undefined;
   return ui?.kind === "form" && ui.schema ? ui : null;
 }
+
+function productsOf(message: Message): ProductCard[] | null {
+  if (message.agentType !== "ProductRecommendation") return null;
+  const recommendation = message.metadata?.productRecommendation as
+    { products?: unknown } | undefined;
+  return Array.isArray(recommendation?.products)
+    ? (recommendation.products as ProductCard[])
+    : null;
+}
+
+// A "[Customer sent a photo]" line is for the AI; the shopper sees the photo.
+const showsText = (message: Message): boolean => {
+  if (!message.content) return false;
+  return !(message.metadata?.mediaPlaceholder === true && message.attachments?.length);
+};
+
+const isImageSegment = (segment: string): boolean =>
+  /^!\[[^\]]*\]\([^)]*\)\s*$/.test(segment.trim());
+
+/** What one message shows, in order: its bubbles, products, form and files. */
+function partsOf(message: Message): Part[] {
+  const parts: Part[] = [];
+  const form = formUi(message);
+  const products = productsOf(message);
+  if (form) {
+    parts.push({ kind: "form", key: `${message.id}-form`, message, form });
+  } else if (products) {
+    parts.push({ kind: "products", key: `${message.id}-products`, message, products });
+  } else if (showsText(message)) {
+    // Agent replies: one bubble per image segment (word reveal only for a
+    // single, image-free segment). The shopper's own text is never markdown.
+    const segments =
+      message.sender === "agent" ? splitMarkdownImages(message.content) : [message.content];
+    segments.forEach((text, i) =>
+      parts.push({
+        kind: message.sender === "agent" && isImageSegment(text) ? "image" : "text",
+        key: `${message.id}-${i}`,
+        message,
+        text,
+        single: segments.length === 1,
+      }),
+    );
+  }
+  if (message.attachments?.length) {
+    parts.push({ kind: "files", key: `${message.id}-files`, message });
+  }
+  return parts;
+}
+
+/** A group's parts; the time sits inside its last bubble when that is text. */
+function groupParts(messages: Message[]): Part[] {
+  const parts = messages.flatMap(partsOf);
+  const last = parts[parts.length - 1];
+  if (last?.kind === "text") parts[parts.length - 1] = { ...last, last: true };
+  return parts;
+}
+
+const lastPartIsBubble = (messages: Message[]) => {
+  const parts = partsOf(messages[messages.length - 1]);
+  return parts[parts.length - 1]?.kind === "text";
+};
+
+// With nothing sent yet, the greeting stands in as the first AI message.
+const displayMessages = computed<Message[]>(() =>
+  props.messages.length === 0 && props.greetingMessage
+    ? [
+        {
+          id: "greeting",
+          sender: "agent",
+          content: props.greetingMessage,
+          timestamp: Date.now(),
+          isGreeting: true,
+        },
+      ]
+    : props.messages,
+);
+
+const items = computed(() => buildThread(displayMessages.value));
+
+const aiName = computed(() =>
+  props.aiLabel ? `${props.assistantName} · ${props.aiLabel}` : props.assistantName,
+);
+
+const notice = (message: Message): AgentNotice =>
+  agentNotice(message, t) ?? { before: "", name: "", after: "" };
+
+const dayLabel = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) return t("chat.today");
+  return new Intl.DateTimeFormat(props.locale, {
+    day: "numeric",
+    month: "short",
+    year: date.getFullYear() === now.getFullYear() ? undefined : "numeric",
+  }).format(date);
+};
 
 const messageListRef = ref<HTMLElement | null>(null);
 const seenIds = new Set<string>(props.messages.map((m) => m.id));
@@ -221,19 +383,15 @@ const scrollDuringAnimation = (animation: Animation) => {
   requestAnimationFrame(tick);
 };
 
+const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
 // Height animation directive for new messages on mount
 const vHeightAnimate: Directive<HTMLElement, boolean> = {
   mounted(el, binding) {
-    if (!binding.value) return;
+    if (!binding.value || reducedMotion() || typeof el.animate !== "function") return;
     const animation = animateHeight(el);
     scrollDuringAnimation(animation);
   },
-};
-
-// A "[Customer sent a photo]" line is for the AI; the shopper sees the photo.
-const showsText = (message: Message): boolean => {
-  if (!message.content) return false;
-  return !(message.metadata?.mediaPlaceholder === true && message.attachments?.length);
 };
 
 // The images the server cleared for this reply; anything else is shown as a link.
@@ -241,13 +399,6 @@ const approvedImages = (message: Message): string[] => {
   const approved = message.metadata?.approvedImages;
   return Array.isArray(approved) ? approved.filter((url) => typeof url === "string") : [];
 };
-
-const renderMarkdown = (content: string, approved: readonly string[]): string => {
-  return parseMarkdown(content, approved);
-};
-
-const isImageSegment = (segment: string): boolean =>
-  /^!\[[^\]]*\]\([^)]*\)\s*$/.test(segment.trim());
 
 const getAnimatedHtml = (content: string, approved: readonly string[]): string => {
   const parsed = parseMarkdown(content, approved);
@@ -259,12 +410,6 @@ const formatTime = (timestamp: number) => {
   const hours = date.getHours().toString().padStart(2, "0");
   const minutes = date.getMinutes().toString().padStart(2, "0");
   return `${hours}:${minutes}`;
-};
-
-// "10:42 · Marina" on a team member's reply, so the shopper knows it is a person
-const timeLabel = (message: Message) => {
-  const name = message.agentType === "HumanAgent" ? agentFirstName(message) : undefined;
-  return name ? `${formatTime(message.timestamp)} · ${name}` : formatTime(message.timestamp);
 };
 
 const formatPrice = (amount?: string | number, currency?: string): string => {
@@ -314,7 +459,7 @@ watch(
     }
 
     // Only animate when a single message arrives (not bulk loads like history)
-    if (newMessages.length === 1) {
+    if (newMessages.length === 1 && !reducedMotion()) {
       const msg = newMessages[0];
       animateEntranceIds.add(msg.id);
 
@@ -344,86 +489,208 @@ watch(
 </script>
 
 <style>
-.hay-message-list {
+.hay-thread {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 16px;
+  padding: 16px 14px 12px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-
-.hay-message-list__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--color-neutral-400);
   gap: 12px;
 }
 
-.hay-message-list__empty p {
-  margin: 0;
-  font-size: 14px;
+/* Push a short conversation to the bottom, next to the composer. */
+.hay-thread > :first-child {
+  margin-top: auto;
 }
 
-.hay-message {
-  max-width: 80%;
+.hay-thread__disclosure {
+  align-self: center;
+  max-width: 290px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--hay-meta);
+  text-align: center;
+}
+
+.hay-thread__day {
+  align-self: center;
+  font-size: 12px;
+  color: var(--hay-meta);
+}
+
+/* Join / leave notices */
+.hay-notice {
+  align-self: center;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 92%;
+  padding: 4px 12px 4px 4px;
+  border-radius: 999px;
+  background: var(--hay-bubble);
+  font-size: 12.5px;
+  color: var(--hay-meta);
+}
+
+.hay-notice__avatar {
+  width: 22px;
+  height: 22px;
+  font-size: 10.5px;
+}
+
+.hay-notice b {
+  font-weight: 600;
+  color: var(--hay-text);
+}
+
+/* Message groups: one avatar (beside the last bubble) and one name line */
+.hay-group {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  max-width: 100%;
+}
+
+.hay-group--visitor {
+  align-self: flex-end;
+  max-width: 78%;
+}
+
+.hay-group__body {
   display: flex;
   flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  max-width: 82%;
 }
 
-.hay-message--user {
-  align-self: flex-end;
+.hay-group--visitor .hay-group__body {
+  max-width: 100%;
+  align-items: flex-end;
 }
 
-.hay-message--agent {
-  align-self: flex-start;
+.hay-group--agent .hay-group__body {
+  align-items: flex-start;
 }
 
-.hay-message__content {
-  border-radius: 12px;
-  font-size: 14px;
-  line-height: 1.5;
-  word-wrap: break-word;
+.hay-group__name {
+  padding-left: 4px;
+  font-size: 12px;
+  color: var(--hay-meta);
 }
 
-.hay-message--user .hay-message__content {
-  background: var(--hay-primary);
-  color: white;
-  border-bottom-right-radius: 4px;
+.hay-group__time {
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--hay-meta);
+}
+
+/* Bubbles */
+.hay-bubble {
+  max-width: 100%;
+  padding: 9px 12px;
+  border-radius: 16px 16px 16px 6px;
+  background: var(--hay-bubble);
+  color: var(--hay-text);
+  overflow-wrap: anywhere;
+}
+
+.hay-bubble--follow {
+  border-top-left-radius: 6px;
+}
+
+.hay-group--visitor .hay-bubble {
+  border-radius: 16px 16px 6px 16px;
+  background: var(--hay-brand);
+  color: var(--hay-on-brand);
   white-space: pre-wrap;
-  padding: 10px 14px;
 }
 
-.hay-message--agent .hay-message__content {
-  color: var(--color-neutral-800);
-  border-bottom-left-radius: 4px;
+.hay-group--visitor .hay-bubble--follow {
+  border-top-right-radius: 6px;
 }
 
+/* The time sits at the end of the last line, inside the bubble. */
+.hay-bubble__time {
+  float: right;
+  margin: 6px 0 0 10px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--hay-meta);
+  white-space: nowrap;
+}
+
+.hay-group--visitor .hay-bubble__time {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.hay-bubble__text,
+.hay-bubble__text > p:last-child {
+  display: inline;
+}
+
+.hay-bubble--image {
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+/* Markdown inside bubbles */
+.hay-bubble--rich img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+}
+
+.hay-bubble--rich a {
+  color: var(--hay-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.hay-bubble--rich strong {
+  font-weight: 600;
+}
+
+.hay-bubble--rich code {
+  background: var(--hay-surface);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
+
+.hay-bubble--rich ul,
+.hay-bubble--rich ol {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.hay-bubble--rich li {
+  margin: 2px 0;
+}
+
+.hay-bubble--rich p {
+  margin: 0 0 8px;
+}
+
+/* Files */
 .hay-message__attachments {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-top: 6px;
-}
-
-.hay-message--user .hay-message__attachments {
-  align-items: flex-end;
-}
-
-.hay-message__attachments:first-child {
-  margin-top: 0;
+  align-items: inherit;
 }
 
 .hay-message__attachment-image img {
   display: block;
   max-width: 220px;
   max-height: 260px;
-  width: auto;
-  height: auto;
-  border-radius: 12px;
+  border-radius: 14px;
   object-fit: cover;
 }
 
@@ -437,16 +704,16 @@ watch(
   gap: 2px;
   max-width: 240px;
   padding: 8px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--color-neutral-200, #e2e8f0);
-  background: var(--color-neutral-50, #f8fafc);
-  color: var(--color-neutral-800);
+  border-radius: 14px;
+  border: 1px solid var(--hay-line);
+  background: var(--hay-raised);
+  color: var(--hay-text);
   font-size: 13px;
   text-decoration: none;
 }
 
 a.hay-message__attachment-file:hover {
-  border-color: var(--hay-primary);
+  border-color: var(--hay-accent);
 }
 
 .hay-message__attachment-name {
@@ -458,94 +725,7 @@ a.hay-message__attachment-file:hover {
 
 .hay-message__attachment-size {
   font-size: 11px;
-  color: var(--color-neutral-500, #64748b);
-}
-
-/* Stacked segment bubbles (one per image) read as separate messages. */
-.hay-message__content + .hay-message__content {
-  margin-top: 6px;
-}
-
-/* Markdown images render as their own block, sized to the bubble. */
-.hay-message__content--rich img {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  border-radius: 8px;
-}
-
-/* Image-only bubbles: no padding, a 4px blue border, blue background. */
-.hay-message__content--image {
-  padding: 0;
-  border: 4px solid var(--hay-primary);
-  background: var(--hay-primary);
-  overflow: hidden;
-}
-
-.hay-message__content--image img {
-  border-radius: 0;
-}
-
-/* Markdown content styles (using since v-html bypasses scoped styles) */
-.hay-message__content--rich a {
-  color: var(--hay-primary);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.hay-message__content--rich a:hover {
-  opacity: 0.8;
-}
-
-.hay-message__content--rich strong {
-  font-weight: 600;
-}
-
-.hay-message__content--rich code {
-  background: var(--color-neutral-100);
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-size: 13px;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
-}
-
-.hay-message__content--rich ul,
-.hay-message__content--rich ol {
-  margin: 4px 0;
-  padding-left: 20px;
-}
-
-.hay-message__content--rich li {
-  margin: 2px 0;
-}
-
-.hay-message__content--rich p {
-  margin: 0;
-}
-
-.hay-message__content--rich p:not(:last-child):not(:only-child) {
-  margin-bottom: 12px;
-}
-
-.hay-message__ai-badge {
-  align-self: flex-start;
-  margin-bottom: 4px;
-  padding: 1px 8px;
-  border: 1px solid var(--color-neutral-200);
-  border-radius: 999px;
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--color-neutral-500);
-}
-
-.hay-message__time {
-  font-size: 11px;
-  color: var(--color-neutral-400);
-  margin-top: 4px;
-}
-
-.hay-message--user .hay-message__time {
-  text-align: right;
+  color: var(--hay-meta);
 }
 
 /* Word-by-word reveal animation */
@@ -565,68 +745,40 @@ a.hay-message__attachment-file:hover {
   }
 }
 
-/* Typing indicator */
-.hay-message__typing {
+/* Typing: dots inside a bubble */
+.hay-typing {
   display: flex;
-  gap: 4px;
-  align-items: center;
-  padding: 12px 0 24px;
+  gap: 5px;
+  padding: 12px 14px;
 }
 
-.hay-message__typing span {
-  width: 8px;
-  height: 8px;
+.hay-typing__dot {
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--color-neutral-400);
-  animation: typing 1.4s infinite;
+  background: var(--hay-meta);
+  animation: hay-typing 1.4s infinite;
 }
 
-.hay-message__typing span:nth-child(2) {
+.hay-typing__dot:nth-child(2) {
   animation-delay: 0.2s;
 }
 
-.hay-message__typing span:nth-child(3) {
+.hay-typing__dot:nth-child(3) {
   animation-delay: 0.4s;
 }
 
-@keyframes typing {
+@keyframes hay-typing {
   0%,
   60%,
   100% {
+    opacity: 0.45;
     transform: translateY(0);
-    opacity: 0.7;
   }
   30% {
-    transform: translateY(-10px);
     opacity: 1;
+    transform: translateY(-3px);
   }
-}
-
-/* Team member joined/left line */
-.hay-message--system {
-  align-self: center;
-  max-width: 90%;
-  margin: 8px 0;
-}
-
-.hay-message__system {
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--color-neutral-500);
-  text-align: center;
-}
-
-/* Closure message styling */
-.hay-message__closure-badge {
-  font-size: 11px;
-  color: var(--color-neutral-500);
-  font-weight: 600;
-  margin-bottom: 4px;
-  padding: 4px 8px;
-  background: var(--color-neutral-200);
-  border-radius: 8px;
-  display: inline-block;
-  align-self: flex-start;
 }
 
 /* Product recommendation cards */
@@ -634,40 +786,34 @@ a.hay-message__attachment-file:hover {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 8px;
-  margin: 4px 0;
+  min-width: 248px;
 }
 
 .hay-product-card {
   display: flex;
   flex-direction: column;
   border-radius: 10px;
-  border: 1px solid var(--color-neutral-200, #e5e7eb);
-  background: white;
+  border: 1px solid var(--hay-line);
+  background: var(--hay-surface);
   text-decoration: none;
   color: inherit;
   overflow: hidden;
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
 }
 
 .hay-product-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: var(--hay-accent);
 }
 
 .hay-product-card__image {
   aspect-ratio: 1 / 1;
-  background: var(--color-neutral-100, #f3f4f6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: var(--hay-raised);
 }
 
 .hay-product-card__image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 0;
 }
 
 .hay-product-card__body {
@@ -690,11 +836,11 @@ a.hay-message__attachment-file:hover {
 .hay-product-card__price {
   font-size: 12px;
   font-weight: 600;
-  color: var(--hay-primary);
+  color: var(--hay-accent);
 }
 
 .hay-product-card__oos {
   font-size: 10px;
-  color: var(--color-neutral-500);
+  color: var(--hay-meta);
 }
 </style>

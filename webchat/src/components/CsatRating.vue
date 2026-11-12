@@ -1,29 +1,44 @@
 <template>
   <div class="hay-csat">
     <template v-if="!submitted">
-      <p class="hay-csat__question">{{ question }}</p>
-      <div class="hay-csat__scale" role="group" :aria-label="question">
+      <p :id="questionId" class="hay-csat__question">{{ question }}</p>
+      <div class="hay-csat__scale" role="group" :aria-labelledby="questionId">
         <button
-          v-for="option in options"
-          :key="option.value"
+          v-for="face in FACES"
+          :key="face.value"
           type="button"
           class="hay-csat__option"
-          :class="{ 'hay-csat__option--selected': selected === option.value }"
-          :aria-label="String(option.value)"
+          :class="{ 'hay-csat__option--selected': selected === face.value }"
+          :aria-label="t(face.label)"
+          :aria-pressed="selected === face.value"
           :disabled="isSubmitting"
-          @click="select(option.value)"
+          @click="select(face.value)"
         >
-          <span class="hay-csat__emoji">{{ option.emoji }}</span>
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="9.5" />
+            <path d="M9 9.5h.01M15 9.5h.01" stroke-width="2.6" />
+            <path :d="face.mouth" />
+          </svg>
         </button>
       </div>
     </template>
-    <p v-else class="hay-csat__thanks">{{ t("csat.thankYou") }}</p>
+    <p v-else class="hay-csat__thanks" role="status">{{ t("csat.thankYou") }}</p>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { useI18n } from "@/i18n";
+import { useI18n, type TranslationKey } from "@/i18n";
 
 const t = useI18n();
 
@@ -33,13 +48,15 @@ const props = defineProps<{
   submit: (rating: number) => Promise<boolean>;
 }>();
 
-// 1 (very unhappy) to 5 (very happy)
-const options = [
-  { value: 1, emoji: "😠" },
-  { value: 2, emoji: "🙁" },
-  { value: 3, emoji: "😐" },
-  { value: 4, emoji: "🙂" },
-  { value: 5, emoji: "😀" },
+const questionId = `hay-csat-${Math.random().toString(36).slice(2, 8)}`;
+
+// 1 (very bad) to 5 (great): the same face, only the mouth changes.
+const FACES: { value: number; label: TranslationKey; mouth: string }[] = [
+  { value: 1, label: "csat.veryBad", mouth: "M8 16.6c1.1-1.5 2.4-2.2 4-2.2s2.9.7 4 2.2" },
+  { value: 2, label: "csat.bad", mouth: "M8.6 16c.9-.8 2.1-1.2 3.4-1.2s2.5.4 3.4 1.2" },
+  { value: 3, label: "csat.okay", mouth: "M8.6 15.2h6.8" },
+  { value: 4, label: "csat.good", mouth: "M8.6 14.4c.9.8 2.1 1.2 3.4 1.2s2.5-.4 3.4-1.2" },
+  { value: 5, label: "csat.great", mouth: "M8 13.8c1.1 1.7 2.4 2.5 4 2.5s2.9-.8 4-2.5" },
 ];
 
 const selected = ref<number | null>(null);
@@ -65,55 +82,43 @@ const select = async (value: number) => {
   text-align: center;
 }
 
-.hay-csat__question {
+.hay-csat__question,
+.hay-csat__thanks {
   margin: 0;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-neutral-700);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--hay-text);
 }
 
 .hay-csat__scale {
   display: flex;
-  align-items: center;
-  justify-content: center;
   gap: 6px;
 }
 
 .hay-csat__option {
-  background: transparent;
-  border: none;
-  padding: 4px;
-  cursor: pointer;
-  border-radius: 50%;
-  line-height: 1;
-  opacity: 0.65;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  border: 1px solid var(--hay-line);
+  background: var(--hay-surface);
+  color: var(--hay-meta);
   transition:
-    transform 0.15s ease,
-    opacity 0.15s ease;
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
-.hay-csat__option:hover:not(:disabled) {
-  transform: scale(1.2);
-  opacity: 1;
-}
-
+.hay-csat__option:hover:not(:disabled),
 .hay-csat__option--selected {
-  opacity: 1;
-  transform: scale(1.2);
+  color: var(--hay-accent);
+  border-color: var(--hay-accent);
+  background: color-mix(in srgb, var(--hay-accent) 12%, var(--hay-surface));
 }
 
 .hay-csat__option:disabled {
   cursor: default;
-}
-
-.hay-csat__emoji {
-  font-size: 26px;
-}
-
-.hay-csat__thanks {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-neutral-700);
 }
 </style>

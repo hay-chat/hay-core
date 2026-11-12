@@ -1,6 +1,8 @@
 // The chat chunk: Vue, the chat window, the socket, DPoP and markdown. widget.js
 // (src/loader) downloads it on intent or when the browser is idle and calls
 // mountChat(). Built as a hashed file with a long immutable cache.
+// Base styles first, so the components' own rules override them.
+import "./styles/widget.css";
 import { createApp } from "vue";
 import Widget from "./Widget.vue";
 import { addContext } from "./composables/useWidgetContext";
@@ -15,7 +17,6 @@ import { highlight } from "./utils/agentActivity";
 import { loadTranslations } from "./i18n";
 import { setDebug, debugLog } from "./utils/debug";
 import type { ChatHandle, ChatMountOptions, HostCall } from "./types";
-import "./styles/widget.css";
 
 const hostApi = {
   addContext,

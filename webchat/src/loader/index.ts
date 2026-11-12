@@ -8,7 +8,6 @@ const defaultConfig: HayChatConfig = {
   organizationId: "",
   baseUrl: "http://localhost:3001",
   position: "right",
-  theme: "blue",
   showGreeting: true,
 };
 

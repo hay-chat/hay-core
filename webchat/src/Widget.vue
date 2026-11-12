@@ -3,11 +3,9 @@
     <Transition name="fade">
       <ChatWindow
         v-if="isOpen"
-        :widget-title="config.widgetTitle || t('widget.defaultTitle')"
-        :widget-subtitle="widgetSubtitle"
-        :position="config.position || 'right'"
-        :show-greeting="config.showGreeting ?? true"
-        :greeting-message="config.greetingMessage || t('widget.defaultGreeting')"
+        :title="title"
+        :position="config.position || publicConfig?.position || 'right'"
+        :greeting-message="showGreeting ? greetingMessage : undefined"
         :messages="messages"
         :is-typing="isTyping"
         :is-ready="isInitialized"
@@ -17,15 +15,17 @@
         :csat-submitted="csatSubmitted"
         :submit-csat="submitCsat"
         :is-expanded="isExpanded"
-        :agent-name="resolvedAgentName"
-        :agent-avatar-url="resolvedAvatarUrl"
-        :organization-logo-url="resolvedLogoUrl"
+        :assistant-name="assistantName"
+        :assistant-avatar-url="resolvedAvatarUrl"
+        :logo-url="resolvedLogoUrl"
+        :team="team"
         :current-agent-type="currentAgentType"
         :current-agent-name="currentAgentName || undefined"
         :send-failure="sendFailure"
         :ai-label="aiLabel"
-        :availability-status="availabilityStatus"
+        :status="availabilityStatus"
         :is-waiting-for-human="isWaitingForHuman"
+        :waiting-typical="waitingTypicalLine"
         :waiting-detail="waitingLine"
         :contact-saved="contactEmailSaved"
         :save-contact-email="saveContactEmail"
@@ -34,6 +34,7 @@
         :pending-pre-chat-form="pendingPreChatForm"
         :pre-chat-form-schema="preChatFormSchema"
         :context="config.context"
+        :locale="locale"
         @close="closeChat"
         @send="sendMessage"
         @attach="sendAttachment"
@@ -53,13 +54,13 @@ import { ref, computed, onMounted, watch } from "vue";
 import ChatWindow from "./components/ChatWindow.vue";
 import { useChat } from "./composables/useChat";
 import { provideI18n, type Translations } from "./i18n";
-import { resolveWidgetSubtitle } from "./utils/subtitle";
 import { resolveLocale } from "./i18n/resolve";
 import { resumeConversationId } from "./utils/resume";
 import {
   fetchAvailability,
   headerStatus,
   waitingDetail,
+  waitingTypical,
   type WidgetAvailability,
 } from "./utils/availability";
 import type { HayChatConfig, LauncherBridge, PublicConfig } from "./types";
@@ -77,9 +78,15 @@ const props = defineProps<{
 
 const t = provideI18n(props.translations);
 
-const widgetSubtitle = computed(() =>
-  resolveWidgetSubtitle(props.config.widgetSubtitle, t("widget.defaultSubtitle")),
+// The page's config wins; the settings (public config) fill in the rest.
+const title = computed(
+  () => props.config.widgetTitle || props.publicConfig?.widgetTitle || t("widget.defaultTitle"),
 );
+const showGreeting = props.config.showGreeting ?? props.publicConfig?.showGreeting ?? true;
+const greetingMessage =
+  props.config.greetingMessage ||
+  props.publicConfig?.greetingMessage ||
+  t("widget.defaultGreeting");
 
 const isExpanded = ref(false);
 
@@ -99,12 +106,18 @@ const resolvedAvatarUrl = computed(() =>
   resolveUrl(props.config.agentAvatarUrl || props.publicConfig?.agentAvatarUrl),
 );
 
-const resolvedLogoUrl = computed(() =>
-  resolveUrl(props.config.organizationLogoUrl || props.publicConfig?.organizationLogoUrl),
+const resolvedLogoUrl = computed(() => resolveUrl(props.publicConfig?.logoUrl));
+
+// People who can take over (only sent when handoff is on), shown in the header.
+const team = computed(() =>
+  (props.publicConfig?.team ?? []).slice(0, 2).map((member) => ({
+    firstName: member.firstName,
+    avatarUrl: resolveUrl(member.avatarUrl) ?? null,
+  })),
 );
 
-// AI label on AI replies (D14-6): on unless the org hid it; the org's text or
-// the localized default. Shown when the config could not be fetched.
+// AI label after the assistant's name (D14-6): on unless the org hid it; the
+// org's text or the localized default. Shown when the config could not be fetched.
 const aiLabel = computed(() =>
   props.publicConfig?.aiLabelShown === false
     ? null
@@ -114,6 +127,7 @@ const aiLabel = computed(() =>
 const resolvedAgentName = computed(
   () => props.config.agentName || props.publicConfig?.agentName || undefined,
 );
+const assistantName = computed(() => resolvedAgentName.value || t("chat.assistant"));
 
 // The org's bot check, when one is on (declarative challenge@1 contribution).
 const challengeContribution =
@@ -163,8 +177,8 @@ const {
     ...props.config,
     // The greeting is pinned as the first message, so give the chat the same
     // localised default the empty state shows.
-    showGreeting: props.config.showGreeting ?? true,
-    greetingMessage: props.config.greetingMessage || t("widget.defaultGreeting"),
+    showGreeting,
+    greetingMessage,
     // Named on the "working" overlay while a page tool runs.
     agentName: resolvedAgentName.value,
   },
@@ -186,6 +200,7 @@ const isWaitingForHuman = computed(
   () => conversationStatus.value === "pending-human" && currentAgentType.value !== "HumanAgent",
 );
 const waitingLine = computed(() => waitingDetail(availability.value, t, locale));
+const waitingTypicalLine = computed(() => waitingTypical(availability.value, t));
 watch(isOpen, (open) => {
   if (open) void refreshAvailability();
 });
@@ -193,8 +208,11 @@ watch(isWaitingForHuman, (waiting) => {
   if (waiting) void refreshAvailability();
 });
 
-// Keep the loader's button in step with the chat.
-watch(isOpen, (open) => props.launcher.setOpen(open));
+// Keep the loader's button in step with the chat; focus goes back to it on close.
+watch(isOpen, (open, wasOpen) => {
+  props.launcher.setOpen(open);
+  if (!open && wasOpen) props.launcher.focus();
+});
 watch(unreadCount, (count) => props.launcher.setUnread(count), { immediate: true });
 
 onMounted(() => {
@@ -207,18 +225,6 @@ defineExpose({ toggle: toggleChat });
 </script>
 
 <style>
-/* Global styles for the widget */
-.hay-webchat-chat {
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-.hay-webchat-chat * {
-  box-sizing: border-box;
-}
-
 /* Transitions */
 .fade-enter-active,
 .fade-leave-active {
