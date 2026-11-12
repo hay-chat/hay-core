@@ -1,19 +1,11 @@
 export interface WebchatSnippetInput {
   organizationId: string;
   baseUrl: string;
-  widgetTitle: string;
-  widgetSubtitle: string;
-  position: string;
-  theme: string;
-  /** With Web Chat off there is no greeting to show, so the snippet leaves it out. */
-  isEnabled: boolean;
-  showGreeting: boolean;
-  greetingMessage: string;
 }
 
 /**
- * A single-quoted JavaScript string literal. Settings text is free-form, so quotes, backslashes,
- * line breaks and `<` (which could close the surrounding script tag) are escaped.
+ * A single-quoted JavaScript string literal. Values are escaped so quotes, backslashes,
+ * line breaks and `<` (which could close the surrounding script tag) stay inside the string.
  */
 export function jsString(value: string): string {
   const escaped = value
@@ -27,22 +19,17 @@ export function jsString(value: string): string {
   return `'${escaped}'`;
 }
 
-/** The snippet that adds the chat widget to a customer's site. */
+/**
+ * The snippet that adds the chat widget to a customer's site. It carries only what the widget
+ * needs to find its organization: everything else (title, position, greeting, colours) comes
+ * from the saved settings, so changes in the dashboard reach sites without re-pasting the code.
+ */
 export function buildWebchatSnippet(input: WebchatSnippetInput): string {
-  const greetingConfig = input.isEnabled
-    ? `,
-    showGreeting: ${input.showGreeting},
-    greetingMessage: ${jsString(input.greetingMessage)}`
-    : "";
   return `<${"script"}>
   window.HayChat = window.HayChat || {};
   window.HayChat.config = {
     organizationId: ${jsString(input.organizationId)},
-    baseUrl: ${jsString(input.baseUrl)},
-    widgetTitle: ${jsString(input.widgetTitle)},
-    widgetSubtitle: ${jsString(input.widgetSubtitle)},
-    position: ${jsString(input.position)},
-    theme: ${jsString(input.theme)}${greetingConfig}
+    baseUrl: ${jsString(input.baseUrl)}
   };
 </${"script"}>
 <${"script"} src="${input.baseUrl}/v1/webchat/widget.js" async></${"script"}>`;

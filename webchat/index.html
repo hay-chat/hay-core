@@ -15,9 +15,7 @@
           organizationId: "468ccc89-1e15-4916-a3a6-3fb646037110",
           baseUrl: "http://localhost:3001",
           widgetTitle: "Chat with us",
-          widgetSubtitle: "Development Mode",
           position: "right",
-          theme: "blue",
           showGreeting: true,
           greetingMessage: "👋 Hello! This is the development widget.",
         },
@@ -27,7 +25,7 @@
     <!-- Dev: the loader with the chat chunk served by Vite (no build, no hash) -->
     <script type="module">
       import { boot } from "/src/loader/boot.ts";
-      boot({ position: "right", theme: "blue", ...window.HayChat.config }, () => import("/src/chat.ts"));
+      boot({ position: "right", ...window.HayChat.config }, () => import("/src/chat.ts"));
     </script>
   </body>
 </html>

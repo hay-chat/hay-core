@@ -804,12 +804,21 @@ export class PrivacyService {
         );
       }
 
-      // Replies they sent in conversations carry their name.
+      // Replies they sent in conversations carry their name and photo, and so
+      // do the "joined / left the chat" lines the shopper saw.
       await manager.query(
         `UPDATE messages
-         SET sender = '[deleted]', metadata = metadata - 'agentFirstName'
+         SET sender = '[deleted]', metadata = metadata - 'agentFirstName' - 'agentAvatarUrl'
          WHERE type = 'HumanAgent'
            AND (metadata->>'sentByUserId' = $1 OR metadata->>'answeredBy' = $1)`,
+        [userId],
+      );
+      await manager.query(
+        `UPDATE messages
+         SET metadata = metadata - 'agentFirstName' - 'agentAvatarUrl'
+         WHERE type = 'System'
+           AND metadata ? 'systemEvent'
+           AND metadata->>'userId' = $1`,
         [userId],
       );
 

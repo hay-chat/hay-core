@@ -56,6 +56,20 @@ import {
   type FormSchema,
 } from "@hay/form-schema";
 
+import {
+  CLIENT_MESSAGE_ID_MAX_LENGTH,
+  acknowledgeVisitorMessage,
+} from "../../../services/widget-events.service";
+import {
+  FeedbackMessageNotFoundError,
+  MessageFeedbackService,
+} from "../../../services/message-feedback.service";
+import {
+  LIST_MINE_LIMIT,
+  toVisitorConversationSummaries,
+  type VisitorConversationSummary,
+} from "./visitor-conversations";
+
 const logger = createLogger("public-conversations");
 
 const customerRepository = new CustomerRepository();
@@ -101,12 +115,16 @@ const createPublicConversationSchema = z.object({
     .optional(),
 });
 
+// The widget's own id for a message it sends, echoed in its message_ack events.
+const clientMessageIdSchema = z.string().min(1).max(CLIENT_MESSAGE_ID_MAX_LENGTH).optional();
+
 // Schema for sending messages
 const sendMessageSchema = z.object({
   conversationId: z.string().uuid(),
   content: z.string().min(1).max(PUBLIC_WIDGET_LIMITS.maxMessageLength),
   proof: z.string(), // DPoP proof
   context: z.record(z.string(), z.any()).optional(),
+  clientMessageId: clientMessageIdSchema,
 });
 
 // Schema for sending a photo or PDF, with an optional caption (D8-9)
@@ -118,6 +136,28 @@ const sendAttachmentSchema = z.object({
   caption: z.string().max(PUBLIC_WIDGET_LIMITS.maxMessageLength).optional(),
   proof: z.string(), // DPoP proof
   context: z.record(z.string(), z.any()).optional(),
+  clientMessageId: clientMessageIdSchema,
+});
+
+// The visitor's thumbs up/down on one AI answer (requires DPoP proof)
+const rateMessageSchema = z.object({
+  conversationId: z.string().uuid(),
+  messageId: z.string().uuid(),
+  rating: z.enum(["up", "down"]),
+  proof: z.string(), // DPoP proof
+});
+
+// The visitor's conversations: one proof per conversation key this browser
+// holds, and/or the store's signed customer id.
+const listMineSchema = z.object({
+  organizationId: z.string().uuid(),
+  conversations: z
+    .array(z.object({ conversationId: z.string().uuid(), proof: z.string().max(4096) }))
+    .max(LIST_MINE_LIMIT)
+    .optional()
+    .default([]),
+  customerExternalId: z.string().max(255).optional(),
+  customerExternalIdSignature: z.string().max(128).optional(),
 });
 
 // Schema for submitting a CSAT rating
@@ -537,12 +577,15 @@ export const publicConversationsRouter = t.router({
         metadata: {
           direction: MessageDirection.IN,
           timestamp: new Date().toISOString(),
+          ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
         },
       });
 
       // Merge incoming context into conversation context if provided
       const context = withVisitorContext(conversation.context, input.context);
       if (context) await conversationRepository.updateById(conversation.id, { context });
+
+      await acknowledgeVisitorMessage(conversation, message);
 
       return {
         messageId: message.id,
@@ -662,11 +705,14 @@ export const publicConversationsRouter = t.router({
         direction: MessageDirection.IN,
         timestamp: new Date().toISOString(),
         ...(caption ? {} : { mediaPlaceholder: true }),
+        ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
       },
     });
 
     const context = withVisitorContext(conversation.context, input.context);
     if (context) await conversationRepository.updateById(conversation.id, { context });
+
+    await acknowledgeVisitorMessage(conversation, message);
 
     const [publicAttachment] = await toPublicAttachments([attachment], organizationId);
     return {
@@ -771,6 +817,97 @@ export const publicConversationsRouter = t.router({
 
     return { saved: true, nonce: verified.newNonce, error: null };
   }),
+
+  // The visitor's thumbs up/down on an AI answer (requires DPoP proof). Only
+  // AI answers of this conversation; rating again replaces the rating.
+  rateMessage: publicProcedure.input(rateMessageSchema).mutation(async ({ input, ctx }) => {
+    if (await isPublicWidgetRateLimited([{ rule: "messagePerIp", id: clientIp(ctx.ipAddress) }])) {
+      throw tooManyRequests();
+    }
+
+    const verified = await verifyDPoPForRequest(
+      input.conversationId,
+      input.proof,
+      publicConversationProofTarget("rateMessage", ctx.req.headers.host),
+    );
+    if (!verified.success) {
+      if (verified.newNonce && verified.error === "Invalid or expired nonce") {
+        return { saved: false, nonce: verified.newNonce, error: "NONCE_EXPIRED" as const };
+      }
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: verified.error || "Invalid DPoP proof",
+      });
+    }
+
+    const conversation = await conversationRepository.findById(input.conversationId);
+    if (!conversation) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+    }
+
+    try {
+      await new MessageFeedbackService().rateAsVisitor(conversation, input.messageId, input.rating);
+    } catch (error) {
+      if (error instanceof FeedbackMessageNotFoundError) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Message not found" });
+      }
+      logger.error({ err: error }, "Error rating message");
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to save rating" });
+    }
+
+    return { saved: true, nonce: verified.newNonce, error: null };
+  }),
+
+  // The visitor's own conversations for the widget's home list: those whose
+  // key this browser proves it holds (one proof per conversation, sent only
+  // after consent since the keys sit behind it), plus the signed-in
+  // customer's web conversations. Newest first, at most LIST_MINE_LIMIT.
+  listMine: publicProcedure
+    .input(listMineSchema)
+    .mutation(async ({ input, ctx }): Promise<VisitorConversationSummary[]> => {
+      if (await isPublicWidgetRateLimited([{ rule: "readPerIp", id: clientIp(ctx.ipAddress) }])) {
+        throw tooManyRequests();
+      }
+      const organizationId = input.organizationId;
+
+      // Read-only, like the socket identify: the proofs must not spend the
+      // conversations' rotating nonces the widget's other calls rely on.
+      const target = publicConversationProofTarget("listMine", ctx.req.headers.host);
+      const proven = await Promise.all(
+        input.conversations.map(async ({ conversationId, proof }) => {
+          const verified = await verifyDPoPForRequest(conversationId, proof, target, {
+            checkNonce: false,
+          });
+          return verified.success ? conversationId : null;
+        }),
+      );
+      const resumableIds = new Set(proven.filter((id): id is string => id !== null));
+
+      const customerExternalId = await verifiedCustomerExternalId(
+        organizationId,
+        input.customerExternalId,
+        input.customerExternalIdSignature,
+      );
+      const customer = customerExternalId
+        ? await customerRepository.findByExternalId(customerExternalId, organizationId)
+        : null;
+
+      const conversations = await conversationRepository.findWebConversationsForVisitor(
+        organizationId,
+        { conversationIds: [...resumableIds], customerId: customer?.id ?? null },
+        LIST_MINE_LIMIT,
+      );
+      if (conversations.length === 0) return [];
+
+      const [lastMessages, organization] = await Promise.all([
+        conversationRepository.getLastWidgetReplies(conversations.map((c) => c.id)),
+        organizationRepository.findById(organizationId),
+      ]);
+      return toVisitorConversationSummaries(conversations, lastMessages, {
+        assistantName: organization?.assistantName?.trim() || null,
+        resumableIds,
+      });
+    }),
 
   // Rotate the keypair for a conversation (requires valid DPoP with old key)
   rotateKeys: publicProcedure

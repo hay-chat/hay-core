@@ -4,11 +4,10 @@
 import type { HayChatConfig } from "@/types";
 import { boot, type ChatModule } from "./boot";
 
+// No default position: the settings' position applies unless the page sets one.
 const defaultConfig: HayChatConfig = {
   organizationId: "",
   baseUrl: "http://localhost:3001",
-  position: "right",
-  theme: "blue",
   showGreeting: true,
 };
 

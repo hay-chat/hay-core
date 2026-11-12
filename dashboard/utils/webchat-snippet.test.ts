@@ -1,17 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildWebchatSnippet, jsString } from "./webchat-snippet";
 
-const base = {
-  organizationId: "org-1",
-  baseUrl: "https://api.hay.test",
-  widgetTitle: "Chat with us",
-  widgetSubtitle: "",
-  position: "right",
-  theme: "blue",
-  isEnabled: true,
-  showGreeting: true,
-  greetingMessage: "Hello!",
-};
+const base = { organizationId: "org-1", baseUrl: "https://api.hay.test" };
 
 /** Evaluates the config object the snippet assigns, the way a browser would. */
 function evalConfig(snippet: string): Record<string, unknown> {
@@ -22,23 +12,19 @@ function evalConfig(snippet: string): Record<string, unknown> {
 }
 
 describe("buildWebchatSnippet", () => {
-  it("keeps a title with an apostrophe valid JavaScript", () => {
-    const config = evalConfig(buildWebchatSnippet({ ...base, widgetTitle: "Alma's help desk" }));
-    expect(config.widgetTitle).toBe("Alma's help desk");
+  it("carries only the organization and base url, so dashboard settings apply", () => {
+    expect(evalConfig(buildWebchatSnippet(base))).toEqual({
+      organizationId: "org-1",
+      baseUrl: "https://api.hay.test",
+    });
   });
 
-  it("round-trips backslashes, line breaks and a closing script tag", () => {
-    const tricky = "a\\b\nc </script><b>";
-    const snippet = buildWebchatSnippet({ ...base, greetingMessage: tricky });
-    expect(evalConfig(snippet).greetingMessage).toBe(tricky);
-    // Only the two real script tags may appear, so the text cannot end the block early.
+  it("keeps an id with quotes and a closing script tag inside the string", () => {
+    const tricky = "a'b </script><b>";
+    const snippet = buildWebchatSnippet({ ...base, organizationId: tricky });
+    expect(evalConfig(snippet).organizationId).toBe(tricky);
+    // Only the two real script tags may appear, so the value cannot end the block early.
     expect(snippet.match(/<\/script>/g)).toHaveLength(2);
-  });
-
-  it("leaves the greeting out when web chat is off", () => {
-    const config = evalConfig(buildWebchatSnippet({ ...base, isEnabled: false }));
-    expect(config).not.toHaveProperty("greetingMessage");
-    expect(config.theme).toBe("blue");
   });
 
   it("loads the widget from the base url", () => {

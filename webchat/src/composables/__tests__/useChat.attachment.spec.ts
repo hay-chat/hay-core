@@ -79,10 +79,16 @@ describe("useChat attachments", () => {
       mimeType: "image/jpeg",
       filename: "broken.jpg",
       caption: "It arrived broken",
+      clientMessageId: expect.stringMatching(/^temp-/),
     });
     const bubble = chat.messages.value.find((m) => m.sender === "user");
+    // The id sent along is the bubble's, so the server's acks find it.
+    expect(bubble?.metadata?.clientMessageId).toBe(body.clientMessageId);
     expect(bubble?.content).toBe("It arrived broken");
-    expect(bubble?.metadata).toEqual({ serverId: "m-1" });
+    expect(bubble?.metadata).toEqual({
+      clientMessageId: expect.stringMatching(/^temp-/),
+      serverId: "m-1",
+    });
     // The photo keeps showing from the shopper's own copy.
     expect(bubble?.attachments?.[0]).toMatchObject({ id: "u1", url: "blob:preview" });
     expect(chat.sendFailure.value).toBeNull();

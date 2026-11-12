@@ -38,6 +38,9 @@ import { checkReplyMedia } from "./reply-media";
 import { decidedActionsLedger } from "./decided-actions";
 import { isToolEnabled } from "@server/services/core/enabled-tools";
 import { isPageTool, PAGE_TOOL_MESSAGE_SOURCE } from "@server/services/webchat/page-tools.service";
+import { markVisitorMessageDelivered } from "@server/services/widget-events.service";
+import { publicAnswerSources } from "./answer-sources";
+import { runToolWithActivity } from "./tool-activity";
 import type { Message } from "@server/database/entities/message.entity";
 import type pino from "pino";
 
@@ -357,6 +360,25 @@ async function saveConfidenceLog(
  * message yet (widget just opened) only has its needs_processing flag cleared,
  * so no greeting is sent and the sweep stops.
  */
+/**
+ * The visitor's latest message reached Hay, with the AI or in the team's queue:
+ * the widget shows it delivered. Best effort; pass the message when the caller
+ * already read it, so the run's input read stays the only one under the lock.
+ */
+async function ackVisitorMessageDelivered(
+  conversation: Conversation,
+  log: pino.Logger,
+  message?: Message | null,
+): Promise<void> {
+  if (conversation.channel !== "web") return;
+  try {
+    const latest = message === undefined ? await conversation.getLastCustomerMessage() : message;
+    await markVisitorMessageDelivered(conversation, latest);
+  } catch (err) {
+    log.warn({ err }, "Could not mark the visitor's message delivered");
+  }
+}
+
 async function parkForPausedAgent(conversation: Conversation, log: pino.Logger): Promise<void> {
   const lastCustomerMessage = await conversation.getLastCustomerMessage();
   const shouldQueue = !!lastCustomerMessage && conversation.status !== "pending-human";
@@ -452,6 +474,7 @@ export const runConversation = async (conversationId: string) => {
       "Skipping - organization suspended",
     );
     if (conversation.needs_processing) {
+      await ackVisitorMessageDelivered(conversation, log);
       const updates: Partial<Conversation> = { needs_processing: false };
       if (conversation.status === "open") updates.status = "pending-human";
       await conversationRepository.update(conversation.id, conversation.organization_id, updates);
@@ -491,6 +514,7 @@ export const runConversation = async (conversationId: string) => {
     if (withinHours && readHandoffTicket(conversation)?.status !== "requested") {
       log.debug("Skipping - waiting for the team within business hours");
       if (conversation.needs_processing) {
+        await ackVisitorMessageDelivered(conversation, log);
         await conversationRepository.update(conversation.id, conversation.organization_id, {
           needs_processing: false,
         });
@@ -505,6 +529,7 @@ export const runConversation = async (conversationId: string) => {
   // as pending-human so the team sees it, and needs_processing is cleared so
   // the sweep stops re-enqueuing it.
   if (isOrganizationAiPaused(conversation.organization)) {
+    if (conversation.needs_processing) await ackVisitorMessageDelivered(conversation, log);
     await parkForPausedAgent(conversation, log);
     return;
   }
@@ -512,6 +537,7 @@ export const runConversation = async (conversationId: string) => {
   // AI switched off on this channel (D7-14, "start on Web Chat only"): the
   // team answers. No notice to the shopper; test conversations still run.
   if (await isChannelAiOff(conversation)) {
+    if (conversation.needs_processing) await ackVisitorMessageDelivered(conversation, log);
     await parkForTeam(conversation, log);
     return;
   }
@@ -590,6 +616,9 @@ export const runConversation = async (conversationId: string) => {
       await conversation.markProcessed(null);
       throw new Error("Last customer message not found");
     }
+
+    // The run holds the visitor's latest message: the widget shows it delivered.
+    await ackVisitorMessageDelivered(conversation, log, lastCustomerMessage);
 
     // Update processing state to perceiving
     await updateProcessingState(conversation, "perceiving", "Analyzing your message");
@@ -1389,10 +1418,10 @@ async function handleExecutionLoop(
       });
 
       // Execute the tool
-      const toolExecResult1 = await toolExecutionService.handleToolExecution(
+      const toolExecResult1 = await runToolWithActivity(
         conversation,
         executionResult.tool,
-        toolMessageId?.id,
+        (tool) => toolExecutionService.handleToolExecution(conversation, tool, toolMessageId?.id),
       );
       toolsCalledThisTurn.push({
         name: executionResult.tool.name,
@@ -1418,10 +1447,10 @@ async function handleExecutionLoop(
       });
 
       // Execute the tool with the message ID for updating
-      const toolExecResult2 = await toolExecutionService.handleToolExecution(
+      const toolExecResult2 = await runToolWithActivity(
         conversation,
         executionResult.tool,
-        toolMessageId?.id,
+        (tool) => toolExecutionService.handleToolExecution(conversation, tool, toolMessageId?.id),
       );
       toolsCalledThisTurn.push({
         name: executionResult.tool.name,
@@ -1664,6 +1693,12 @@ async function handleExecutionLoop(
           );
         }
 
+        // The public documents behind the answer, linked under it in the widget.
+        const sources = await publicAnswerSources(
+          conversation.organization_id,
+          executionResult.confidence?.documentsUsed,
+        );
+
         await sendBotMessage(
           conversation,
           {
@@ -1671,6 +1706,7 @@ async function handleExecutionLoop(
             type: MessageType.BOT_AGENT,
             metadata: {
               ...buildMessageMetadata(executionResult),
+              ...(sources.length > 0 ? { sources } : {}),
               ...(executionResult.tool
                 ? { potentialHallucination: true, claimedTool: executionResult.tool.name }
                 : {}),

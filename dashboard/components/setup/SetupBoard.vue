@@ -59,7 +59,7 @@
       v-if="installOpen"
       :not-ready="board.totalCount - board.readyCount"
       :total="board.totalCount"
-      :settings-to="canOpen('/settings/webchat') ? '/settings/webchat' : null"
+      :settings-to="canOpen('/channels/webchat') ? '/channels/webchat' : null"
       @close="closeInstall"
     />
 
@@ -403,7 +403,7 @@ const connectTo = computed(() => {
 });
 
 // --- Add to your site: an inline panel, available whatever the state of the list.
-const canInstall = computed(() => canOpen("/settings/webchat"));
+const canInstall = computed(() => canOpen("/channels/webchat"));
 const installOpen = ref(false);
 const openInstall = () => {
   installOpen.value = true;

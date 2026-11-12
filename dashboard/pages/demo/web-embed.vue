@@ -322,9 +322,8 @@ const implementationExample = `<!-- Hay Webchat Widget -->
 
     // Widget customization
     widgetTitle: "Chat with us",
-    widgetSubtitle: "We're here to help!",
     position: "right",
-    theme: "blue",
+    brandColor: "#001df5",
     showGreeting: true,
     greetingMessage: "👋 Hello! How can I help you today?"
   };
@@ -346,9 +345,7 @@ onMounted(() => {
 
     // Widget customization for demo
     widgetTitle: "Chat with us",
-    widgetSubtitle: "Test DPoP authentication",
     position: "right",
-    theme: "blue",
     showGreeting: true,
     greetingMessage:
       "👋 Hello! This is a demo of anonymous-but-authenticated conversations using DPoP.",

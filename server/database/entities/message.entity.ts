@@ -186,6 +186,10 @@ export class Message {
     confidenceDetails?: string;
     /** `excerpt`: the knowledge-base text the AI read (dispute evidence, G5). */
     documentsUsed?: Array<{ id: string; title: string; similarity: number; excerpt?: string }>;
+    /** The public ones of documentsUsed, as the widget links them under the answer. */
+    sources?: Array<{ title: string; url: string }>;
+    /** Customer messages: the id the webchat widget gave the message (echoed in acks). */
+    clientMessageId?: string;
     recheckAttempted?: boolean;
     recheckCount?: number;
     // Tool execution metadata
