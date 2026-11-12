@@ -19,14 +19,7 @@
       </Button>
     </div>
 
-    <p v-if="loading" class="mt-3 text-sm text-neutral-muted" role="status">
-      {{ $t("setup.install.loading") }}
-    </p>
-    <div v-else-if="failed" class="mt-3 flex flex-wrap items-center gap-3" role="alert">
-      <p class="text-sm text-destructive">{{ $t("setup.install.error") }}</p>
-      <Button variant="outline" size="sm" @click="load">{{ $t("setup.install.retry") }}</Button>
-    </div>
-    <template v-else-if="snippet">
+    <template v-if="snippet">
       <p class="mt-3 text-sm text-neutral-muted">{{ $t("setup.install.instructions") }}</p>
       <pre
         class="mt-2 overflow-x-auto rounded-md bg-background p-3 text-sm"
@@ -73,7 +66,7 @@ const panelId = "setup-install-panel";
 const headingId = "setup-install-heading";
 const heading = ref<HTMLElement | null>(null);
 
-const { snippet, loading, failed, load } = useWebchatSnippet();
+const { snippet } = useWebchatSnippet();
 
 const honesty = computed(() => {
   if (props.total === 0) return t("setup.install.noRequests");
@@ -101,7 +94,6 @@ const copy = async () => {
 };
 
 onMounted(async () => {
-  void load();
   // The panel opens from a button elsewhere on the page; move focus so keyboard users land in it.
   await nextTick();
   heading.value?.focus();

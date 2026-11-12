@@ -174,11 +174,6 @@ const snippet = computed(() =>
   buildWebchatSnippet({
     organizationId: userStore.activeOrganizationId || "YOUR_ORG_ID",
     baseUrl: getApiUrl(),
-    widgetTitle: form.value.widgetTitle,
-    position: form.value.position,
-    isEnabled: form.value.isEnabled,
-    showGreeting: form.value.showGreeting,
-    greetingMessage: form.value.greetingMessage,
   }),
 );
 
