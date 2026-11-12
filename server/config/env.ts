@@ -55,13 +55,6 @@ export const config = {
       process.env.TRUST_PROXY || (process.env.NODE_ENV === "production" ? "1" : "0"),
       10,
     ),
-    // Client IPs exempt from the public widget's per-IP limits (comma list),
-    // for load tests from one machine. Per-org and per-conversation limits
-    // still apply. Leave empty outside a test.
-    publicWidgetRateLimitExemptIps: (process.env.PUBLIC_WIDGET_RATE_LIMIT_EXEMPT_IPS || "")
-      .split(",")
-      .map((ip) => ip.trim())
-      .filter(Boolean),
   },
 
   domain: {

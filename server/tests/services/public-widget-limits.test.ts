@@ -13,7 +13,6 @@ jest.mock("@server/services/rate-limit.service", () => ({
   rateLimitService: { checkKeyRateLimit: mockCheckKey },
 }));
 
-import { config } from "@server/config/env";
 import {
   PUBLIC_WIDGET_LIMITS,
   isPublicWidgetRateLimited,
@@ -98,22 +97,5 @@ describe("isPublicWidgetRateLimited", () => {
       "public-widget:createPerIp:ip",
       "public-widget:createPerOrg:org",
     ]);
-  });
-
-  it("skips only the per-IP rules for an exempt IP", async () => {
-    mockCheckKey.mockResolvedValue({ limited: false });
-    const exempt = config.server.publicWidgetRateLimitExemptIps;
-    exempt.push("198.51.100.9");
-    try {
-      await isPublicWidgetRateLimited([
-        { rule: "createPerIp", id: "198.51.100.9" },
-        { rule: "createPerOrg", id: "org-1" },
-      ]);
-    } finally {
-      exempt.pop();
-    }
-
-    expect(mockCheckKey).toHaveBeenCalledTimes(1);
-    expect(mockCheckKey.mock.calls[0][0]).toBe("public-widget:createPerOrg:org-1");
   });
 });
