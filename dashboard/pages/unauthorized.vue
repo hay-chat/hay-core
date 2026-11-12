@@ -79,7 +79,7 @@ const requiredRole = computed(() => {
     attemptedPath.includes("/settings/api-tokens") ||
     attemptedPath.includes("/settings/general") ||
     attemptedPath.includes("/settings/privacy") ||
-    attemptedPath.includes("/settings/webchat") ||
+    attemptedPath.includes("/channels") ||
     attemptedPath.includes("/settings/assistant") ||
     attemptedPath.includes("/integrations/marketplace")
   ) {

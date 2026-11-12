@@ -1,17 +1,18 @@
 {
   "channels": {
     "title": "Canais",
-    "description": "Canais de comunicação ativos conectando seus clientes ao Hay.chat",
+    "description": "Onde seus clientes podem falar com você. Cada canal traz as conversas para a mesma caixa de entrada.",
     "headTitle": "Canais - Hay.chat",
     "browseMarketplace": "Ver Marketplace",
-    "loading": "Carregando canais...",
-    "empty": {
-      "title": "Nenhum canal ativo",
-      "description": "Instale uma integração de canal no marketplace para começar a receber conversas.",
-      "action": "Ver Marketplace"
+    "add": {
+      "title": "Adicionar um canal",
+      "description": "WhatsApp, Instagram, e-mail e mais"
     },
-    "actions": {
-      "configure": "Configurar"
+    "webchat": {
+      "description": "O chat para o seu site.",
+      "liveOn": "O chat no seu site, {host}.",
+      "notInstalled": "O chat para o seu site. Adicione uma linha de código para colocar no ar.",
+      "off": "O chat para o seu site. Ele está desligado."
     }
   },
   "marketplace": {
