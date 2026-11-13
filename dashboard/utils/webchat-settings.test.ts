@@ -91,7 +91,11 @@ describe("buildPreviewSrcdoc", () => {
     expect(html).toContain('src="https://api.hay.test/v1/webchat/widget.js"');
     expect(html.match(/<\/script>/g)).toHaveLength(2);
     // The dashboard CSP blocks inline scripts, and the srcdoc frame inherits it.
-    expect(html.match(/<script>/g)).toBeNull();
+    const openings = html.match(/<script\b[^>]*>/gi) ?? [];
+    expect(openings).toHaveLength(2);
+    for (const tag of openings) {
+      expect(tag).toMatch(/\bsrc="|\btype="application\/json"/);
+    }
 
     const block = html.split('<script type="application/json" id="hay-chat-config">')[1];
     expect(JSON.parse(block.split("</" + "script>")[0])).toEqual(config);
