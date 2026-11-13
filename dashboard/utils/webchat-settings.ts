@@ -87,8 +87,11 @@ export interface WebchatPreviewConfig {
 }
 
 /**
- * The page inside the preview iframe: the real widget.js, configured like an embed. `<` is
- * escaped so settings text cannot close the script block.
+ * The page inside the preview iframe: the real widget.js, configured like an embed.
+ *
+ * A srcdoc frame inherits the dashboard's Content-Security-Policy, which allows no inline
+ * scripts. So the config travels as a JSON data block (not executed, so CSP lets it through)
+ * that widget.js reads. `<` is escaped so settings text cannot close the block.
  */
 export function buildPreviewSrcdoc(config: WebchatPreviewConfig, background: string): string {
   const json = JSON.stringify(config)
@@ -98,6 +101,6 @@ export function buildPreviewSrcdoc(config: WebchatPreviewConfig, background: str
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <style>html,body{margin:0;height:100%;background:${background}}</style></head>
-<body><${"script"}>window.HayChat = { config: ${json} };</${"script"}>
+<body><${"script"} type="application/json" id="hay-chat-config">${json}</${"script"}>
 <${"script"} src="${config.baseUrl}/v1/webchat/widget.js" async></${"script"}></body></html>`;
 }
