@@ -83,6 +83,12 @@ describe("buildPreviewSrcdoc", () => {
     csatEnabled: true,
     csatQuestion: "",
     teaserMessage: "",
+    agentName: null,
+    agentAvatarUrl: null,
+    agentAvatarPreset: "sparkle",
+    launcherIcon: "chat",
+    launcherIconStyle: "outline",
+    launcherIconUrl: null,
     preview: { state: "home", device: "desktop" },
   };
 

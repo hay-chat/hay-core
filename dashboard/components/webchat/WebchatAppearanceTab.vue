@@ -137,49 +137,161 @@
     />
   </section>
 
-  <section class="flex items-center gap-3 py-6">
-    <img
-      v-if="assistant?.avatarUrl"
-      :src="assistant.avatarUrl"
-      alt=""
-      class="h-9 w-9 rounded-full object-cover"
-    />
-    <span
-      v-else
-      class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#eef0ff] text-[#3b3f9e]"
-      aria-hidden="true"
+  <section class="space-y-4 py-6" data-testid="webchat-button">
+    <div class="space-y-1">
+      <h2 class="text-base">{{ $t("webchat.appearance.button") }}</h2>
+      <p class="text-sm text-neutral-500">{{ $t("webchat.appearance.buttonHint") }}</p>
+    </div>
+    <WebchatTilePicker
+      v-model="form.launcherIcon"
+      name="webchat-button-icon"
+      :legend="$t('webchat.appearance.buttonIcon')"
+      :options="buttonIconOptions"
     >
-      <Sparkles class="h-4 w-4" />
-    </span>
-    <div class="min-w-0 flex-1">
-      <p class="text-sm font-medium text-neutral-900">
-        {{ assistant?.name || $t("webchat.appearance.assistantFallback") }}
-      </p>
+      <template #tile="{ value }">
+        <span
+          class="grid h-11 w-11 place-items-center rounded-full shadow-sm"
+          :style="{ background: form.brandColor, color: initialColor }"
+          aria-hidden="true"
+        >
+          <img
+            v-if="value === 'custom'"
+            :src="state.launcherIconSrc.value ?? ''"
+            alt=""
+            class="h-5 w-5 object-contain"
+            :class="initialColor === '#ffffff' ? 'brightness-0 invert' : 'brightness-0'"
+          />
+          <WebchatIcon v-else :name="value" :variant="form.launcherIconStyle" class="h-5 w-5" />
+        </span>
+      </template>
+    </WebchatTilePicker>
+    <WebchatChoiceChips
+      v-if="form.launcherIcon !== 'custom'"
+      v-model="form.launcherIconStyle"
+      name="webchat-button-icon-style"
+      :legend="$t('webchat.appearance.buttonIconStyle')"
+      :options="[
+        { value: 'outline', label: $t('webchat.appearance.buttonStyles.outline') },
+        { value: 'filled', label: $t('webchat.appearance.buttonStyles.filled') },
+      ]"
+    />
+    <div class="space-y-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <input
+          id="webchat-button-icon-file"
+          ref="buttonIconInput"
+          type="file"
+          accept="image/svg+xml,.svg"
+          class="sr-only"
+          @change="onButtonIconPicked"
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          :loading="state.launcherIconBusy.value"
+          @click="buttonIconInput?.click()"
+        >
+          {{
+            state.launcherIconSrc.value
+              ? $t("webchat.appearance.replaceSvg")
+              : $t("webchat.appearance.uploadSvg")
+          }}
+        </Button>
+        <Button
+          v-if="state.launcherIconSrc.value"
+          variant="link"
+          size="sm"
+          :disabled="state.launcherIconBusy.value"
+          @click="state.removeLauncherIcon"
+        >
+          {{ $t("webchat.appearance.remove") }}
+        </Button>
+      </div>
+      <p class="text-sm text-neutral-500">{{ $t("webchat.appearance.buttonIconHint") }}</p>
+    </div>
+  </section>
+
+  <section class="space-y-4 py-6" data-testid="webchat-assistant">
+    <div class="space-y-1">
+      <h2 class="text-base">{{ $t("webchat.appearance.assistant") }}</h2>
       <p class="text-sm text-neutral-500">{{ $t("webchat.appearance.assistantHint") }}</p>
     </div>
-    <Button variant="link" size="sm" @click="router.push('/settings/assistant')">
-      {{ $t("webchat.appearance.edit") }}
-    </Button>
+    <Input
+      v-model="form.assistantName"
+      :label="$t('webchat.appearance.assistantName')"
+      :placeholder="$t('webchat.appearance.assistantFallback')"
+      maxlength="255"
+      class="max-w-sm"
+      data-testid="webchat-assistant-name"
+    />
+    <WebchatTilePicker
+      :model-value="avatarChoice"
+      name="webchat-assistant-avatar"
+      :legend="$t('webchat.appearance.avatar')"
+      :options="avatarOptions"
+      @update:model-value="pickAvatar"
+    >
+      <template #tile="{ value }">
+        <img
+          v-if="value === 'upload'"
+          :src="state.assistantAvatarSrc.value ?? ''"
+          alt=""
+          class="h-11 w-11 rounded-full object-cover"
+        />
+        <span
+          v-else
+          class="grid h-11 w-11 place-items-center rounded-full"
+          :style="avatarTint"
+          aria-hidden="true"
+        >
+          <WebchatIcon :name="value" class="h-6 w-6" />
+        </span>
+      </template>
+    </WebchatTilePicker>
+    <div class="space-y-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <input
+          id="webchat-assistant-avatar-file"
+          ref="avatarInput"
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          class="sr-only"
+          @change="onAvatarPicked"
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          :loading="state.avatarBusy.value"
+          @click="avatarInput?.click()"
+        >
+          {{
+            state.assistantAvatarSrc.value
+              ? $t("webchat.appearance.replacePicture")
+              : $t("webchat.appearance.uploadPicture")
+          }}
+        </Button>
+      </div>
+      <p class="text-sm text-neutral-500">{{ $t("webchat.appearance.avatarHint") }}</p>
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { Sparkles } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
-import { useWebchatSettings } from "@/composables/useWebchatSettings";
+import { useWebchatSettings, type AssistantAvatarPreset } from "@/composables/useWebchatSettings";
 import { useUserStore } from "@/stores/user";
 import { normalizeHex, websiteHost } from "@/utils/webchat-settings";
 
 const { t } = useI18n();
-const router = useRouter();
 const state = useWebchatSettings();
 const form = state.form;
 const userStore = useUserStore();
 
 const fileInput = ref<HTMLInputElement | null>(null);
+const buttonIconInput = ref<HTMLInputElement | null>(null);
+const avatarInput = ref<HTMLInputElement | null>(null);
 const websiteHostName = ref<string | null>(null);
-const assistant = ref<{ name: string | null; avatarUrl: string | null } | null>(null);
 
 const organizationName = computed(
   () =>
@@ -217,21 +329,59 @@ function onHexInput() {
   if (color && hexText.value.replace("#", "").length === 6) form.value.brandColor = color;
 }
 
-function onLogoPicked(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (file) void state.uploadLogo(file);
-  input.value = "";
+/** Hands the picked file to `upload` and clears the input, so the same file can be picked again. */
+function onFilePicked(upload: (file: File) => Promise<void>) {
+  return (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file) void upload(file);
+    input.value = "";
+  };
 }
+const onLogoPicked = onFilePicked(state.uploadLogo);
+const onButtonIconPicked = onFilePicked(state.uploadLauncherIcon);
+const onAvatarPicked = onFilePicked(state.uploadAssistantAvatar);
+
+// --- Chat button: the uploaded icon is a choice only once there is one.
+const buttonIconOptions = computed(() => [
+  { value: "chat" as const, label: t("webchat.appearance.buttonIcons.chat") },
+  { value: "sparkle" as const, label: t("webchat.appearance.buttonIcons.sparkle") },
+  { value: "robot" as const, label: t("webchat.appearance.buttonIcons.robot") },
+  ...(state.launcherIconSrc.value
+    ? [{ value: "custom" as const, label: t("webchat.appearance.buttonIcons.custom") }]
+    : []),
+]);
+
+// --- Assistant avatar: an uploaded picture wins over the preset icon. Picking an icon
+// while there is a picture removes the picture, so the icon shows.
+type AvatarChoice = AssistantAvatarPreset | "upload";
+const avatarChoice = computed<AvatarChoice>(() =>
+  state.assistantAvatarSrc.value ? "upload" : form.value.assistantAvatarPreset,
+);
+const avatarOptions = computed(() => [
+  { value: "sparkle" as AvatarChoice, label: t("webchat.appearance.avatarPresets.sparkle") },
+  { value: "sparkles" as AvatarChoice, label: t("webchat.appearance.avatarPresets.sparkles") },
+  { value: "robot" as AvatarChoice, label: t("webchat.appearance.avatarPresets.robot") },
+  ...(state.assistantAvatarSrc.value
+    ? [{ value: "upload" as AvatarChoice, label: t("webchat.appearance.avatarPicture") }]
+    : []),
+]);
+function pickAvatar(choice: AvatarChoice) {
+  if (choice === "upload") return;
+  form.value.assistantAvatarPreset = choice;
+  if (state.assistantAvatarSrc.value) void state.removeAssistantAvatar();
+}
+// The widget draws the assistant's icon in the brand colour on a light tint of it.
+const avatarTint = computed(() => ({
+  background: `color-mix(in srgb, ${form.value.brandColor} 12%, white)`,
+  color: form.value.brandColor,
+}));
 
 onMounted(async () => {
-  const [settings, identity] = await Promise.allSettled([
-    Hay.organizations.getSettings.query(),
-    Hay.organizations.assistant.get.query(),
-  ]);
-  if (settings.status === "fulfilled") websiteHostName.value = websiteHost(settings.value.website);
-  if (identity.status === "fulfilled") {
-    assistant.value = { name: identity.value.name, avatarUrl: identity.value.avatarUrl };
+  try {
+    websiteHostName.value = websiteHost((await Hay.organizations.getSettings.query()).website);
+  } catch {
+    // The hint falls back to "add your website".
   }
 });
 </script>

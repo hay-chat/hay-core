@@ -83,7 +83,15 @@ export interface WebchatPreviewConfig {
   csatEnabled: boolean;
   csatQuestion: string;
   teaserMessage: string;
-  preview: { state: "home" | "chat" | "ended"; device: "desktop" | "mobile" };
+  agentName: string | null;
+  /** The uploaded picture; wins over the preset. */
+  agentAvatarUrl: string | null;
+  agentAvatarPreset: "sparkle" | "sparkles" | "robot";
+  launcherIcon: "chat" | "sparkle" | "robot" | "custom";
+  launcherIconStyle: "filled" | "outline";
+  launcherIconUrl: string | null;
+  /** "closed" shows the button (and the teaser) with the chat not open. */
+  preview: { state: "closed" | "home" | "chat" | "ended"; device: "desktop" | "mobile" };
 }
 
 /**

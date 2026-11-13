@@ -353,8 +353,44 @@
       "positionRight": "Canto inferior direito",
       "positionLeft": "Canto inferior esquerdo",
       "assistantFallback": "Seu assistente",
-      "assistantHint": "O nome e o avatar do assistente vêm de Identidade do assistente.",
-      "edit": "Editar"
+      "assistantHint": "Como o assistente aparece no chat. O nome e o avatar também são usados em todo o Hay.",
+      "button": "Botão do chat",
+      "buttonHint": "O botão redondo que os visitantes clicam para abrir o chat.",
+      "buttonIcon": "Ícone",
+      "buttonIcons": {
+        "chat": "Balão de conversa",
+        "sparkle": "Brilho",
+        "robot": "Robô",
+        "custom": "Seu ícone"
+      },
+      "buttonIconStyle": "Estilo do ícone",
+      "buttonStyles": {
+        "outline": "Contorno",
+        "filled": "Preenchido"
+      },
+      "uploadSvg": "Enviar seu SVG",
+      "replaceSvg": "Trocar seu SVG",
+      "buttonIconHint": "SVG de até 100 KB. Aparece em uma cor, branco ou escuro conforme sua cor da marca, e vale na hora.",
+      "buttonIconTooLarge": "O ícone deve ter no máximo 100 KB",
+      "buttonIconSaved": "Ícone salvo. O botão já mostra o novo ícone.",
+      "buttonIconRemoved": "Ícone removido. O botão mostra o balão de conversa.",
+      "buttonIconFailed": "Não foi possível trocar o ícone do botão. Confira se o arquivo é um SVG.",
+      "assistant": "Assistente",
+      "assistantName": "Nome",
+      "avatar": "Avatar",
+      "avatarPresets": {
+        "sparkle": "Brilho",
+        "sparkles": "Brilhos",
+        "robot": "Robô"
+      },
+      "avatarPicture": "Sua imagem",
+      "uploadPicture": "Enviar uma imagem",
+      "replacePicture": "Trocar a imagem",
+      "avatarHint": "PNG, JPG, WebP ou GIF, até 2 MB. A imagem vale na hora e aparece no lugar do ícone. Escolha um ícone para voltar a ele.",
+      "avatarTooLarge": "A imagem deve ter no máximo 2 MB",
+      "avatarSaved": "Imagem salva. O chat já mostra a nova imagem.",
+      "avatarRemoved": "Imagem removida. O chat mostra o ícone.",
+      "avatarFailed": "Não foi possível trocar a imagem do assistente"
     },
     "content": {
       "home": "Início",
@@ -447,7 +483,8 @@
       "states": {
         "home": "Início",
         "chat": "Chat",
-        "ended": "Encerrado"
+        "ended": "Encerrado",
+        "closed": "Botão"
       },
       "deviceLabel": "Dispositivo",
       "devices": {

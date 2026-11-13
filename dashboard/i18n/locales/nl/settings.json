@@ -353,8 +353,44 @@
       "positionRight": "Rechtsonder",
       "positionLeft": "Linksonder",
       "assistantFallback": "Je assistent",
-      "assistantHint": "De naam en avatar van de assistent komen uit Identiteit van de assistent.",
-      "edit": "Bewerken"
+      "assistantHint": "Hoe de assistent in de chat verschijnt. Naam en avatar worden ook elders in Hay gebruikt.",
+      "button": "Chatknop",
+      "buttonHint": "De ronde knop waarmee bezoekers de chat openen.",
+      "buttonIcon": "Pictogram",
+      "buttonIcons": {
+        "chat": "Tekstballon",
+        "sparkle": "Ster",
+        "robot": "Robot",
+        "custom": "Jouw pictogram"
+      },
+      "buttonIconStyle": "Stijl van het pictogram",
+      "buttonStyles": {
+        "outline": "Omlijnd",
+        "filled": "Gevuld"
+      },
+      "uploadSvg": "Eigen SVG uploaden",
+      "replaceSvg": "Je SVG vervangen",
+      "buttonIconHint": "SVG tot 100 KB. Wordt in één kleur getoond, wit of donker passend bij je merkkleur, en geldt meteen.",
+      "buttonIconTooLarge": "Het pictogram mag maximaal 100 KB zijn",
+      "buttonIconSaved": "Pictogram opgeslagen. De knop toont het meteen.",
+      "buttonIconRemoved": "Pictogram verwijderd. De knop toont de tekstballon.",
+      "buttonIconFailed": "Het pictogram kon niet worden gewijzigd. Controleer of het bestand een SVG is.",
+      "assistant": "Assistent",
+      "assistantName": "Naam",
+      "avatar": "Avatar",
+      "avatarPresets": {
+        "sparkle": "Ster",
+        "sparkles": "Sterren",
+        "robot": "Robot"
+      },
+      "avatarPicture": "Jouw afbeelding",
+      "uploadPicture": "Afbeelding uploaden",
+      "replacePicture": "Afbeelding vervangen",
+      "avatarHint": "PNG, JPG, WebP of GIF, tot 2 MB. Een afbeelding geldt meteen en vervangt het pictogram. Kies een pictogram om terug te gaan.",
+      "avatarTooLarge": "De afbeelding mag maximaal 2 MB zijn",
+      "avatarSaved": "Afbeelding opgeslagen. De chat toont hem meteen.",
+      "avatarRemoved": "Afbeelding verwijderd. De chat toont het pictogram.",
+      "avatarFailed": "De afbeelding van de assistent kon niet worden gewijzigd"
     },
     "content": {
       "home": "Start",
@@ -447,7 +483,8 @@
       "states": {
         "home": "Start",
         "chat": "Chat",
-        "ended": "Afgerond"
+        "ended": "Afgerond",
+        "closed": "Knop"
       },
       "deviceLabel": "Apparaat",
       "devices": {

@@ -125,7 +125,8 @@ function sampleThread(ended: boolean): { messages: Message[]; seenId: string } {
 export function createPreviewChat(options: PreviewOptions): WidgetChat {
   const ended = options.state === "ended";
   const thread = sampleThread(ended);
-  const isOpen = ref(true);
+  // "closed" shows the button (and the teaser); clicking it opens the chat.
+  const isOpen = ref(options.state !== "closed");
   const csatSubmitted = ref(false);
   const ratings = ref<Record<string, "up" | "down">>({});
   const done = async () => true;

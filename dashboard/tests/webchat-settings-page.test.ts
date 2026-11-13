@@ -8,6 +8,8 @@ const api = vi.hoisted(() => ({
   getSettings: vi.fn(),
   updateSettings: vi.fn(),
   setUnderAttack: vi.fn(),
+  getAssistant: vi.fn(),
+  updateAssistant: vi.fn(),
 }));
 vi.mock("@/utils/api", () => ({
   Hay: {
@@ -15,6 +17,12 @@ vi.mock("@/utils/api", () => ({
       getSettings: { query: api.getSettings },
       updateSettings: { mutate: api.updateSettings },
       setUnderAttack: { mutate: api.setUnderAttack },
+    },
+    organizations: {
+      assistant: {
+        get: { query: api.getAssistant },
+        update: { mutate: api.updateAssistant },
+      },
     },
   },
   HayApi: {},
@@ -47,6 +55,9 @@ const saved = {
   logoSource: null,
   themeMode: "light",
   position: "right",
+  launcherIcon: "chat",
+  launcherIconStyle: "outline",
+  launcherIconUrl: null,
   widgetTitle: "Chat with us",
   homeHeading: null,
   showGreeting: true,
@@ -100,6 +111,8 @@ describe("Webchat settings page", () => {
     route.query = { tab: "content" };
     api.getSettings.mockResolvedValue(saved);
     api.updateSettings.mockResolvedValue({});
+    api.getAssistant.mockResolvedValue({ name: "Ava", avatarUrl: null, avatarPreset: "sparkle" });
+    api.updateAssistant.mockResolvedValue({});
   });
 
   it("shows the save bar only after a change, and saves the edit", async () => {
@@ -121,9 +134,42 @@ describe("Webchat settings page", () => {
         brandColor: "#14532d",
         themeMode: "light",
         allowedDomains: ["acme.com"],
+        launcherIcon: "chat",
+        launcherIconStyle: "outline",
       }),
     );
+    // The assistant didn't change, so it isn't saved (that takes another permission).
+    expect(api.updateAssistant).not.toHaveBeenCalled();
     expect(saveBar(wrapper).exists()).toBe(false);
+  });
+
+  it("saves the assistant's name and icon with the Save bar when they changed", async () => {
+    const { createWebchatSettings } = await import("../composables/useWebchatSettings");
+    let state!: ReturnType<typeof createWebchatSettings>;
+    mountWithStubs(
+      defineComponent({
+        setup() {
+          state = createWebchatSettings();
+          return () => h("div");
+        },
+      }),
+      {},
+    );
+    await state.load();
+    expect(state.form.value).toMatchObject({
+      assistantName: "Ava",
+      assistantAvatarPreset: "sparkle",
+    });
+
+    state.form.value.assistantName = "Robin";
+    state.form.value.assistantAvatarPreset = "robot";
+    expect(state.isDirty.value).toBe(true);
+    await state.save();
+
+    expect(api.updateAssistant).toHaveBeenCalledWith({ name: "Robin", avatarPreset: "robot" });
+    expect(api.updateSettings).toHaveBeenCalledWith(
+      expect.not.objectContaining({ assistantName: expect.anything() }),
+    );
   });
 
   it("discard puts the saved values back", async () => {

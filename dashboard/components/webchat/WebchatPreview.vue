@@ -82,7 +82,8 @@ import { buildPreviewSrcdoc, type WebchatPreviewConfig } from "@/utils/webchat-s
 type PreviewState = WebchatPreviewConfig["preview"]["state"];
 type PreviewDevice = WebchatPreviewConfig["preview"]["device"];
 
-const states: PreviewState[] = ["home", "chat", "ended"];
+// The visitor's journey: the button (and teaser), then the chat.
+const states: PreviewState[] = ["closed", "home", "chat", "ended"];
 const devices: PreviewDevice[] = ["desktop", "mobile"];
 const themes = ["light", "dark"] as const;
 
@@ -131,6 +132,12 @@ const config = computed<WebchatPreviewConfig>(() => ({
   csatEnabled: form.value.csatEnabled,
   csatQuestion: form.value.csatQuestion,
   teaserMessage: form.value.teaserMessage,
+  agentName: form.value.assistantName.trim() || null,
+  agentAvatarUrl: state.assistantAvatarSrc.value,
+  agentAvatarPreset: form.value.assistantAvatarPreset,
+  launcherIcon: form.value.launcherIcon,
+  launcherIconStyle: form.value.launcherIconStyle,
+  launcherIconUrl: state.launcherIconSrc.value,
   preview: { state: previewState.value, device: device.value },
 }));
 

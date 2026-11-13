@@ -74,7 +74,7 @@
   width: 56px;
   height: 56px;
   padding: 0;
-  border-radius: 20px;
+  border-radius: 50%;
   background: var(--hay-launcher);
   border: none;
   cursor: pointer;
@@ -115,6 +115,23 @@
 .hay-chat-button--left {
   left: 20px;
   right: auto;
+}
+
+.hay-chat-button svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* The merchant's own icon, recoloured to the icon colour. */
+.hay-chat-button__icon-image {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+#hay-webchat-root[data-launcher-dark-icon] .hay-chat-button__icon-image {
+  filter: brightness(0);
 }
 
 .hay-chat-button__icon-close,

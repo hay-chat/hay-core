@@ -9,15 +9,27 @@ import { normalizeHex, type WebchatThemeMode } from "@/utils/webchat-settings";
 type UpdateSettingsInput = RouterInputs["webchat"]["updateSettings"];
 type SavedSettings = RouterOutputs["webchat"]["getSettings"];
 type UnderAttackState = SavedSettings["underAttack"];
+type Assistant = RouterOutputs["organizations"]["assistant"]["get"];
+export type AssistantAvatarPreset = Assistant["avatarPreset"];
+export type LauncherIcon = SavedSettings["launcherIcon"];
+export type LauncherIconStyle = SavedSettings["launcherIconStyle"];
 
 export const DEFAULT_BRAND_COLOR = "#001df5";
 
-/** Everything the Save bar saves. Logo, under-attack mode and the secret act straight away. */
+/**
+ * Everything the Save bar saves. Uploads (logo, avatar, button icon), under-attack mode and
+ * the secret act straight away. The assistant's name and icon belong to the organization's
+ * assistant, not to the webchat, and are saved there.
+ */
 export interface WebchatSettingsForm {
   isEnabled: boolean;
   brandColor: string;
   themeMode: WebchatThemeMode;
   position: "left" | "right";
+  launcherIcon: LauncherIcon;
+  launcherIconStyle: LauncherIconStyle;
+  assistantName: string;
+  assistantAvatarPreset: AssistantAvatarPreset;
   widgetTitle: string;
   homeHeading: string;
   showGreeting: boolean;
@@ -38,6 +50,10 @@ const emptyForm = (): WebchatSettingsForm => ({
   brandColor: DEFAULT_BRAND_COLOR,
   themeMode: "light",
   position: "right",
+  launcherIcon: "chat",
+  launcherIconStyle: "outline",
+  assistantName: "",
+  assistantAvatarPreset: "sparkle",
   widgetTitle: "",
   homeHeading: "",
   showGreeting: true,
@@ -61,12 +77,16 @@ const lines = (text: string) =>
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
-function toForm(settings: SavedSettings): WebchatSettingsForm {
+function toForm(settings: SavedSettings, assistant: Assistant): WebchatSettingsForm {
   return {
     isEnabled: settings.isEnabled,
     brandColor: normalizeHex(settings.brandColor) ?? DEFAULT_BRAND_COLOR,
     themeMode: settings.themeMode,
     position: settings.position,
+    launcherIcon: settings.launcherIcon,
+    launcherIconStyle: settings.launcherIconStyle,
+    assistantName: assistant.name ?? "",
+    assistantAvatarPreset: assistant.avatarPreset,
     widgetTitle: settings.widgetTitle,
     homeHeading: settings.homeHeading ?? "",
     showGreeting: settings.showGreeting,
@@ -89,6 +109,8 @@ function toUpdateInput(form: WebchatSettingsForm): UpdateSettingsInput {
     brandColor: normalizeHex(form.brandColor) ?? DEFAULT_BRAND_COLOR,
     themeMode: form.themeMode,
     position: form.position as NonNullable<UpdateSettingsInput["position"]>,
+    launcherIcon: form.launcherIcon,
+    launcherIconStyle: form.launcherIconStyle,
     widgetTitle: form.widgetTitle.trim() || undefined,
     homeHeading: form.homeHeading.trim() || null,
     showGreeting: form.showGreeting,
@@ -120,6 +142,8 @@ export function createWebchatSettings() {
   const brandColorSource = ref<"website" | "custom" | null>(null);
   const logoUrl = ref<string | null>(null);
   const logoSource = ref<"website" | "custom" | null>(null);
+  const launcherIconUrl = ref<string | null>(null);
+  const assistantAvatarUrl = ref<string | null>(null);
   const lastSeenAt = ref<string | null>(null);
   const lastSeenOrigin = ref<string | null>(null);
   const underAttack = ref<UnderAttackState>({ active: false, until: null, source: null });
@@ -127,16 +151,20 @@ export function createWebchatSettings() {
 
   // Uploads come back as a path on the API; website icons may be absolute.
   const { getApiUrl } = useDomain();
-  const logoSrc = computed(() => {
-    const url = logoUrl.value;
+  const absolute = (url: string | null) => {
     if (!url) return null;
     return /^(https?:|data:)/.test(url) ? url : getApiUrl(url);
-  });
+  };
+  const logoSrc = computed(() => absolute(logoUrl.value));
+  const launcherIconSrc = computed(() => absolute(launcherIconUrl.value));
+  const assistantAvatarSrc = computed(() => absolute(assistantAvatarUrl.value));
 
   const isDirty = computed(() => JSON.stringify(form.value) !== JSON.stringify(saved.value));
 
-  function apply(settings: SavedSettings) {
-    saved.value = toForm(settings);
+  function apply(settings: SavedSettings, assistant: Assistant) {
+    saved.value = toForm(settings, assistant);
+    launcherIconUrl.value = settings.launcherIconUrl;
+    assistantAvatarUrl.value = assistant.avatarUrl;
     form.value = clone(saved.value);
     brandPalette.value = (settings.brandPalette ?? []).flatMap(
       (c: string) => normalizeHex(c) ?? [],
@@ -151,11 +179,14 @@ export function createWebchatSettings() {
   }
 
   /** Re-reads the saved settings without throwing away unsaved edits. */
+  const fetchAll = () =>
+    Promise.all([Hay.webchat.getSettings.query(), Hay.organizations.assistant.get.query()]);
+
   async function refreshFacts() {
-    const settings = await Hay.webchat.getSettings.query();
+    const [settings, assistant] = await fetchAll();
     const edits = clone(form.value);
     const wasDirty = isDirty.value;
-    apply(settings);
+    apply(settings, assistant);
     if (wasDirty) form.value = edits;
   }
 
@@ -163,7 +194,7 @@ export function createWebchatSettings() {
     loading.value = true;
     loadFailed.value = false;
     try {
-      apply(await Hay.webchat.getSettings.query());
+      apply(...(await fetchAll()));
     } catch (error) {
       console.error("Failed to load webchat settings:", error);
       loadFailed.value = true;
@@ -177,6 +208,16 @@ export function createWebchatSettings() {
     saving.value = true;
     try {
       const sent = clone(form.value);
+      // Only when they changed: editing the webchat doesn't need permission to edit the assistant.
+      if (
+        sent.assistantName !== saved.value.assistantName ||
+        sent.assistantAvatarPreset !== saved.value.assistantAvatarPreset
+      ) {
+        await Hay.organizations.assistant.update.mutate({
+          name: sent.assistantName,
+          avatarPreset: sent.assistantAvatarPreset,
+        });
+      }
       await Hay.webchat.updateSettings.mutate(toUpdateInput(sent));
       saved.value = sent;
       // The server sets brandColorSource and normalizes values; keep edits made while saving.
@@ -194,6 +235,87 @@ export function createWebchatSettings() {
     form.value = clone(saved.value);
   }
 
+  const readAsDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
+
+  /** Uploads and removals apply straight away, then re-read the saved facts. True when done. */
+  async function act(
+    busy: { value: boolean },
+    run: () => Promise<unknown>,
+    messages: { success: string; failure: string },
+  ): Promise<boolean> {
+    busy.value = true;
+    try {
+      await run();
+      await refreshFacts();
+      toast.success(t(messages.success));
+      return true;
+    } catch (error) {
+      console.error(t(messages.failure), error);
+      toast.error(t(messages.failure));
+      return false;
+    } finally {
+      busy.value = false;
+    }
+  }
+
+  // --- Assistant avatar (the picture wins over the preset icon).
+  const avatarBusy = ref(false);
+
+  async function uploadAssistantAvatar(file: File) {
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error(t("webchat.appearance.avatarTooLarge"));
+      return;
+    }
+    await act(
+      avatarBusy,
+      async () =>
+        Hay.organizations.assistant.uploadAvatar.mutate({ avatar: await readAsDataUrl(file) }),
+      { success: "webchat.appearance.avatarSaved", failure: "webchat.appearance.avatarFailed" },
+    );
+  }
+
+  /** Back to a preset icon: drops the picture, keeping the icon chosen in the form. */
+  async function removeAssistantAvatar() {
+    await act(avatarBusy, () => Hay.organizations.assistant.removeAvatar.mutate(), {
+      success: "webchat.appearance.avatarRemoved",
+      failure: "webchat.appearance.avatarFailed",
+    });
+  }
+
+  // --- Chat button icon: the merchant's own SVG, rendered to an image on the server.
+  const launcherIconBusy = ref(false);
+
+  async function uploadLauncherIcon(file: File) {
+    if (file.size > 100 * 1024) {
+      toast.error(t("webchat.appearance.buttonIconTooLarge"));
+      return;
+    }
+    const done = await act(
+      launcherIconBusy,
+      async () => Hay.webchat.uploadLauncherIcon.mutate({ icon: await readAsDataUrl(file) }),
+      {
+        success: "webchat.appearance.buttonIconSaved",
+        failure: "webchat.appearance.buttonIconFailed",
+      },
+    );
+    // The server switched the button to the upload; unsaved edits must not undo that.
+    if (done) form.value.launcherIcon = "custom";
+  }
+
+  async function removeLauncherIcon() {
+    const done = await act(launcherIconBusy, () => Hay.webchat.removeLauncherIcon.mutate(), {
+      success: "webchat.appearance.buttonIconRemoved",
+      failure: "webchat.appearance.buttonIconFailed",
+    });
+    if (done && form.value.launcherIcon === "custom") form.value.launcherIcon = "chat";
+  }
+
   // --- Logo: uploads and removals apply straight away.
   const logoBusy = ref(false);
 
@@ -204,12 +326,7 @@ export function createWebchatSettings() {
     }
     logoBusy.value = true;
     try {
-      const logo = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error("Failed to read file"));
-        reader.readAsDataURL(file);
-      });
+      const logo = await readAsDataUrl(file);
       await Hay.webchat.uploadLogo.mutate({ logo });
       await refreshFacts();
       toast.success(t("webchat.appearance.logoSaved"));
@@ -271,17 +388,25 @@ export function createWebchatSettings() {
     logoUrl,
     logoSrc,
     logoSource,
+    launcherIconSrc,
+    assistantAvatarSrc,
     lastSeenAt,
     lastSeenOrigin,
     underAttack,
     underAttackHours,
     logoBusy,
+    avatarBusy,
+    launcherIconBusy,
     togglingUnderAttack,
     load,
     save,
     discard,
     uploadLogo,
     removeLogo,
+    uploadAssistantAvatar,
+    removeAssistantAvatar,
+    uploadLauncherIcon,
+    removeLauncherIcon,
     toggleUnderAttack,
   };
 }

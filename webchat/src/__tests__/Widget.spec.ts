@@ -292,5 +292,23 @@ describe("Widget", () => {
       expect(window.props("home")).toBe(true);
       expect(window.props("isSheet")).toBe(false);
     });
+
+    it("closed: shows only the button; opening it lands on home", async () => {
+      const { createPreviewChat, PREVIEW_AVAILABILITY } = await import("../preview");
+      const chat = createPreviewChat({ state: "closed", device: "desktop" });
+      const wrapper = shallowMount(Widget, {
+        props: {
+          config: { ...config, preview: { state: "closed", device: "desktop" } },
+          publicConfig: null,
+          launcher: launcher(),
+          preview: { chat, availability: PREVIEW_AVAILABILITY, conversations: [] },
+        },
+      });
+      expect(wrapper.findComponent({ name: "ChatWindow" }).exists()).toBe(false);
+
+      chat.toggleChat();
+      await nextTick();
+      expect(wrapper.findComponent({ name: "ChatWindow" }).props("home")).toBe(true);
+    });
   });
 });

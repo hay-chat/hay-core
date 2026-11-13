@@ -3,6 +3,8 @@ import {
   WebchatSettings,
   WebchatPosition,
   type WebchatBrandingSource,
+  type WebchatLauncherIcon,
+  type WebchatLauncherIconStyle,
   type WebchatPageToolsSettings,
   type WebchatThemeMode,
 } from "@server/database/entities/webchat-settings.entity";
@@ -11,6 +13,7 @@ import { storageService } from "@server/services/storage.service";
 import { Upload } from "@server/entities/upload.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import type { Organization } from "@server/entities/organization.entity";
+import type { AssistantAvatarPreset } from "@server/types/organization-settings.types";
 import { AppDataSource } from "@server/database/data-source";
 import { ACTIONS, RESOURCES } from "@server/types/scopes";
 import { createLogger } from "@server/lib/logger";
@@ -24,6 +27,8 @@ export interface WebchatSettingsUpdateDTO {
   position?: WebchatPosition;
   themeMode?: WebchatThemeMode;
   brandColor?: string;
+  launcherIcon?: WebchatLauncherIcon;
+  launcherIconStyle?: WebchatLauncherIconStyle;
   homeHeading?: string | null;
   showGreeting?: boolean;
   greetingMessage?: string | null;
@@ -63,6 +68,12 @@ export interface WebchatPublicConfig {
   csatQuestion: string | null;
   agentName: string | null;
   agentAvatarUrl: string | null;
+  /** The assistant's icon when it has no uploaded avatar. */
+  agentAvatarPreset: AssistantAvatarPreset;
+  /** The chat button's icon; "custom" comes with launcherIconUrl. */
+  launcherIcon: WebchatLauncherIcon;
+  launcherIconStyle: WebchatLauncherIconStyle;
+  launcherIconUrl: string | null;
   preChatForm: FormSchema | null;
 }
 
@@ -73,6 +84,8 @@ export type WebchatSettingsView = Omit<
   | "identitySecret"
   | "logoUpload"
   | "logoUploadId"
+  | "launcherIconUpload"
+  | "launcherIconUploadId"
   | "brandingImportedAt"
   | "lastSeenAt"
   | "underAttackUntil"
@@ -81,6 +94,7 @@ export type WebchatSettingsView = Omit<
 > & {
   logoUrl: string | null;
   logoSource: WebchatBrandingSource | null;
+  launcherIconUrl: string | null;
   lastSeenAt: string | null;
   lastSeenOrigin: string | null;
   underAttackUntil: string | null;
@@ -126,6 +140,8 @@ export class WebchatSettingsService {
       identitySecret: _identitySecret,
       logoUpload: _logoUpload,
       logoUploadId,
+      launcherIconUpload: _launcherIconUpload,
+      launcherIconUploadId,
       brandingImportedAt: _brandingImportedAt,
       lastSeenAt,
       underAttackUntil,
@@ -136,6 +152,7 @@ export class WebchatSettingsService {
     return {
       ...rest,
       logoUrl: await uploadUrl(logoUploadId),
+      launcherIconUrl: await uploadUrl(launcherIconUploadId),
       lastSeenAt: lastSeenAt ? new Date(lastSeenAt).toISOString() : null,
       underAttackUntil: underAttackUntil ? new Date(underAttackUntil).toISOString() : null,
       createdAt: new Date(createdAt).toISOString(),
@@ -189,10 +206,37 @@ export class WebchatSettingsService {
     return this.toView(updated);
   }
 
+  /** Show the merchant's own icon on the chat button. */
+  async setCustomLauncherIcon(
+    organizationId: string,
+    uploadId: string,
+  ): Promise<WebchatSettingsView> {
+    const settings = await this.getSettings(organizationId);
+    const previous = settings.launcherIconUploadId;
+    const updated = await webchatSettingsRepository.update(organizationId, {
+      launcherIconUploadId: uploadId,
+      launcherIcon: "custom",
+    });
+    if (previous && previous !== uploadId) await this.deleteUpload(previous);
+    return this.toView(updated);
+  }
+
+  /** Remove the uploaded button icon; the button goes back to the chat bubble. */
+  async removeLauncherIcon(organizationId: string): Promise<WebchatSettingsView> {
+    const settings = await this.getSettings(organizationId);
+    const previous = settings.launcherIconUploadId;
+    const updated = await webchatSettingsRepository.update(organizationId, {
+      launcherIconUploadId: null,
+      ...(settings.launcherIcon === "custom" ? { launcherIcon: "chat" as const } : {}),
+    });
+    if (previous) await this.deleteUpload(previous);
+    return this.toView(updated);
+  }
+
   private async deleteUpload(uploadId: string): Promise<void> {
     await storageService
       .delete(uploadId)
-      .catch((error) => logger.warn({ err: error, uploadId }, "Could not delete a webchat logo"));
+      .catch((error) => logger.warn({ err: error, uploadId }, "Could not delete a webchat image"));
   }
 
   /** Website branding import for this organization's website, in the background. */
@@ -277,6 +321,9 @@ export class WebchatSettingsService {
       ? storageService.getUrl(organization.assistantAvatarUpload)
       : null;
 
+    const launcherIconUrl =
+      settings.launcherIcon === "custom" ? await uploadUrl(settings.launcherIconUploadId) : null;
+
     // Widget logo, else the organization logo.
     const logoUrl =
       (await uploadUrl(settings.logoUploadId)) ??
@@ -298,6 +345,12 @@ export class WebchatSettingsService {
       csatQuestion: settings.csatQuestion,
       agentName,
       agentAvatarUrl,
+      agentAvatarPreset: organization?.settings?.assistantAvatarPreset ?? "sparkle",
+      // "custom" with its upload gone (deleted elsewhere) falls back to the chat bubble.
+      launcherIcon:
+        settings.launcherIcon === "custom" && !launcherIconUrl ? "chat" : settings.launcherIcon,
+      launcherIconStyle: settings.launcherIconStyle,
+      launcherIconUrl,
       preChatForm: settings.preChatForm ?? null,
     };
   }

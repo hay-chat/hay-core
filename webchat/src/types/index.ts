@@ -79,6 +79,14 @@ export interface HayChatConfig {
   logoUrl?: string | null;
   /** Home view heading; overrides the one in Settings > Webchat (the dashboard preview sets it). */
   homeHeading?: string | null;
+  /** The assistant's icon when it has no avatar picture; overrides Settings > Webchat. */
+  agentAvatarPreset?: AssistantAvatarPreset;
+  /** The chat button's icon; overrides Settings > Webchat. "custom" needs `launcherIconUrl`. */
+  launcherIcon?: LauncherIcon;
+  /** Whether a preset button icon is drawn solid or as an outline. */
+  launcherIconStyle?: LauncherIconStyle;
+  /** The merchant's own button icon (an image), shown in white. */
+  launcherIconUrl?: string | null;
   /**
    * The dashboard's live preview (C4): the widget opens straight away on sample
    * content, and never calls the server, stores anything or opens a socket.
@@ -86,9 +94,14 @@ export interface HayChatConfig {
   preview?: PreviewOptions;
 }
 
+export type AssistantAvatarPreset = "sparkle" | "sparkles" | "robot";
+export type LauncherIcon = "chat" | "sparkle" | "robot" | "custom";
+export type LauncherIconStyle = "filled" | "outline";
+
 /** What the dashboard's live preview shows. */
 export interface PreviewOptions {
-  state: "home" | "chat" | "ended";
+  /** "closed" shows the chat button (and the teaser) with the chat closed. */
+  state: "home" | "chat" | "ended" | "closed";
   /** "mobile" forces the full-screen sheet, "desktop" the floating window. */
   device: "desktop" | "mobile";
 }
@@ -114,6 +127,12 @@ export interface PublicConfig {
   greetingMessage?: string | null;
   agentName?: string | null;
   agentAvatarUrl?: string | null;
+  /** The assistant's icon when it has no avatar picture. */
+  agentAvatarPreset?: AssistantAvatarPreset;
+  launcherIcon?: LauncherIcon;
+  launcherIconStyle?: LauncherIconStyle;
+  /** Set when launcherIcon is "custom". */
+  launcherIconUrl?: string | null;
   /** Hex "#rrggbb"; the widget applies the brand-colour rule (utils/brandColor). */
   brandColor?: string;
   themeMode?: ThemeMode;

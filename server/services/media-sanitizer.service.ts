@@ -230,3 +230,35 @@ export async function sanitizePublicImage(buffer: Buffer): Promise<SanitizedMedi
   }
   return reencodeOrReject(buffer, detected.mime);
 }
+
+/** Largest SVG accepted as an icon; real icons are a few KB. */
+export const MAX_SVG_ICON_BYTES = 100 * 1024;
+/** Side of the PNG an SVG icon is rendered to: sharp at 3x a 32px icon. */
+const SVG_ICON_SIZE = 128;
+
+/**
+ * Render an uploaded SVG icon to a square, transparent PNG. Visitors only ever
+ * get the PNG, so nothing in the SVG (scripts, links, external references)
+ * leaves the server. libvips reads it from memory with no base path, so it
+ * cannot reach other files.
+ */
+export async function rasterizeSvgIcon(buffer: Buffer): Promise<Buffer> {
+  if (buffer.length > MAX_SVG_ICON_BYTES) {
+    throw new MediaRejectedError("The SVG is too large. Use one under 100 KB.");
+  }
+  const head = buffer.subarray(0, 1024).toString("utf8").trimStart().toLowerCase();
+  if (!/^(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*(<!doctype svg[^>]*>\s*)?<svg[\s>]/.test(head)) {
+    throw new MediaRejectedError("That file is not an SVG");
+  }
+  try {
+    return await sharp(buffer, { density: 300, limitInputPixels: MAX_IMAGE_INPUT_PIXELS })
+      .resize(SVG_ICON_SIZE, SVG_ICON_SIZE, {
+        fit: "contain",
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      })
+      .png()
+      .toBuffer();
+  } catch {
+    throw new MediaRejectedError("That SVG could not be read");
+  }
+}

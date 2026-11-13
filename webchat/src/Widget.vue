@@ -84,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, defineAsyncComponent } from "vue";
+import { ref, computed, onMounted, watch, defineAsyncComponent, provide } from "vue";
 import ChatWindow from "./components/ChatWindow.vue";
 import { useChat, type WidgetChat, type WidgetPreview } from "./composables/useChat";
 import { safeStorage } from "./composables/useConsent";
@@ -100,6 +100,7 @@ import {
 } from "./utils/availability";
 import type { FormResponse } from "@hay/form-schema";
 import type { HayChatConfig, LauncherBridge, PublicConfig } from "./types";
+import { ASSISTANT_AVATAR_PRESET } from "./components/Avatar.vue";
 
 // The home view loads with the chat's first open (most visitors start there),
 // in its own chunk so the chat chunk stays within its size budget.
@@ -153,6 +154,14 @@ const resolveUrl = (url: string | undefined | null): string | undefined => {
 // Host-provided config takes priority, fetched config fills in gaps
 const resolvedAvatarUrl = computed(() =>
   resolveUrl(props.config.agentAvatarUrl || props.publicConfig?.agentAvatarUrl),
+);
+
+// The assistant's icon when it has no picture; every Avatar reads it.
+provide(
+  ASSISTANT_AVATAR_PRESET,
+  computed(
+    () => props.config.agentAvatarPreset || props.publicConfig?.agentAvatarPreset || "sparkle",
+  ),
 );
 
 const resolvedLogoUrl = computed(() =>
@@ -267,7 +276,10 @@ watch(isSheet, (sheet) => props.launcher.setSheet(sheet), { immediate: true });
 
 // Home (question first) or the conversation. Opening the widget with a
 // conversation in this tab goes straight to it; otherwise home.
-const view = ref<"home" | "chat">(props.config.preview?.state === "home" ? "home" : "chat");
+const previewState = props.config.preview?.state;
+const view = ref<"home" | "chat">(
+  previewState === "home" || previewState === "closed" ? "home" : "chat",
+);
 const hasConversation = () =>
   Boolean(
     conversationId.value ||

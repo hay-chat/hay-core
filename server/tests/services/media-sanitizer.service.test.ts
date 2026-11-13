@@ -6,6 +6,7 @@ import {
   MediaRejectedError,
   sanitizeConversationMedia,
   neutraliseCsvFormulas,
+  rasterizeSvgIcon,
 } from "@server/services/media-sanitizer.service";
 
 /**
@@ -188,5 +189,36 @@ describe("neutraliseCsvFormulas", () => {
   it("applies to a .csv declared as plain text", async () => {
     const result = await sanitizeConversationMedia(Buffer.from("=1,b"), "text/plain", "x.CSV");
     expect(result.buffer.toString()).toBe("'=1,b");
+  });
+});
+
+describe("rasterizeSvgIcon", () => {
+  const svg = (body: string, head = "") =>
+    Buffer.from(`${head}<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${body}</svg>`);
+
+  it("renders an SVG to a square transparent PNG", async () => {
+    const out = await rasterizeSvgIcon(
+      svg('<path d="M3 3h18v18H3z" fill="#000"/>', '<?xml version="1.0"?>\n'),
+    );
+    const meta = await sharp(out).metadata();
+    expect(meta).toMatchObject({ format: "png", width: 128, height: 128, hasAlpha: true });
+  });
+
+  it("keeps nothing of the SVG: scripts and links are gone", async () => {
+    const out = await rasterizeSvgIcon(
+      svg(
+        '<script>alert(1)</script><a href="javascript:alert(1)"><circle cx="12" cy="12" r="9"/></a>',
+      ),
+    );
+    expect(out.toString("latin1")).not.toMatch(/script|javascript/i);
+  });
+
+  it("rejects files that are not SVG, and oversized ones", async () => {
+    await expect(rasterizeSvgIcon(await png())).rejects.toBeInstanceOf(MediaRejectedError);
+    await expect(rasterizeSvgIcon(Buffer.from("<html><svg></svg></html>"))).rejects.toBeInstanceOf(
+      MediaRejectedError,
+    );
+    const huge = svg(`<!--${"x".repeat(110 * 1024)}--><path d="M0 0h1v1z"/>`);
+    await expect(rasterizeSvgIcon(huge)).rejects.toThrow(/under 100 KB/);
   });
 });

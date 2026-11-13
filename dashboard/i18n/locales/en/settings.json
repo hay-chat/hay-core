@@ -353,8 +353,44 @@
       "positionRight": "Bottom right",
       "positionLeft": "Bottom left",
       "assistantFallback": "Your assistant",
-      "assistantHint": "The assistant's name and avatar come from Assistant identity.",
-      "edit": "Edit"
+      "assistantHint": "How the assistant appears in the chat. The name and avatar are also used across Hay.",
+      "button": "Chat button",
+      "buttonHint": "The round button visitors click to open the chat.",
+      "buttonIcon": "Icon",
+      "buttonIcons": {
+        "chat": "Chat bubble",
+        "sparkle": "Sparkle",
+        "robot": "Robot",
+        "custom": "Your icon"
+      },
+      "buttonIconStyle": "Icon style",
+      "buttonStyles": {
+        "outline": "Outline",
+        "filled": "Filled"
+      },
+      "uploadSvg": "Upload your own SVG",
+      "replaceSvg": "Replace your SVG",
+      "buttonIconHint": "SVG up to 100 KB. It shows in one colour, white or dark to suit your brand colour, and applies straight away.",
+      "buttonIconTooLarge": "The icon must be 100 KB or smaller",
+      "buttonIconSaved": "Icon saved. The button shows it straight away.",
+      "buttonIconRemoved": "Icon removed. The button shows the chat bubble.",
+      "buttonIconFailed": "Couldn't change the button icon. Check that the file is an SVG.",
+      "assistant": "Assistant",
+      "assistantName": "Name",
+      "avatar": "Avatar",
+      "avatarPresets": {
+        "sparkle": "Sparkle",
+        "sparkles": "Sparkles",
+        "robot": "Robot"
+      },
+      "avatarPicture": "Your picture",
+      "uploadPicture": "Upload a picture",
+      "replacePicture": "Replace the picture",
+      "avatarHint": "PNG, JPG, WebP or GIF, up to 2 MB. A picture applies straight away and shows instead of the icon. Pick an icon to go back to it.",
+      "avatarTooLarge": "The picture must be 2 MB or smaller",
+      "avatarSaved": "Picture saved. The chat shows it straight away.",
+      "avatarRemoved": "Picture removed. The chat shows the icon.",
+      "avatarFailed": "Couldn't change the assistant's picture"
     },
     "content": {
       "home": "Home",
@@ -447,7 +483,8 @@
       "states": {
         "home": "Home",
         "chat": "Chat",
-        "ended": "Ended"
+        "ended": "Ended",
+        "closed": "Button"
       },
       "deviceLabel": "Device",
       "devices": {
