@@ -446,6 +446,17 @@ describe("widget loader", () => {
       expect(openIcon()?.getAttribute("src")).toBe("https://api.example.test/uploads/i.png");
     });
 
+    it("ignores an icon URL that isn't http(s), showing the chat bubble", async () => {
+      mockPublicConfig({
+        enabled: true,
+        launcherIcon: "custom",
+        launcherIconUrl: "javascript:alert(1)",
+      });
+      boot({ ...config, loading: "eager" }, fakeChunk().loadChat);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(openIcon()?.tagName.toLowerCase()).toBe("svg");
+    });
+
     it("the page's own icon wins over the settings'", async () => {
       mockPublicConfig({ enabled: true, launcherIcon: "sparkle" });
       boot({ ...config, launcherIcon: "robot", loading: "eager" }, fakeChunk().loadChat);

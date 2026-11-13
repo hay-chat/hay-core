@@ -61,6 +61,17 @@ export function buttonIcon(source: HayChatConfig | PublicConfig | null | undefin
   };
 }
 
+/** An http(s) URL for `url`, relative ones resolved against the API; anything else null. */
+export function httpUrl(url: string | null | undefined, baseUrl: string): string | null {
+  if (!url) return null;
+  try {
+    const resolved = new URL(url, `${baseUrl}/`);
+    return resolved.protocol === "https:" || resolved.protocol === "http:" ? resolved.href : null;
+  } catch {
+    return null;
+  }
+}
+
 export function createLauncher(config: HayChatConfig, labels: LauncherLabels): Launcher {
   const style = document.createElement("style");
   style.textContent = css;
@@ -108,11 +119,12 @@ export function createLauncher(config: HayChatConfig, labels: LauncherLabels): L
   // The default (no setting yet) is the outlined chat bubble.
   const setIcon: Launcher["setIcon"] = ({ icon: name, style, url }) => {
     let next: Element;
-    if (name === "custom" && url) {
+    const imageUrl = name === "custom" ? httpUrl(url, config.baseUrl) : null;
+    if (imageUrl) {
       const image = document.createElement("img");
       image.className = "hay-chat-button__icon-open hay-chat-button__icon-image";
       image.alt = "";
-      image.src = /^https?:/.test(url) ? url : `${config.baseUrl}${url}`;
+      image.src = imageUrl;
       next = image;
     } else {
       const preset = name && name !== "custom" ? name : "chat";
