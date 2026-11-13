@@ -7,6 +7,7 @@ import {
   sanitizeConversationMedia,
   neutraliseCsvFormulas,
   rasterizeSvgIcon,
+  startsWithSvgElement,
 } from "@server/services/media-sanitizer.service";
 
 /**
@@ -220,5 +221,27 @@ describe("rasterizeSvgIcon", () => {
     );
     const huge = svg(`<!--${"x".repeat(110 * 1024)}--><path d="M0 0h1v1z"/>`);
     await expect(rasterizeSvgIcon(huge)).rejects.toThrow(/under 100 KB/);
+  });
+});
+
+describe("startsWithSvgElement", () => {
+  it("skips the XML declaration, comments and doctype", () => {
+    expect(
+      startsWithSvgElement('<?xml version="1.0"?>\n<!-- a --><!-- b -->\n<!DOCTYPE svg><svg>'),
+    ).toBe(true);
+    expect(startsWithSvgElement("<SVG viewBox='0 0 1 1'/>")).toBe(true);
+  });
+
+  it("rejects other documents and unterminated comments", () => {
+    expect(startsWithSvgElement("<html><svg></svg></html>")).toBe(false);
+    expect(startsWithSvgElement("<svgx>")).toBe(false);
+    expect(startsWithSvgElement("<!-- never closed <svg>")).toBe(false);
+  });
+
+  it("stays fast on many repeated comments", () => {
+    const start = Date.now();
+    expect(startsWithSvgElement("-->".concat("<!---->".repeat(50_000)))).toBe(false);
+    expect(startsWithSvgElement("<!---->".repeat(50_000) + "<svg>")).toBe(true);
+    expect(Date.now() - start).toBeLessThan(500);
   });
 });
