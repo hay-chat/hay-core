@@ -334,7 +334,7 @@
       "logoWebsite": "Het icoon van je website",
       "logoCustom": "Door jou geüpload",
       "logoNone": "Nog geen logo. De chat toont je eerste letter.",
-      "logoHint": "PNG, JPG, WebP, GIF of SVG, maximaal 2 MB. Een nieuw logo geldt meteen.",
+      "logoHint": "PNG, JPG, WebP of GIF, maximaal 2 MB. Een nieuw logo geldt meteen.",
       "logoTooLarge": "Het logo mag maximaal 2 MB zijn",
       "logoSaved": "Logo opgeslagen. De chat toont het meteen.",
       "logoRemoved": "Logo verwijderd",

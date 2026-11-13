@@ -334,7 +334,7 @@
       "logoWebsite": "O ícone do seu site",
       "logoCustom": "Enviado por você",
       "logoNone": "Ainda sem logo. O chat mostra sua primeira letra.",
-      "logoHint": "PNG, JPG, WebP, GIF ou SVG, até 2 MB. Um logo novo vale na hora.",
+      "logoHint": "PNG, JPG, WebP ou GIF, até 2 MB. Um logo novo vale na hora.",
       "logoTooLarge": "O logo precisa ter no máximo 2 MB",
       "logoSaved": "Logo salvo. O chat já mostra o novo logo.",
       "logoRemoved": "Logo removido",

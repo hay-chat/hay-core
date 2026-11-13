@@ -39,7 +39,7 @@
           id="webchat-logo"
           ref="fileInput"
           type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+          accept="image/png,image/jpeg,image/webp,image/gif"
           class="sr-only"
           @change="onLogoPicked"
         />

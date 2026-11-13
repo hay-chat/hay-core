@@ -334,7 +334,7 @@
       "logoWebsite": "Your website icon",
       "logoCustom": "Uploaded by you",
       "logoNone": "No logo yet. The chat shows your first letter.",
-      "logoHint": "PNG, JPG, WebP, GIF or SVG, up to 2 MB. A new logo applies straight away.",
+      "logoHint": "PNG, JPG, WebP or GIF, up to 2 MB. A new logo applies straight away.",
       "logoTooLarge": "The logo must be 2 MB or smaller",
       "logoSaved": "Logo saved. The chat shows it straight away.",
       "logoRemoved": "Logo removed",
