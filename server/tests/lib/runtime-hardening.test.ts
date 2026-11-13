@@ -30,6 +30,8 @@ describe("bodyLimitForPath", () => {
     expect(bodyLimitForPath("/v1/documents.create")).toBe("50mb");
     expect(bodyLimitForPath("/v1/conversations.uploadAttachment")).toBe("50mb");
     expect(bodyLimitForPath("/v1/organizations.uploadLogo")).toBe("50mb");
+    expect(bodyLimitForPath("/v1/webchat.uploadLogo")).toBe("50mb");
+    expect(bodyLimitForPath("/v1/organizations.assistant.uploadAvatar")).toBe("50mb");
     expect(bodyLimitForPath("/v1/plugin-api/send-email")).toBe("50mb");
     // tRPC batch containing an upload procedure
     expect(bodyLimitForPath("/v1/agents.list,documents.update")).toBe("50mb");
