@@ -11,8 +11,8 @@ import type { MigrationInterface, QueryRunner } from "typeorm";
  * Adding a stored generated column rewrites `products` under an exclusive
  * lock: brief for a catalog-sized table, but run it outside a bulk sync.
  */
-export class AddProductSearchVector1794900000000 implements MigrationInterface {
-  name = "AddProductSearchVector1794900000000";
+export class AddProductSearchVector1795000200000 implements MigrationInterface {
+  name = "AddProductSearchVector1795000200000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
