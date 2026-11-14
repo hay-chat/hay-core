@@ -361,6 +361,13 @@
         "chat": "Tekstballon",
         "sparkle": "Ster",
         "robot": "Robot",
+        "bubble": "Spreekballon",
+        "smiley": "Smiley",
+        "question": "Vraag",
+        "headset": "Headset",
+        "agent": "Medewerker",
+        "operator": "Operator",
+        "lifebuoy": "Reddingsboei",
         "custom": "Jouw pictogram"
       },
       "buttonIconStyle": "Stijl van het pictogram",
@@ -478,6 +485,7 @@
     },
     "preview": {
       "title": "Voorbeeld",
+      "updating": "Voorbeeld wordt bijgewerkt",
       "frameTitle": "Voorbeeld van de chat op je website",
       "stateLabel": "Tonen",
       "states": {

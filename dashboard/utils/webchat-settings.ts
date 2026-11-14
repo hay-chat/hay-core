@@ -3,6 +3,29 @@
 export type WebchatTab = "appearance" | "content" | "install" | "security";
 export const WEBCHAT_TABS: WebchatTab[] = ["appearance", "content", "install", "security"];
 
+/** The chat button's preset icons, in picker order, then the merchant's upload. */
+export const LAUNCHER_PRESET_ICONS = [
+  "chat",
+  "bubble",
+  "smiley",
+  "question",
+  "sparkle",
+  "robot",
+  "headset",
+  "agent",
+  "operator",
+  "lifebuoy",
+] as const;
+export type LauncherIcon = (typeof LAUNCHER_PRESET_ICONS)[number] | "custom";
+/** Presets drawn one way only: the outline/filled choice does not apply to them. */
+export const SINGLE_STYLE_LAUNCHER_ICONS: readonly LauncherIcon[] = [
+  "bubble",
+  "smiley",
+  "headset",
+  "agent",
+  "operator",
+];
+
 export type WebchatThemeMode = "light" | "dark" | "system";
 export type WebchatInstallStatus = "live" | "notInstalled" | "off";
 
@@ -87,7 +110,7 @@ export interface WebchatPreviewConfig {
   /** The uploaded picture; wins over the preset. */
   agentAvatarUrl: string | null;
   agentAvatarPreset: "sparkle" | "sparkles" | "robot";
-  launcherIcon: "chat" | "sparkle" | "robot" | "custom";
+  launcherIcon: LauncherIcon;
   launcherIconStyle: "filled" | "outline";
   launcherIconUrl: string | null;
   /** "closed" shows the button (and the teaser) with the chat not open. */

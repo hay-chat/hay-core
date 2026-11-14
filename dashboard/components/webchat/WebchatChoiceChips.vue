@@ -6,9 +6,9 @@
         v-for="option in options"
         :key="option.value"
         :class="[
-          'cursor-pointer rounded-full border px-3.5 py-1.5 text-sm transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary has-[:focus-visible]:ring-offset-2',
+          'cursor-pointer rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary has-[:focus-visible]:ring-offset-2',
           modelValue === option.value
-            ? 'border-primary bg-[#e8f3ff] font-medium text-primary'
+            ? 'border-primary bg-[#e8f3ff] text-primary'
             : 'bg-white text-neutral-900 hover:border-neutral-400',
         ]"
       >

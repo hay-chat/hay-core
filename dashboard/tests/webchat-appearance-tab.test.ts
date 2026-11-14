@@ -98,11 +98,21 @@ describe("Webchat appearance: button and assistant", () => {
     api.removeAvatar.mockResolvedValue({});
   });
 
-  it("offers the three button icons; the uploaded one only once there is one", async () => {
+  it("offers the preset button icons; the uploaded one only once there is one", async () => {
     const { wrapper } = await mountTab();
-    expect(radio(wrapper, "webchat-button-icon-chat").exists()).toBe(true);
-    expect(radio(wrapper, "webchat-button-icon-robot").exists()).toBe(true);
+    for (const icon of ["chat", "robot", "question", "lifebuoy", "headset", "bubble"]) {
+      expect(radio(wrapper, `webchat-button-icon-${icon}`).exists()).toBe(true);
+    }
     expect(radio(wrapper, "webchat-button-icon-custom").exists()).toBe(false);
+  });
+
+  it("hides the outline/filled choice for icons drawn one way only", async () => {
+    const { wrapper } = await mountTab();
+    const styleChips = () => wrapper.find('input[name="webchat-button-icon-style"]');
+    await radio(wrapper, "webchat-button-icon-lifebuoy").trigger("change");
+    expect(styleChips().exists()).toBe(true);
+    await radio(wrapper, "webchat-button-icon-headset").trigger("change");
+    expect(styleChips().exists()).toBe(false);
   });
 
   it("picking a button icon and style edits the form", async () => {

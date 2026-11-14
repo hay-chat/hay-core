@@ -361,6 +361,13 @@
         "chat": "Balão de conversa",
         "sparkle": "Brilho",
         "robot": "Robô",
+        "bubble": "Balão de fala",
+        "smiley": "Sorriso",
+        "question": "Pergunta",
+        "headset": "Headset",
+        "agent": "Atendente",
+        "operator": "Operador",
+        "lifebuoy": "Boia salva-vidas",
         "custom": "Seu ícone"
       },
       "buttonIconStyle": "Estilo do ícone",
@@ -478,6 +485,7 @@
     },
     "preview": {
       "title": "Prévia",
+      "updating": "Atualizando a pré-visualização",
       "frameTitle": "Prévia do chat no seu site",
       "stateLabel": "Mostrar",
       "states": {

@@ -17,7 +17,7 @@
         <AccessNoticeBanner />
         <!-- The team paused the AI everywhere (D11-9) -->
         <AiPauseBanner />
-        <main class="min-h-0 flex-1 overflow-y-auto bg-neutral-50">
+        <main class="min-h-0 flex-1 overflow-y-auto bg-neutral-50 [scrollbar-gutter:stable]">
           <slot />
         </main>
       </div>

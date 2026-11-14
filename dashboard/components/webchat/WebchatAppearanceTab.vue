@@ -166,7 +166,7 @@
       </template>
     </WebchatTilePicker>
     <WebchatChoiceChips
-      v-if="form.launcherIcon !== 'custom'"
+      v-if="iconHasStyles"
       v-model="form.launcherIconStyle"
       name="webchat-button-icon-style"
       :legend="$t('webchat.appearance.buttonIconStyle')"
@@ -281,7 +281,13 @@ import { computed, onMounted, ref, watch } from "vue";
 import { Hay } from "@/utils/api";
 import { useWebchatSettings, type AssistantAvatarPreset } from "@/composables/useWebchatSettings";
 import { useUserStore } from "@/stores/user";
-import { normalizeHex, websiteHost } from "@/utils/webchat-settings";
+import {
+  LAUNCHER_PRESET_ICONS,
+  SINGLE_STYLE_LAUNCHER_ICONS,
+  normalizeHex,
+  websiteHost,
+  type LauncherIcon,
+} from "@/utils/webchat-settings";
 
 const { t } = useI18n();
 const state = useWebchatSettings();
@@ -344,13 +350,20 @@ const onAvatarPicked = onFilePicked(state.uploadAssistantAvatar);
 
 // --- Chat button: the uploaded icon is a choice only once there is one.
 const buttonIconOptions = computed(() => [
-  { value: "chat" as const, label: t("webchat.appearance.buttonIcons.chat") },
-  { value: "sparkle" as const, label: t("webchat.appearance.buttonIcons.sparkle") },
-  { value: "robot" as const, label: t("webchat.appearance.buttonIcons.robot") },
+  ...LAUNCHER_PRESET_ICONS.map((value) => ({
+    value: value as LauncherIcon,
+    label: t(`webchat.appearance.buttonIcons.${value}`),
+  })),
   ...(state.launcherIconSrc.value
-    ? [{ value: "custom" as const, label: t("webchat.appearance.buttonIcons.custom") }]
+    ? [{ value: "custom" as LauncherIcon, label: t("webchat.appearance.buttonIcons.custom") }]
     : []),
 ]);
+// Outline/filled applies only to presets drawn both ways.
+const iconHasStyles = computed(
+  () =>
+    form.value.launcherIcon !== "custom" &&
+    !SINGLE_STYLE_LAUNCHER_ICONS.includes(form.value.launcherIcon),
+);
 
 // --- Assistant avatar: an uploaded picture wins over the preset icon. Picking an icon
 // while there is a picture removes the picture, so the icon shows.
