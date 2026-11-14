@@ -95,7 +95,18 @@ export interface HayChatConfig {
 }
 
 export type AssistantAvatarPreset = "sparkle" | "sparkles" | "robot";
-export type LauncherIcon = "chat" | "sparkle" | "robot" | "custom";
+export type LauncherIcon =
+  | "chat"
+  | "sparkle"
+  | "robot"
+  | "question"
+  | "lifebuoy"
+  | "headset"
+  | "agent"
+  | "operator"
+  | "smiley"
+  | "bubble"
+  | "custom";
 export type LauncherIconStyle = "filled" | "outline";
 
 /** What the dashboard's live preview shows. */

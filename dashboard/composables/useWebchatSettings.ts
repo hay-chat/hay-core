@@ -4,14 +4,13 @@ import { Hay } from "@/utils/api";
 import type { RouterInputs, RouterOutputs } from "@/types/trpc";
 import { useToast } from "@/composables/useToast";
 import { useDomain } from "@/composables/useDomain";
-import { normalizeHex, type WebchatThemeMode } from "@/utils/webchat-settings";
+import { normalizeHex, type LauncherIcon, type WebchatThemeMode } from "@/utils/webchat-settings";
 
 type UpdateSettingsInput = RouterInputs["webchat"]["updateSettings"];
 type SavedSettings = RouterOutputs["webchat"]["getSettings"];
 type UnderAttackState = SavedSettings["underAttack"];
 type Assistant = RouterOutputs["organizations"]["assistant"]["get"];
 export type AssistantAvatarPreset = Assistant["avatarPreset"];
-export type LauncherIcon = SavedSettings["launcherIcon"];
 export type LauncherIconStyle = SavedSettings["launcherIconStyle"];
 
 export const DEFAULT_BRAND_COLOR = "#001df5";

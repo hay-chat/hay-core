@@ -191,7 +191,21 @@ function bootPreview(
     .catch((error) => {
       console.error("[Hay Webchat] Failed to load the chat preview:", error);
       return null;
-    });
+    })
+    .finally(notifyPreviewReady);
   launcher.button.addEventListener("click", () => handle?.toggle());
   return { chatReady: () => chat };
+}
+
+/**
+ * Tells the dashboard the preview has painted, so it can swap the new frame in
+ * over the old one instead of showing a blank page while the widget loads.
+ */
+export const PREVIEW_READY_MESSAGE = "hay-webchat:preview-ready";
+function notifyPreviewReady() {
+  if (window.parent === window) return;
+  // Two frames: the first lays the chat out, the second has painted it.
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => window.parent.postMessage({ type: PREVIEW_READY_MESSAGE }, "*")),
+  );
 }

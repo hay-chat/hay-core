@@ -361,6 +361,13 @@
         "chat": "Chat bubble",
         "sparkle": "Sparkle",
         "robot": "Robot",
+        "bubble": "Speech bubble",
+        "smiley": "Smiley",
+        "question": "Question",
+        "headset": "Headset",
+        "agent": "Agent",
+        "operator": "Operator",
+        "lifebuoy": "Lifebuoy",
         "custom": "Your icon"
       },
       "buttonIconStyle": "Icon style",
@@ -478,6 +485,7 @@
     },
     "preview": {
       "title": "Preview",
+      "updating": "Updating preview",
       "frameTitle": "Preview of the chat on your website",
       "stateLabel": "Show",
       "states": {

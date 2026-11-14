@@ -409,6 +409,26 @@ describe("widget loader", () => {
     expect(localStorage.length).toBe(0);
   });
 
+  it("preview: tells the dashboard once the chat has painted", async () => {
+    const postMessage = vi.fn();
+    const parent = vi.spyOn(window, "parent", "get").mockReturnValue({ postMessage } as never);
+    const frames = vi.spyOn(window, "requestAnimationFrame").mockImplementation((step) => {
+      step(0);
+      return 0;
+    });
+    const chunk = fakeChunk();
+    const loader = boot(
+      { ...config, preview: { state: "home", device: "desktop" } },
+      chunk.loadChat,
+    );
+    expect(postMessage).not.toHaveBeenCalled();
+    await loader.chatReady();
+    await Promise.resolve();
+    expect(postMessage).toHaveBeenCalledWith({ type: "hay-webchat:preview-ready" }, "*");
+    parent.mockRestore();
+    frames.mockRestore();
+  });
+
   it("preview, closed: shows the button and the teaser, chat not open", async () => {
     const chunk = fakeChunk();
     const preview = { state: "closed", device: "desktop" } as const;
