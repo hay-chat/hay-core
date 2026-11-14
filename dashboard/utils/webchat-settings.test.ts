@@ -83,17 +83,27 @@ describe("buildPreviewSrcdoc", () => {
     csatEnabled: true,
     csatQuestion: "",
     teaserMessage: "",
+    agentName: null,
+    agentAvatarUrl: null,
+    agentAvatarPreset: "sparkle",
+    launcherIcon: "chat",
+    launcherIconStyle: "outline",
+    launcherIconUrl: null,
     preview: { state: "home", device: "desktop" },
   };
 
-  it("loads the real widget with the config, and text cannot close the script", () => {
+  it("loads the real widget with the config in a data block, not an inline script", () => {
     const html = buildPreviewSrcdoc(config, "#fff");
     expect(html).toContain('src="https://api.hay.test/v1/webchat/widget.js"');
     expect(html.match(/<\/script>/g)).toHaveLength(2);
+    // The dashboard CSP blocks inline scripts, and the srcdoc frame inherits it.
+    const openings = html.match(/<script\b[^>]*>/gi) ?? [];
+    expect(openings).toHaveLength(2);
+    for (const tag of openings) {
+      expect(tag).toMatch(/\bsrc="|\btype="application\/json"/);
+    }
 
-    const body = html.split("<" + "script>")[1].split("</" + "script>")[0];
-    const window: { HayChat?: { config?: WebchatPreviewConfig } } = {};
-    new Function("window", body)(window);
-    expect(window.HayChat!.config).toEqual(config);
+    const block = html.split('<script type="application/json" id="hay-chat-config">')[1];
+    expect(JSON.parse(block.split("</" + "script>")[0])).toEqual(config);
   });
 });

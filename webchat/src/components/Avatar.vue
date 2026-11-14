@@ -2,15 +2,24 @@
   <!-- Decorative: the name is always written next to it. -->
   <span class="hay-avatar" :class="`hay-avatar--${kind}`" aria-hidden="true">
     <img v-if="src && !failed" :src="src" alt="" @error="failed = true" />
-    <svg v-else-if="kind === 'ai'" width="55%" height="55%" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 2.5l2.1 6.4 6.4 2.1-6.4 2.1L12 19.5l-2.1-6.4L3.5 11l6.4-2.1z" />
-    </svg>
+    <!-- Our own icon markup (utils/icons), never user input. -->
+    <span v-else-if="kind === 'ai'" class="hay-avatar__icon" v-html="aiIcon" />
     <template v-else>{{ initial }}</template>
   </span>
 </template>
 
+<script lang="ts">
+import type { ComputedRef, InjectionKey } from "vue";
+import type { AssistantAvatarPreset } from "../types";
+
+/** Provided by Widget.vue: the assistant's icon when it has no picture. */
+export const ASSISTANT_AVATAR_PRESET: InjectionKey<ComputedRef<AssistantAvatarPreset>> =
+  Symbol("assistant-avatar-preset");
+</script>
+
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, inject, ref, watch } from "vue";
+import { assistantAvatarSvg } from "../utils/icons";
 
 const props = defineProps<{
   kind: "ai" | "human";
@@ -25,4 +34,7 @@ watch(
 );
 
 const initial = computed(() => props.name?.trim().charAt(0).toUpperCase() ?? "");
+
+const preset = inject(ASSISTANT_AVATAR_PRESET, null);
+const aiIcon = computed(() => assistantAvatarSvg(preset?.value));
 </script>

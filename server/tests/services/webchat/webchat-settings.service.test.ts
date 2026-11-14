@@ -73,6 +73,9 @@ function settingsRow(overrides: Settings = {}): Settings {
     brandPalette: [],
     logoUploadId: null,
     logoSource: null,
+    launcherIcon: "chat",
+    launcherIconStyle: "outline",
+    launcherIconUploadId: null,
     brandingImportedAt: null,
     homeHeading: null,
     showGreeting: true,
@@ -269,8 +272,65 @@ describe("getPublicConfig", () => {
       csatQuestion: null,
       agentName: "Ava",
       agentAvatarUrl: null,
+      agentAvatarPreset: "sparkle",
+      launcherIcon: "chat",
+      launcherIconStyle: "outline",
+      launcherIconUrl: null,
       preChatForm: null,
     });
+  });
+
+  it("sends the assistant's preset and the uploaded button icon", async () => {
+    stored = settingsRow({
+      launcherIcon: "custom",
+      launcherIconStyle: "filled",
+      launcherIconUploadId: "icon-1",
+    });
+    mockFindOrganization.mockResolvedValue({
+      id: ORG,
+      settings: { assistantAvatarPreset: "robot" },
+    });
+    const config = await webchatSettingsService.getPublicConfig(ORG);
+    expect(config).toMatchObject({
+      agentAvatarPreset: "robot",
+      launcherIcon: "custom",
+      launcherIconStyle: "filled",
+      launcherIconUrl: "https://cdn.example/icon-1.png",
+    });
+  });
+
+  it("falls back to the chat bubble when the custom icon has no upload", async () => {
+    stored = settingsRow({ launcherIcon: "custom", launcherIconUploadId: null });
+    mockFindOrganization.mockResolvedValue({ id: ORG, settings: {} });
+    const config = await webchatSettingsService.getPublicConfig(ORG);
+    expect(config).toMatchObject({ launcherIcon: "chat", launcherIconUrl: null });
+  });
+});
+
+describe("launcher icon upload", () => {
+  it("switches the button to the upload and deletes the previous one", async () => {
+    stored = settingsRow({ launcherIconUploadId: "old-icon" });
+    const view = await webchatSettingsService.setCustomLauncherIcon(ORG, "new-icon");
+    expect(mockUpdate).toHaveBeenCalledWith(ORG, {
+      launcherIconUploadId: "new-icon",
+      launcherIcon: "custom",
+    });
+    expect(mockDeleteUpload).toHaveBeenCalledWith("old-icon");
+    expect(view).toMatchObject({
+      launcherIcon: "custom",
+      launcherIconUrl: "https://cdn.example/new-icon.png",
+    });
+    expect(view).not.toHaveProperty("launcherIconUploadId");
+  });
+
+  it("goes back to the chat bubble when the upload is removed", async () => {
+    stored = settingsRow({ launcherIcon: "custom", launcherIconUploadId: "icon-1" });
+    await webchatSettingsService.removeLauncherIcon(ORG);
+    expect(mockUpdate).toHaveBeenCalledWith(ORG, {
+      launcherIconUploadId: null,
+      launcherIcon: "chat",
+    });
+    expect(mockDeleteUpload).toHaveBeenCalledWith("icon-1");
   });
 
   it("falls back to the organization logo, and shows no team when hand-off is off", async () => {

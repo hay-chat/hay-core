@@ -11,9 +11,15 @@ import { webchatSettingsService } from "@server/services/webchat/webchat-setting
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { customAiLabel, isAiLabelShown } from "@server/services/ai-disclosure";
 import {
+  WEBCHAT_LAUNCHER_ICONS,
+  WEBCHAT_LAUNCHER_ICON_STYLES,
   WEBCHAT_THEME_MODES,
   WebchatPosition,
 } from "@server/database/entities/webchat-settings.entity";
+import { TRPCError } from "@trpc/server";
+import { parseBase64Upload } from "@server/lib/upload-helper";
+import { storageService } from "@server/services/storage.service";
+import { MediaRejectedError, rasterizeSvgIcon } from "@server/services/media-sanitizer.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { isDashboardHost } from "@server/lib/webchat-origin";
 import { getAvailability, typicalFirstReplyMinutes } from "@server/services/business-hours.service";
@@ -126,6 +132,43 @@ export const webchatRouter = router({
   }),
 
   /**
+   * The merchant's own chat button icon, as an SVG data URI. It is rendered to
+   * a PNG here and only the PNG is stored, so no SVG ever reaches a visitor.
+   */
+  uploadLauncherIcon: scopedProcedure("webchat", "write")
+    .input(z.object({ icon: z.string().max(200_000) }))
+    .mutation(async ({ ctx, input }) => {
+      let png: Buffer;
+      try {
+        const parsed = parseBase64Upload(input.icon);
+        if (parsed.mimeType !== "image/svg+xml") throw new MediaRejectedError("Upload an SVG file");
+        png = await rasterizeSvgIcon(parsed.buffer);
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: error instanceof MediaRejectedError ? error.message : "Upload an SVG file",
+        });
+      }
+      const result = await storageService.upload({
+        buffer: png,
+        originalName: "launcher-icon.png",
+        mimeType: "image/png",
+        folder: "organizations",
+        organizationId: ctx.organizationId!,
+        uploadedById: ctx.user!.id,
+      });
+      return await webchatSettingsService.setCustomLauncherIcon(
+        ctx.organizationId!,
+        result.upload.id,
+      );
+    }),
+
+  /** Remove the uploaded button icon; the button goes back to the chat bubble. */
+  removeLauncherIcon: scopedProcedure("webchat", "write").mutation(async ({ ctx }) => {
+    return await webchatSettingsService.removeLauncherIcon(ctx.organizationId!);
+  }),
+
+  /**
    * Under-attack mode (D9-10): challenge every visitor for the next
    * UNDER_ATTACK_HOURS, or switch it off early.
    */
@@ -145,6 +188,8 @@ export const webchatRouter = router({
         position: z.nativeEnum(WebchatPosition).optional(),
         themeMode: z.enum(WEBCHAT_THEME_MODES).optional(),
         brandColor: hexColorSchema.optional(),
+        launcherIcon: z.enum(WEBCHAT_LAUNCHER_ICONS).optional(),
+        launcherIconStyle: z.enum(WEBCHAT_LAUNCHER_ICON_STYLES).optional(),
         homeHeading: z
           .string()
           .trim()

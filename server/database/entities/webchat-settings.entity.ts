@@ -30,6 +30,13 @@ export type WebchatBrandingSource = "website" | "custom";
 
 export const DEFAULT_WEBCHAT_BRAND_COLOR = "#001df5";
 
+/** The chat button's icon: a preset, or the merchant's upload ("custom"). */
+export const WEBCHAT_LAUNCHER_ICONS = ["chat", "sparkle", "robot", "custom"] as const;
+export type WebchatLauncherIcon = (typeof WEBCHAT_LAUNCHER_ICONS)[number];
+/** Whether a preset icon is drawn solid or as an outline (the button itself is always filled). */
+export const WEBCHAT_LAUNCHER_ICON_STYLES = ["filled", "outline"] as const;
+export type WebchatLauncherIconStyle = (typeof WEBCHAT_LAUNCHER_ICON_STYLES)[number];
+
 @Entity("webchat_settings")
 export class WebchatSettings {
   @PrimaryGeneratedColumn("uuid")
@@ -76,6 +83,22 @@ export class WebchatSettings {
 
   @Column({ type: "varchar", length: 10, nullable: true })
   logoSource!: WebchatBrandingSource | null;
+
+  // The chat button's icon. The default (an outlined chat bubble) is the
+  // button as it was before this was a setting. "custom" shows
+  // launcherIconUpload, an SVG the merchant uploaded, rendered to a PNG.
+  @Column({ type: "varchar", length: 10, default: "chat" })
+  launcherIcon!: WebchatLauncherIcon;
+
+  @Column({ type: "varchar", length: 10, default: "outline" })
+  launcherIconStyle!: WebchatLauncherIconStyle;
+
+  @OneToOne(() => Upload, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "launcher_icon_upload_id" })
+  launcherIconUpload?: Upload | null;
+
+  @Column({ type: "uuid", nullable: true })
+  launcherIconUploadId!: string | null;
 
   // When the website branding was last imported (or attempted). The lazy
   // import on a settings read only runs while this is null.

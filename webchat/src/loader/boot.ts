@@ -2,7 +2,7 @@ import { resolveLocale } from "@/i18n/resolve";
 import type { ChatHandle, ChatMountOptions, HayChatConfig, PublicConfig } from "@/types";
 import { installHostApi } from "./hostApi";
 import { launcherLabels } from "./labels";
-import { createLauncher } from "./launcher";
+import { buttonIcon, createLauncher } from "./launcher";
 import { fetchPublicConfig } from "./publicConfig";
 
 /** Longest the button stays hidden waiting for the merchant's colour. */
@@ -85,6 +85,7 @@ export function boot(
         config.themeMode ?? settings?.themeMode,
       );
       if (!config.position && settings?.position) launcher.setPosition(settings.position);
+      if (!config.launcherIcon && settings?.launcherIcon) launcher.setIcon(buttonIcon(settings));
       clearTimeout(appearanceTimer);
       launcher.setPending(false);
       if (wantsTeaser && !pageSetTeaser && settings?.teaserMessage) {
@@ -171,6 +172,9 @@ function bootPreview(
   loadChat: () => Promise<ChatModule>,
 ): { chatReady: () => Promise<ChatHandle | null> } {
   const launcher = createLauncher(config, launcherLabels[resolveLocale(config.locale)]);
+  // "closed" previews the button (and the teaser) with the chat not open yet.
+  const open = config.preview?.state !== "closed";
+  if (!open && config.teaserMessage) launcher.showTeaser(config.teaserMessage);
   let handle: ChatHandle | null = null;
   const chat = loadChat()
     .then((module) =>
@@ -180,7 +184,7 @@ function bootPreview(
         publicConfig: null,
         launcher,
         hostCalls: [],
-        open: true,
+        open,
       }),
     )
     .then((mounted) => (handle = mounted))

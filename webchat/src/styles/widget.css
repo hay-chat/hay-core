@@ -60,7 +60,7 @@
   white-space: nowrap;
 }
 
-/* Avatars: a photo, an initial or the AI sparkle */
+/* Avatars: a photo, an initial or the assistant's icon */
 .hay-avatar {
   flex: none;
   display: grid;
@@ -78,6 +78,19 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* The assistant's preset icon (utils/icons). */
+.hay-avatar__icon {
+  display: grid;
+  place-items: center;
+  width: 55%;
+  height: 55%;
+}
+
+.hay-avatar__icon svg {
+  width: 100%;
+  height: 100%;
 }
 
 .hay-avatar--ai {
