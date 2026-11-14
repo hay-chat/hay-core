@@ -31,7 +31,19 @@ export type WebchatBrandingSource = "website" | "custom";
 export const DEFAULT_WEBCHAT_BRAND_COLOR = "#001df5";
 
 /** The chat button's icon: a preset, or the merchant's upload ("custom"). */
-export const WEBCHAT_LAUNCHER_ICONS = ["chat", "sparkle", "robot", "custom"] as const;
+export const WEBCHAT_LAUNCHER_ICONS = [
+  "chat",
+  "bubble",
+  "smiley",
+  "question",
+  "sparkle",
+  "robot",
+  "headset",
+  "agent",
+  "operator",
+  "lifebuoy",
+  "custom",
+] as const;
 export type WebchatLauncherIcon = (typeof WEBCHAT_LAUNCHER_ICONS)[number];
 /** Whether a preset icon is drawn solid or as an outline (the button itself is always filled). */
 export const WEBCHAT_LAUNCHER_ICON_STYLES = ["filled", "outline"] as const;
