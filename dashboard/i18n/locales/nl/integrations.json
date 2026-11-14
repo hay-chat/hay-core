@@ -289,10 +289,12 @@
     },
     "channelHealth": {
       "failingTitle": "Dit kanaal werkt niet goed",
+      "expiringTitle": "De koppeling van dit kanaal verloopt binnenkort",
       "since": "Sinds {time}",
       "reasons": {
         "delivery_failures": "{detail} antwoorden konden het afgelopen uur niet worden afgeleverd. Klanten op dit kanaal krijgen mogelijk geen antwoord.",
         "token_revoked": "De koppeling is ingetrokken of verlopen. Koppel opnieuw om weer berichten te ontvangen en te versturen.",
+        "token_expiring": "De koppeling verloopt op {detail} en kon niet automatisch worden verlengd. Koppel opnieuw vóór die datum om berichten te blijven ontvangen en versturen.",
         "quality_drop": "De provider heeft de kwaliteitsscore van dit kanaal verlaagd ({detail}). Als die blijft dalen, kunnen de berichtlimieten omlaag gaan."
       },
       "alerted": "Eigenaren en beheerders zijn via e-mail en pushmelding op de hoogte gebracht."

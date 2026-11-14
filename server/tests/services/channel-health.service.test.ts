@@ -129,6 +129,72 @@ describe("channelHealthService", () => {
     expect(sendTemplateEmail).toHaveBeenCalledTimes(2); // one alert, two admins
   });
 
+  it("asks to reconnect in the subject of a revoked connection", async () => {
+    mockQueries(0);
+    await channelHealthService.markFailing("org-1", "hay-channel-whatsapp", "token_revoked", "190");
+    expect(sendTemplateEmail.mock.calls[0][0]).toMatchObject({
+      locale: "pt-BR",
+      subject: "Ação necessária: reconecte o WhatsApp para continuar respondendo clientes",
+    });
+    expect(sendTemplateEmail.mock.calls[1][0]).toMatchObject({
+      locale: "nl",
+      subject: "Actie nodig: koppel WhatsApp opnieuw om klanten te blijven antwoorden",
+    });
+  });
+
+  it("warns before an expiring token dies, with the date in the message", async () => {
+    mockQueries(0);
+    await channelHealthService.markFailing(
+      "org-1",
+      "hay-channel-whatsapp",
+      "token_expiring",
+      "2026-11-20T10:00:00.000Z",
+    );
+    expect(instance?.channelHealth).toMatchObject({ status: "failing", reason: "token_expiring" });
+    const email = sendTemplateEmail.mock.calls[0][0] as {
+      subject: string;
+      variables: { notificationMessage: string; details?: unknown };
+    };
+    expect(email.subject).toBe(
+      "Ação necessária: reconecte o WhatsApp antes que ele pare de funcionar",
+    );
+    expect(email.variables.notificationMessage).toContain("20 de novembro de 2026");
+    // The raw timestamp is not repeated as a detail row.
+    expect(email.variables.details).toBeUndefined();
+  });
+
+  it("alerts again within the cooldown when the reason changes", async () => {
+    mockQueries(0);
+    await channelHealthService.markFailing(
+      "org-1",
+      "hay-channel-whatsapp",
+      "token_expiring",
+      "2026-11-20T10:00:00.000Z",
+    );
+    await channelHealthService.markFailing(
+      "org-1",
+      "hay-channel-whatsapp",
+      "token_expiring",
+      "2026-11-20T10:00:00.000Z",
+    );
+    expect(sendTemplateEmail).toHaveBeenCalledTimes(2); // one alert, two admins
+
+    await channelHealthService.markFailing("org-1", "hay-channel-whatsapp", "token_revoked", "190");
+    expect(sendTemplateEmail).toHaveBeenCalledTimes(4);
+  });
+
+  it("a successful delivery does not clear an expiry warning", async () => {
+    mockQueries(0);
+    await channelHealthService.markFailing(
+      "org-1",
+      "hay-channel-whatsapp",
+      "token_expiring",
+      "2026-11-20T10:00:00.000Z",
+    );
+    await channelHealthService.recordDeliverySuccess("org-1", "hay-channel-whatsapp");
+    expect(instance?.channelHealth).toMatchObject({ status: "failing", reason: "token_expiring" });
+  });
+
   it("a successful delivery does not clear a plugin-reported quality drop", async () => {
     mockQueries(0);
     await channelHealthService.markFailing("org-1", "hay-channel-whatsapp", "quality_drop", "RED");

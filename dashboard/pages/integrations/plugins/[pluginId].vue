@@ -226,13 +226,19 @@
         :icon="AlertTriangle"
         data-testid="channel-health-alert"
       >
-        <AlertTitle>{{ $t("pluginSettings.channelHealth.failingTitle") }}</AlertTitle>
+        <AlertTitle>
+          {{
+            plugin.channelHealth.reason === "token_expiring"
+              ? $t("pluginSettings.channelHealth.expiringTitle")
+              : $t("pluginSettings.channelHealth.failingTitle")
+          }}
+        </AlertTitle>
         <AlertDescription>
           <p>
             {{
               $t(
                 `pluginSettings.channelHealth.reasons.${plugin.channelHealth.reason ?? "delivery_failures"}`,
-                { detail: plugin.channelHealth.detail ?? "" },
+                { detail: channelHealthDetail },
               )
             }}
           </p>
@@ -684,6 +690,17 @@ const apiBaseUrl = computed(() => {
 const loading = ref(true);
 const error = ref<string | null>(null);
 const plugin = ref<any>(null);
+
+/** The health detail for the alert copy; an expiry timestamp reads as a date. */
+const channelHealthDetail = computed(() => {
+  const health = plugin.value?.channelHealth;
+  const detail = health?.detail ?? "";
+  if (health?.reason !== "token_expiring") return detail;
+  const date = new Date(detail);
+  return Number.isNaN(date.getTime())
+    ? detail
+    : date.toLocaleDateString(locale.value, { dateStyle: "long", timeZone: "UTC" });
+});
 const enabled = ref(false);
 const saving = ref(false);
 const testing = ref(false);
@@ -1372,7 +1389,10 @@ const connectQuery = route.query.connect === "1" ? { ...route.query } : null;
 /** Turn transport failures (HTML error pages, timeouts) into a sentence a merchant understands. */
 const describeConnectError = (err: any): string => {
   const raw = String(err?.message || err?.data?.message || "");
-  if (!raw || /JSON|Unexpected token|<html|Failed to fetch|NetworkError|timeout|aborted/i.test(raw)) {
+  if (
+    !raw ||
+    /JSON|Unexpected token|<html|Failed to fetch|NetworkError|timeout|aborted/i.test(raw)
+  ) {
     return t("pluginSettings.connect.networkError");
   }
   return raw;
@@ -1439,7 +1459,9 @@ const handleConnectIntent = async (): Promise<boolean> => {
     console.error("Failed to auto-connect plugin:", err);
     connectStep.value = null;
     connectError.value = describeConnectError(err);
-    toast.error(t("pluginSettings.toast.oauthConnectFailed", { name: displayName.value || pluginId.value }));
+    toast.error(
+      t("pluginSettings.toast.oauthConnectFailed", { name: displayName.value || pluginId.value }),
+    );
     router.replace({ path: route.path, query: {} });
     if (!plugin.value) await fetchPlugin();
     return false;

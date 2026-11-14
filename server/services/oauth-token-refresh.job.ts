@@ -1,6 +1,7 @@
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { oauthService } from "./oauth.service";
 import { createLogger } from "@server/lib/logger";
+import { channelHealthService } from "./channel-health.service";
 
 const logger = createLogger("oauth-refresh");
 
@@ -10,11 +11,17 @@ const logger = createLogger("oauth-refresh");
  * passed (a 60-day Instagram token at day 48), so a failed refresh or a
  * server outage still leaves many retries before it dies. Tokens stored
  * before `issuedAt` was recorded fall back to the last 15 minutes.
+ *
+ * If refreshing still fails within EXPIRY_WARNING of expiry, the instance is
+ * marked `token_expiring` so owners and admins are asked to reconnect before
+ * the token dies; the next successful refresh clears it.
  */
 
 /** Share of a token's lifetime after which it is refreshed. */
 export const REFRESH_AT_LIFETIME_SHARE = 0.8;
 const FALLBACK_THRESHOLD_SECONDS = 15 * 60;
+/** Warn owners and admins once a failing token has this little time left. */
+export const EXPIRY_WARNING_SECONDS = 3 * 24 * 60 * 60;
 
 /** True when a token with this expiry (and issue time, if known) should be refreshed now. */
 export function shouldRefresh(
@@ -78,16 +85,21 @@ export async function refreshOAuthTokens(): Promise<void> {
           try {
             await oauthService.refreshToken(instance.organizationId, instance.plugin.pluginId);
             logger.debug(`Token refreshed successfully for plugin ${instance.plugin.pluginId}`);
+            await channelHealthService.markOk(instance.organizationId, instance.plugin.pluginId, [
+              "token_expiring",
+            ]);
           } catch (error) {
             logger.error(
               { err: error },
               `Token refresh failed for plugin ${instance.plugin.pluginId}`,
             );
-
-            // Mark connection as expired if refresh fails and token is already expired
-            if (timeUntilExpiry <= 0) {
-              logger.debug(`Marking connection as expired for plugin ${instance.plugin.pluginId}`);
-              // Could update instance status here if needed
+            if (timeUntilExpiry <= EXPIRY_WARNING_SECONDS) {
+              await channelHealthService.markFailing(
+                instance.organizationId,
+                instance.plugin.pluginId,
+                "token_expiring",
+                new Date(expiresAt * 1000).toISOString(),
+              );
             }
           }
         }

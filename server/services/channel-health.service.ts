@@ -19,13 +19,16 @@ import { orgDashboardPath } from "@server/lib/dashboard-links";
  *     ended `providerStatus: failed` within FAILURE_WINDOW (core delivery,
  *     plugin status webhooks, email bounces),
  *   - a revoked connection (`connection.revoke`),
+ *   - an OAuth token about to expire that the refresh job could not renew,
  *   - the plugin's own report (`channel.reportHealth`, e.g. a WhatsApp
  *     number's quality rating dropping).
  *
  * Turning failing alerts every active owner and admin: an email and a push.
- * Repeat alerts for the same instance wait ALERT_COOLDOWN. A successful
- * delivery clears delivery/revocation failures; a reconnect clears all; a
- * plugin clears its own report with status "ok".
+ * Repeat alerts for the same instance wait ALERT_COOLDOWN, unless the reason
+ * changed (an expiring token that then gets revoked alerts again). A
+ * successful delivery clears delivery/revocation failures; a successful token
+ * refresh clears an expiry warning; a reconnect clears all; a plugin clears
+ * its own report with status "ok".
  */
 
 const logger = createLogger("channel-health");
@@ -43,8 +46,16 @@ const IGNORED_FAILURE_CODES = ["24h_window_expired", "empty_message", "bounced",
 /** Reasons a successful delivery proves resolved. */
 const CLEARED_BY_DELIVERY: ChannelHealthReason[] = ["delivery_failures", "token_revoked"];
 
+/** Formats a `token_expiring` detail (ISO timestamp) as a long date. */
+function formatExpiry(detail: string, locale: NotificationLocale): string {
+  const date = new Date(detail);
+  if (Number.isNaN(date.getTime())) return detail;
+  return date.toLocaleDateString(locale, { dateStyle: "long", timeZone: "UTC" });
+}
+
 type Copy = {
-  subject: (channel: string) => string;
+  /** Per reason, so the ones that need a reconnect say so in the inbox. */
+  subjects: Record<ChannelHealthReason, (channel: string) => string>;
   title: (channel: string) => string;
   reasons: Record<ChannelHealthReason, (detail: string) => string>;
   detailLabel: string;
@@ -54,13 +65,21 @@ type Copy = {
 
 const COPY: Record<NotificationLocale, Copy> = {
   en: {
-    subject: (channel) => `${channel} is failing on Hay.chat`,
+    subjects: {
+      delivery_failures: (channel) => `${channel} is failing on Hay.chat`,
+      token_revoked: (channel) =>
+        `Action needed: reconnect ${channel} to keep replying to customers`,
+      token_expiring: (channel) => `Action needed: reconnect ${channel} before it stops working`,
+      quality_drop: (channel) => `${channel} is failing on Hay.chat`,
+    },
     title: (channel) => `${channel} needs attention`,
     reasons: {
       delivery_failures: () =>
         "Several replies to customers could not be delivered in the last hour. Customers on this channel may not be getting answers.",
       token_revoked: () =>
         "The connection was revoked or expired. Hay.chat cannot receive or send messages on this channel until you reconnect it.",
+      token_expiring: (detail) =>
+        `The connection expires on ${formatExpiry(detail, "en")}. Hay.chat tried to renew it automatically, but the provider refused. Reconnect it before then, or Hay.chat will stop receiving and sending messages on this channel.`,
       quality_drop: () =>
         "The provider lowered this channel's quality rating. Messaging limits may drop if it keeps falling.",
     },
@@ -69,13 +88,22 @@ const COPY: Record<NotificationLocale, Copy> = {
     footer: "Sent to every owner and admin of this organization.",
   },
   "pt-BR": {
-    subject: (channel) => `${channel} está com falhas no Hay.chat`,
+    subjects: {
+      delivery_failures: (channel) => `${channel} está com falhas no Hay.chat`,
+      token_revoked: (channel) =>
+        `Ação necessária: reconecte o ${channel} para continuar respondendo clientes`,
+      token_expiring: (channel) =>
+        `Ação necessária: reconecte o ${channel} antes que ele pare de funcionar`,
+      quality_drop: (channel) => `${channel} está com falhas no Hay.chat`,
+    },
     title: (channel) => `${channel} precisa de atenção`,
     reasons: {
       delivery_failures: () =>
         "Várias respostas a clientes não puderam ser entregues na última hora. Clientes neste canal podem estar sem resposta.",
       token_revoked: () =>
         "A conexão foi revogada ou expirou. O Hay.chat não consegue receber nem enviar mensagens neste canal até você reconectá-lo.",
+      token_expiring: (detail) =>
+        `A conexão expira em ${formatExpiry(detail, "pt-BR")}. O Hay.chat tentou renová-la automaticamente, mas o provedor recusou. Reconecte antes dessa data para não deixar de receber e enviar mensagens neste canal.`,
       quality_drop: () =>
         "O provedor reduziu a classificação de qualidade deste canal. Os limites de mensagens podem cair se ela continuar baixando.",
     },
@@ -84,13 +112,22 @@ const COPY: Record<NotificationLocale, Copy> = {
     footer: "Enviado a todos os proprietários e administradores desta organização.",
   },
   es: {
-    subject: (channel) => `${channel} está fallando en Hay.chat`,
+    subjects: {
+      delivery_failures: (channel) => `${channel} está fallando en Hay.chat`,
+      token_revoked: (channel) =>
+        `Acción necesaria: vuelve a conectar ${channel} para seguir respondiendo a clientes`,
+      token_expiring: (channel) =>
+        `Acción necesaria: vuelve a conectar ${channel} antes de que deje de funcionar`,
+      quality_drop: (channel) => `${channel} está fallando en Hay.chat`,
+    },
     title: (channel) => `${channel} necesita atención`,
     reasons: {
       delivery_failures: () =>
         "Varias respuestas a clientes no se pudieron entregar en la última hora. Los clientes de este canal pueden estar sin respuesta.",
       token_revoked: () =>
         "La conexión fue revocada o expiró. Hay.chat no puede recibir ni enviar mensajes en este canal hasta que lo vuelvas a conectar.",
+      token_expiring: (detail) =>
+        `La conexión expira el ${formatExpiry(detail, "es")}. Hay.chat intentó renovarla automáticamente, pero el proveedor lo rechazó. Vuelve a conectarla antes de esa fecha para no dejar de recibir y enviar mensajes en este canal.`,
       quality_drop: () =>
         "El proveedor bajó la calificación de calidad de este canal. Los límites de mensajes pueden bajar si sigue cayendo.",
     },
@@ -99,13 +136,22 @@ const COPY: Record<NotificationLocale, Copy> = {
     footer: "Enviado a todos los propietarios y administradores de esta organización.",
   },
   nl: {
-    subject: (channel) => `${channel} werkt niet goed op Hay.chat`,
+    subjects: {
+      delivery_failures: (channel) => `${channel} werkt niet goed op Hay.chat`,
+      token_revoked: (channel) =>
+        `Actie nodig: koppel ${channel} opnieuw om klanten te blijven antwoorden`,
+      token_expiring: (channel) =>
+        `Actie nodig: koppel ${channel} opnieuw voordat het stopt met werken`,
+      quality_drop: (channel) => `${channel} werkt niet goed op Hay.chat`,
+    },
     title: (channel) => `${channel} heeft aandacht nodig`,
     reasons: {
       delivery_failures: () =>
         "Het afgelopen uur konden meerdere antwoorden aan klanten niet worden afgeleverd. Klanten op dit kanaal krijgen mogelijk geen antwoord.",
       token_revoked: () =>
         "De koppeling is ingetrokken of verlopen. Hay.chat kan op dit kanaal geen berichten ontvangen of versturen tot je het opnieuw koppelt.",
+      token_expiring: (detail) =>
+        `De koppeling verloopt op ${formatExpiry(detail, "nl")}. Hay.chat probeerde die automatisch te verlengen, maar de provider weigerde. Koppel opnieuw vóór die datum, anders kan Hay.chat op dit kanaal geen berichten meer ontvangen of versturen.`,
       quality_drop: () =>
         "De provider heeft de kwaliteitsbeoordeling van dit kanaal verlaagd. Als die blijft dalen, kunnen de berichtlimieten omlaag gaan.",
     },
@@ -189,7 +235,9 @@ export const channelHealthService = {
     const recentlyAlerted =
       !!previous?.lastAlertAt &&
       now.getTime() - new Date(previous.lastAlertAt).getTime() < ALERT_COOLDOWN_MS;
-    const alert = !recentlyAlerted;
+    // A new reason is news (e.g. an expiring token that then got revoked).
+    const reasonChanged = previous?.status === "failing" && previous.reason !== reason;
+    const alert = !recentlyAlerted || reasonChanged;
 
     const next: ChannelHealth = {
       status: "failing",
@@ -253,7 +301,7 @@ export const channelHealthService = {
           return emailService
             .sendTemplateEmail({
               to: recipient.email,
-              subject: copy.subject(channelName),
+              subject: copy.subjects[reason](channelName),
               template: "notification",
               locale,
               variables: {
@@ -262,7 +310,8 @@ export const channelHealthService = {
                 notificationTitle: copy.title(channelName),
                 notificationMessage: message(copy),
                 details:
-                  health.detail && reason !== "delivery_failures"
+                  // A failure count adds nothing; the expiry date is already in the message.
+                  health.detail && reason !== "delivery_failures" && reason !== "token_expiring"
                     ? [{ label: copy.detailLabel, value: health.detail }]
                     : undefined,
                 actionButton: { url: `${getDashboardUrl()}${path}`, text: copy.button },

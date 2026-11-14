@@ -307,10 +307,12 @@
     },
     "channelHealth": {
       "failingTitle": "This channel is failing",
+      "expiringTitle": "This channel's connection is about to expire",
       "since": "Since {time}",
       "reasons": {
         "delivery_failures": "{detail} replies could not be delivered in the last hour. Customers on this channel may not be getting answers.",
         "token_revoked": "The connection was revoked or expired. Reconnect it to receive and send messages again.",
+        "token_expiring": "The connection expires on {detail} and could not be renewed automatically. Reconnect it before then to keep receiving and sending messages.",
         "quality_drop": "The provider lowered this channel's quality rating ({detail}). Messaging limits may drop if it keeps falling."
       },
       "alerted": "Owners and admins were notified by email and push."
