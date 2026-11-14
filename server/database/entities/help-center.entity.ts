@@ -53,7 +53,7 @@ export class HelpCenter extends OrganizationScopedEntity {
   @Column({ type: "varchar", length: 63 })
   subdomain!: string;
 
-  /** A `SupportedLanguage` code: the page language and the language of the site's own labels. */
+  /** A `LanguageCode`: the page language and the language of the site's own labels. */
   @Column({ type: "varchar", length: 10, default: "en" })
   defaultLanguage!: string;
 

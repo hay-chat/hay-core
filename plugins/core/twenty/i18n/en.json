@@ -1,6 +1,7 @@
 {
   "name": "Twenty CRM",
   "description": "Connect your Twenty CRM workspace to manage people, companies, notes, tasks, and any custom object",
+  "summary": "Manage people, companies, notes, tasks and any custom object.",
   "tools": {},
   "config": {
     "baseUrl": {

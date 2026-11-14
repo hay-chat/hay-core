@@ -5,7 +5,7 @@ description: Transforma a avaliação de uma resposta da IA pela equipe num even
 version: 1.0.0
 ---
 
-Alguém da equipe da loja avaliou uma resposta do agente de IA da loja. Explique a avaliação para o dono da loja. Escreva todos os campos de texto em português do Brasil.
+{{#if byVisitor}}O cliente desta conversa avaliou uma resposta do agente de IA da loja (polegar para cima ou para baixo no chat).{{else}}Alguém da equipe da loja avaliou uma resposta do agente de IA da loja.{{/if}} Explique a avaliação para o dono da loja. Escreva todos os campos de texto em português do Brasil.
 
 AVALIAÇÃO: {{rating}}
 {{#if comment}}

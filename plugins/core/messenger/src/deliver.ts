@@ -52,7 +52,7 @@ export function isWindowError(error: unknown): boolean {
  *   3. Returns { success:true, providerMessageId } with the last Meta mid.
  *
  * Errors: window closed → 200 { success:false, error:"24h_window_expired" };
- * other Graph 4xx → 200 { error:"graph_<status>" }; a failure after part of
+ * other Graph 4xx → 200 { error:"graph_<code>" }; a failure after part of
  * the message went out → 200 { error:"partial_delivery" }; network/5xx → 500.
  */
 export async function deliverHandler(
@@ -178,7 +178,7 @@ export async function deliverHandler(
           message: error.message,
           messageId,
         });
-        res.status(200).json({ success: false, error: `graph_${error.status}` });
+        res.status(200).json({ success: false, error: `graph_${error.code ?? error.status}` });
         return;
       }
     }

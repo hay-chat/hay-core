@@ -47,11 +47,30 @@ jest.mock("@server/services/orchestrator-queue.service", () => ({
 jest.mock("@server/services/dpop-cache.service", () => ({
   dpopCacheService: { generateNonce: jest.fn(async () => "nonce-1") },
 }));
+const mockFindVisitorConversations =
+  jest.fn<(orgId: string, visitor: unknown, limit: number) => Promise<unknown[]>>();
+const mockLastReplies = jest.fn<(ids: string[]) => Promise<Map<string, unknown>>>();
 jest.mock("@server/repositories/conversation.repository", () => ({
   conversationRepository: {
     updateById: jest.fn(async () => undefined),
     findById: jest.fn(async () => mockConversation()),
+    findWebConversationsForVisitor: (orgId: string, visitor: unknown, limit: number) =>
+      mockFindVisitorConversations(orgId, visitor, limit),
+    getLastWidgetReplies: (ids: string[]) => mockLastReplies(ids),
   },
+}));
+const mockAcknowledge = jest.fn<(...args: unknown[]) => Promise<void>>(async () => undefined);
+jest.mock("@server/services/widget-events.service", () => ({
+  CLIENT_MESSAGE_ID_MAX_LENGTH: 64,
+  acknowledgeVisitorMessage: (...args: unknown[]) => mockAcknowledge(...args),
+}));
+class MockFeedbackMessageNotFoundError extends Error {}
+const mockRateAsVisitor = jest.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({}));
+jest.mock("@server/services/message-feedback.service", () => ({
+  FeedbackMessageNotFoundError: MockFeedbackMessageNotFoundError,
+  MessageFeedbackService: jest.fn(() => ({
+    rateAsVisitor: (...args: unknown[]) => mockRateAsVisitor(...args),
+  })),
 }));
 const mockFindCustomerById = jest.fn<() => Promise<unknown>>(async () => null);
 const mockFindByEmail = jest.fn(async () => ({ id: "existing-customer" }));
@@ -779,5 +798,223 @@ describe("publicConversations.submitForm", () => {
     await callerFor().submitForm(input);
 
     expect(mockUpdateCustomer).toHaveBeenCalledWith("customer-1", ORG_ID, { name: "Sam Typed" });
+  });
+});
+
+describe("publicConversations.sendMessage acks (C3)", () => {
+  const conversationId = "22222222-2222-4222-8222-222222222222";
+  const addMessage = jest.fn(async (data: Record<string, unknown>) => ({
+    id: "msg-1",
+    created_at: new Date(),
+    ...data,
+  }));
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRateLimited.mockResolvedValue(false);
+    mockVerifyProof.mockResolvedValue({ success: true, newNonce: "nonce-2" });
+    mockConversation.mockReturnValue({
+      id: conversationId,
+      organization_id: ORG_ID,
+      channel: "web",
+      context: null,
+      addMessage,
+    });
+  });
+
+  it("keeps the widget's id on the message and acknowledges it", async () => {
+    await callerFor().sendMessage({
+      conversationId,
+      content: "hello",
+      proof: "proof",
+      clientMessageId: "local-1",
+    });
+
+    expect(addMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ clientMessageId: "local-1" }),
+      }),
+    );
+    expect(mockAcknowledge).toHaveBeenCalledWith(
+      expect.objectContaining({ id: conversationId }),
+      expect.objectContaining({ id: "msg-1" }),
+    );
+  });
+
+  it("refuses an oversized client id", async () => {
+    await expect(
+      callerFor().sendMessage({
+        conversationId,
+        content: "hello",
+        proof: "proof",
+        clientMessageId: "x".repeat(65),
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+});
+
+describe("publicConversations.rateMessage (C3)", () => {
+  const conversationId = "22222222-2222-4222-8222-222222222222";
+  const messageId = "44444444-4444-4444-8444-444444444444";
+  const rateInput = { conversationId, messageId, rating: "up" as const, proof: "proof" };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRateLimited.mockResolvedValue(false);
+    mockVerifyProof.mockResolvedValue({ success: true, newNonce: "nonce-2" });
+    mockConversation.mockReturnValue({ id: conversationId, organization_id: ORG_ID });
+  });
+
+  it("stores the visitor's rating behind the conversation's proof", async () => {
+    await expect(callerFor().rateMessage(rateInput)).resolves.toEqual({
+      saved: true,
+      nonce: "nonce-2",
+      error: null,
+    });
+    expect(mockVerifyProof).toHaveBeenCalledWith(
+      conversationId,
+      "proof",
+      expect.objectContaining({ path: "/v1/publicConversations.rateMessage" }),
+    );
+    expect(mockRateAsVisitor).toHaveBeenCalledWith(
+      expect.objectContaining({ id: conversationId }),
+      messageId,
+      "up",
+    );
+  });
+
+  it("refuses without a valid proof", async () => {
+    mockVerifyProof.mockResolvedValue({ success: false, error: "Public key mismatch" });
+    await expect(callerFor().rateMessage(rateInput)).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    });
+    expect(mockRateAsVisitor).not.toHaveBeenCalled();
+  });
+
+  it("returns a fresh nonce when the proof's nonce expired", async () => {
+    mockVerifyProof.mockResolvedValue({
+      success: false,
+      error: "Invalid or expired nonce",
+      newNonce: "fresh",
+    });
+    await expect(callerFor().rateMessage(rateInput)).resolves.toEqual({
+      saved: false,
+      nonce: "fresh",
+      error: "NONCE_EXPIRED",
+    });
+  });
+
+  it("answers NOT_FOUND for a message that is not an AI answer of this conversation", async () => {
+    mockRateAsVisitor.mockRejectedValueOnce(new MockFeedbackMessageNotFoundError());
+    await expect(callerFor().rateMessage(rateInput)).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+  });
+
+  it("only takes up or down", async () => {
+    await expect(
+      callerFor().rateMessage({ ...rateInput, rating: "meh" as never }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+});
+
+describe("publicConversations.listMine (C3)", () => {
+  const mine = "22222222-2222-4222-8222-222222222222";
+  const notMine = "33333333-3333-4333-8333-333333333333";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRateLimited.mockResolvedValue(false);
+    mockFindOrganization.mockResolvedValue({ id: ORG_ID, assistantName: "Hay" });
+    mockVerifyProof.mockImplementation(async (conversationId) => ({
+      success: conversationId === mine,
+    }));
+    mockFindVisitorConversations.mockImplementation(async (_org, visitor) =>
+      (visitor as { conversationIds: string[] }).conversationIds.map((id) => ({
+        id,
+        status: "resolved",
+      })),
+    );
+    mockLastReplies.mockResolvedValue(
+      new Map([
+        [
+          mine,
+          {
+            id: "m1",
+            type: "BotAgent",
+            content: "Your order   shipped\ntoday.",
+            created_at: new Date("2026-11-01T10:00:00Z"),
+            metadata: null,
+          },
+        ],
+      ]),
+    );
+  });
+
+  it("lists only conversations whose key the browser proves, read-only", async () => {
+    const list = await callerFor().listMine({
+      organizationId: ORG_ID,
+      conversations: [
+        { conversationId: mine, proof: "p1" },
+        { conversationId: notMine, proof: "p2" },
+      ],
+    });
+
+    expect(mockVerifyProof).toHaveBeenCalledWith(
+      mine,
+      "p1",
+      expect.objectContaining({ path: "/v1/publicConversations.listMine" }),
+      { checkNonce: false },
+    );
+    expect(mockFindVisitorConversations).toHaveBeenCalledWith(
+      ORG_ID,
+      { conversationIds: [mine], customerId: null },
+      20,
+    );
+    expect(list).toEqual([
+      {
+        id: mine,
+        status: "closed",
+        lastMessagePreview: "Your order shipped today.",
+        lastMessageAt: "2026-11-01T10:00:00.000Z",
+        lastSenderName: "Hay",
+        resumable: true,
+      },
+    ]);
+  });
+
+  it("adds the signed-in customer's conversations", async () => {
+    mockVerifiedCustomerExternalId.mockResolvedValueOnce("ext-1");
+    mockFindByExternalId.mockResolvedValueOnce({ id: "customer-1" });
+
+    await callerFor().listMine({
+      organizationId: ORG_ID,
+      customerExternalId: "ext-1",
+      customerExternalIdSignature: "sig",
+    });
+
+    expect(mockVerifiedCustomerExternalId).toHaveBeenCalledWith(ORG_ID, "ext-1", "sig");
+    expect(mockFindVisitorConversations).toHaveBeenCalledWith(
+      ORG_ID,
+      { conversationIds: [], customerId: "customer-1" },
+      20,
+    );
+  });
+
+  it("an unsigned customer id lists nothing", async () => {
+    mockFindVisitorConversations.mockResolvedValue([]);
+    await expect(
+      callerFor().listMine({ organizationId: ORG_ID, customerExternalId: "ext-1" }),
+    ).resolves.toEqual([]);
+    expect(mockFindByExternalId).not.toHaveBeenCalled();
+  });
+
+  it("caps the proofs a request may carry", async () => {
+    await expect(
+      callerFor().listMine({
+        organizationId: ORG_ID,
+        conversations: Array.from({ length: 21 }, () => ({ conversationId: mine, proof: "p" })),
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });

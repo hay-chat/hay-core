@@ -8,7 +8,7 @@ import {
   toAccessState,
 } from "@server/services/organization-access.service";
 import { TRPCError } from "@trpc/server";
-import { SupportedLanguage } from "@server/types/language.types";
+import { LANGUAGE_CODES } from "@server/types/language.types";
 import {
   DateFormat,
   TimeFormat,
@@ -171,7 +171,7 @@ const updateSettingsSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   about: z.string().max(10000).optional(),
   website: websiteSchema.nullable().optional(),
-  defaultLanguage: z.nativeEnum(SupportedLanguage).optional(),
+  defaultLanguage: z.enum(LANGUAGE_CODES).optional(),
   dateFormat: z.nativeEnum(DateFormat).optional(),
   timeFormat: z.nativeEnum(TimeFormat).optional(),
   timezone: z.nativeEnum(Timezone).optional(),
@@ -814,6 +814,14 @@ export const organizationsRouter = t.router({
               ),
             ),
         );
+        // The webchat logo and brand colour follow the site (unless set by hand).
+        if (input.website) {
+          const website = input.website;
+          void import("@server/services/branding-import/branding-import.service").then(
+            ({ brandingImportService }) =>
+              brandingImportService.startImport(organizationId, website),
+          );
+        }
       }
 
       // Drop any cached LLM provider bundle so settings changes take effect immediately.
@@ -954,7 +962,7 @@ export const organizationsRouter = t.router({
           userId: input.userId,
           organizationId: ctx.organizationId,
         },
-        relations: ["user"],
+        relations: { user: true },
       });
 
       if (!userOrg) {
@@ -1105,7 +1113,7 @@ export const organizationsRouter = t.router({
           userId: input.userId,
           organizationId: ctx.organizationId,
         },
-        relations: ["user"],
+        relations: { user: true },
       });
 
       if (!userOrg) {
@@ -1305,7 +1313,7 @@ export const organizationsRouter = t.router({
           organizationId: input.organizationId,
           isActive: true,
         },
-        relations: ["organization", "organization.logoUpload"],
+        relations: { organization: { logoUpload: true } },
       });
 
       if (!userOrg) {

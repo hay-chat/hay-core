@@ -230,3 +230,53 @@ export async function sanitizePublicImage(buffer: Buffer): Promise<SanitizedMedi
   }
   return reencodeOrReject(buffer, detected.mime);
 }
+
+/** Largest SVG accepted as an icon; real icons are a few KB. */
+export const MAX_SVG_ICON_BYTES = 100 * 1024;
+/** Side of the PNG an SVG icon is rendered to: sharp at 3x a 32px icon. */
+const SVG_ICON_SIZE = 128;
+
+/**
+ * Whether the first element is <svg>, after any XML declaration, comments and
+ * doctype. A plain scan (no regex), so crafted input can't make it slow.
+ */
+export function startsWithSvgElement(text: string): boolean {
+  const lower = text.toLowerCase();
+  let i = 0;
+  for (;;) {
+    while (i < lower.length && /\s/.test(lower[i])) i++;
+    let end: number;
+    if (lower.startsWith("<?", i)) end = lower.indexOf("?>", i) + 2;
+    else if (lower.startsWith("<!--", i)) end = lower.indexOf("-->", i + 4) + 3;
+    else if (lower.startsWith("<!", i)) end = lower.indexOf(">", i) + 1;
+    else return lower.startsWith("<svg", i) && /[\s>/]/.test(lower[i + 4] ?? "");
+    if (end <= i) return false; // unterminated
+    i = end;
+  }
+}
+
+/**
+ * Render an uploaded SVG icon to a square, transparent PNG. Visitors only ever
+ * get the PNG, so nothing in the SVG (scripts, links, external references)
+ * leaves the server. libvips reads it from memory with no base path, so it
+ * cannot reach other files.
+ */
+export async function rasterizeSvgIcon(buffer: Buffer): Promise<Buffer> {
+  if (buffer.length > MAX_SVG_ICON_BYTES) {
+    throw new MediaRejectedError("The SVG is too large. Use one under 100 KB.");
+  }
+  if (!startsWithSvgElement(buffer.toString("utf8"))) {
+    throw new MediaRejectedError("That file is not an SVG");
+  }
+  try {
+    return await sharp(buffer, { density: 300, limitInputPixels: MAX_IMAGE_INPUT_PIXELS })
+      .resize(SVG_ICON_SIZE, SVG_ICON_SIZE, {
+        fit: "contain",
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      })
+      .png()
+      .toBuffer();
+  } catch {
+    throw new MediaRejectedError("That SVG could not be read");
+  }
+}

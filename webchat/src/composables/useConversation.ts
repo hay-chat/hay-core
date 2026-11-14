@@ -1,5 +1,4 @@
 import type { Attachment, HayChatConfig } from "@/types";
-import { resolveLocale } from "@/i18n/resolve";
 import type { FormResponse } from "@hay/form-schema";
 
 interface ConversationMetadata {
@@ -122,8 +121,10 @@ export function useConversation(config: HayChatConfig) {
         organizationId: config.organizationId,
         publicJwk,
         metadata,
-        // Same locale the widget UI uses, so the server greeting matches it.
-        language: resolveLocale(config.locale),
+        // The customer's raw language tag, not the widget UI locale: the UI only knows a few
+        // languages, while the server normalizes any tag (unknown ones fall back to the
+        // organization's default language).
+        language: config.locale ?? navigator.languages?.[0] ?? navigator.language,
         ...(context && Object.keys(context).length > 0 ? { context } : {}),
         ...(customer?.externalId ? { customerExternalId: customer.externalId } : {}),
         ...(customer?.externalId && customer.signature
@@ -194,6 +195,7 @@ export function useConversation(config: HayChatConfig) {
     content: string,
     proof: string,
     context?: Record<string, unknown>,
+    clientMessageId?: string,
   ): Promise<SendMessageResponse> => {
     const response = await fetch(`${baseUrl}/v1/publicConversations.sendMessage`, {
       method: "POST",
@@ -204,6 +206,7 @@ export function useConversation(config: HayChatConfig) {
         conversationId,
         content,
         proof,
+        ...(clientMessageId ? { clientMessageId } : {}),
         ...(context && Object.keys(context).length > 0 ? { context } : {}),
       }),
     });
@@ -240,6 +243,8 @@ export function useConversation(config: HayChatConfig) {
     caption?: string;
     proof: string;
     context?: Record<string, unknown>;
+    /** The widget's id for the message, echoed in its message_ack events. */
+    clientMessageId?: string;
   }): Promise<SendAttachmentResponse> => {
     const { context, caption, ...rest } = params;
     const response = await fetch(`${baseUrl}/v1/publicConversations.sendAttachment`, {
@@ -300,6 +305,28 @@ export function useConversation(config: HayChatConfig) {
     return data.result.data;
   };
 
+  /**
+   * Thumbs up/down on an AI answer. Resolves to the server answer, which may
+   * carry NONCE_EXPIRED with a fresh nonce.
+   */
+  const rateMessage = async (
+    conversationId: string,
+    messageId: string,
+    rating: "up" | "down",
+    proof: string,
+  ): Promise<{ saved: boolean; nonce?: string; error: string | null }> => {
+    const response = await fetch(`${baseUrl}/v1/publicConversations.rateMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversationId, messageId, rating, proof }),
+    });
+    if (!response.ok) {
+      throw new WidgetRequestError(response.status);
+    }
+    const data = await response.json();
+    return data.result.data;
+  };
+
   return {
     createConversation,
     getMessages,
@@ -307,5 +334,6 @@ export function useConversation(config: HayChatConfig) {
     sendAttachment,
     setContactEmail,
     submitCsat,
+    rateMessage,
   };
 }

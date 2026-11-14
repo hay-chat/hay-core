@@ -10,6 +10,8 @@ describe("hasRouteAccess", () => {
     ["/channels", "contributor", false],
     ["/insights", "agent", false],
     ["/insights", "viewer", true],
+    ["/analytics", "agent", false],
+    ["/analytics", "viewer", true],
     ["/playbooks/new", "member", false],
     ["/documents/import", "viewer", false],
     ["/help-center", "member", false],

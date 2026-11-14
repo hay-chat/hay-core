@@ -28,6 +28,11 @@ import { MCPClientFactory } from "@server/services/mcp-client-factory.service";
 import { toPluginInstanceDto } from "./plugin-instance.dto";
 import { PluginStatus } from "@server/entities/plugin-registry.entity";
 import {
+  defaultDeps,
+  resolveConnections,
+  type ConnectionState,
+} from "@server/services/setup/connection";
+import {
   mergeWithStoredConfig,
   separateConfigAndAuth,
   hasAuthChanges,
@@ -59,71 +64,119 @@ interface PluginHealthCheckResult {
 }
 
 /**
+ * Plugin i18n files are vue-i18n messages, where a literal such as "@" is written
+ * `{'@'}`. Copy served outside vue-i18n gets the literal itself.
+ */
+export function plainText(message: string | undefined): string {
+  return (message ?? "").replace(/\{'([^']*)'\}/g, "$1");
+}
+
+/**
  * Get all available plugins (core + organization's custom plugins)
  */
-export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
-  // Get plugins visible to this organization (core + org's custom)
-  const plugins = await pluginRegistryRepository.findByOrganization(ctx.organizationId!);
+export const getAllPlugins = authenticatedProcedure
+  .input(z.object({ locale: z.string().optional() }).optional())
+  .query(async ({ ctx, input }) => {
+    const locale = input?.locale ?? "en";
 
-  // Get enabled instances for this organization
-  const instances = await pluginInstanceRepository.findByOrganization(ctx.organizationId!);
-  const enabledPluginIds = new Set(instances.filter((i) => i.enabled).map((i) => i.pluginId));
+    // Get plugins visible to this organization (core + org's custom)
+    const plugins = await pluginRegistryRepository.findByOrganization(ctx.organizationId!);
 
-  return plugins
-    .filter((plugin) => {
-      const manifest = plugin.manifest as HayPluginManifest;
-      // Filter out invisible plugins from the marketplace listing
-      if (manifest.invisible) return false;
+    // Get enabled instances for this organization
+    const instances = await pluginInstanceRepository.findByOrganization(ctx.organizationId!);
+    const enabledPluginIds = new Set(instances.filter((i) => i.enabled).map((i) => i.pluginId));
 
-      // Filter out plugins marked as not_found (source files removed)
-      if (plugin.status === PluginStatus.NOT_FOUND) return false;
+    return plugins
+      .filter((plugin) => {
+        const manifest = plugin.manifest as HayPluginManifest;
+        // Filter out invisible plugins from the marketplace listing
+        if (manifest.invisible) return false;
 
-      return true;
-    })
-    .map((plugin) => {
-      const manifest = plugin.manifest as HayPluginManifest;
+        // Filter out plugins marked as not_found (source files removed)
+        if (plugin.status === PluginStatus.NOT_FOUND) return false;
 
-      // Use metadata for runtime config
-      const configSchema = plugin.metadata?.configSchema || {};
-      // Capabilities remain in manifest
-      const capabilities = manifest.capabilities;
+        return true;
+      })
+      .map((plugin) => {
+        const manifest = plugin.manifest as HayPluginManifest;
 
-      const result = {
-        id: plugin.pluginId, // Use pluginId as the identifier for frontend
-        dbId: plugin.id, // Keep database ID for reference
-        name: plugin.name,
-        version: plugin.version,
-        type: manifest.type,
-        channel: manifest.channel, // Channel identifier for channel-type plugins (undefined otherwise)
-        description: configSchema
-          ? Object.values(configSchema)[0]?.description
-          : `${plugin.name} plugin`,
-        installed: plugin.installed,
-        built: plugin.built,
-        enabled: enabledPluginIds.has(plugin.id),
-        configSchema, // Runtime config schema from metadata
-        hasConfiguration: Object.keys(configSchema).length > 0,
-        hasCustomUI: !!manifest.ui?.configuration,
-        capabilities, // From manifest
-        features: manifest.capabilities?.chat_connector?.features || {},
-        sourceType: plugin.sourceType,
-        isCustom: plugin.sourceType === "custom",
-        uploadedAt: plugin.uploadedAt,
-        uploadedBy: plugin.uploadedBy,
-        status: plugin.status || PluginStatus.AVAILABLE, // Include status field
-        metadata: plugin.metadata, // Include full metadata
-        // Git-sourced plugin fields
-        gitRepoFullName: plugin.gitRepoFullName,
-        gitBranch: plugin.gitBranch,
-        gitLastCommitSha: plugin.gitLastCommitSha,
-        gitLastSyncAt: plugin.gitLastSyncAt,
-        gitSyncError: plugin.gitSyncError,
-        gitAvailableCommitSha: plugin.gitAvailableCommitSha,
-      };
+        // Use metadata for runtime config
+        const configSchema = plugin.metadata?.configSchema || {};
+        // Capabilities remain in manifest
+        const capabilities = manifest.capabilities;
+        // Marketplace copy in the caller's language, for plugins that are not enabled too.
+        const copy = manifest.i18n ? resolvePluginLocale(manifest.i18n, locale) : undefined;
+        const description = plainText(copy?.description) || manifest.description || "";
 
-      return result;
-    });
-});
+        const result = {
+          id: plugin.pluginId, // Use pluginId as the identifier for frontend
+          dbId: plugin.id, // Keep database ID for reference
+          name: plainText(copy?.name) || plugin.name,
+          version: plugin.version,
+          type: manifest.type,
+          channel: manifest.channel, // Channel identifier for channel-type plugins (undefined otherwise)
+          description,
+          // One short sentence for the marketplace card.
+          summary: plainText(copy?.summary) || description,
+          marketplaceCategory: manifest.marketplaceCategory ?? null,
+          installed: plugin.installed,
+          built: plugin.built,
+          enabled: enabledPluginIds.has(plugin.id),
+          configSchema, // Runtime config schema from metadata
+          hasConfiguration: Object.keys(configSchema).length > 0,
+          hasCustomUI: !!manifest.ui?.configuration,
+          capabilities, // From manifest
+          features: manifest.capabilities?.chat_connector?.features || {},
+          sourceType: plugin.sourceType,
+          isCustom: plugin.sourceType === "custom",
+          uploadedAt: plugin.uploadedAt,
+          uploadedBy: plugin.uploadedBy,
+          status: plugin.status || PluginStatus.AVAILABLE, // Include status field
+          metadata: plugin.metadata, // Include full metadata
+          // Git-sourced plugin fields
+          gitRepoFullName: plugin.gitRepoFullName,
+          gitBranch: plugin.gitBranch,
+          gitLastCommitSha: plugin.gitLastCommitSha,
+          gitLastSyncAt: plugin.gitLastSyncAt,
+          gitSyncError: plugin.gitSyncError,
+          gitAvailableCommitSha: plugin.gitAvailableCommitSha,
+        };
+
+        return result;
+      });
+  });
+
+/**
+ * Whether each enabled plugin is really connected, as the setup board judges it
+ * (services/setup/connection.ts). The plugin list never waits on this: it asks
+ * plugin workers, each with its own timeout.
+ */
+export const getConnectionStates = authenticatedProcedure.query(
+  async ({ ctx }): Promise<Record<string, ConnectionState>> => {
+    const instances = await pluginInstanceRepository.findByOrganization(ctx.organizationId!);
+    const enabledIds = instances
+      .filter((instance) => instance.enabled)
+      .map((instance) => instance.plugin?.pluginId)
+      .filter((id): id is string => !!id);
+
+    // Only plugins that give the agent tools need tools to count as connected.
+    const hasTools = (pluginId: string) => {
+      const capabilities = pluginManagerService.getPlugin(pluginId)?.manifest?.capabilities;
+      return Array.isArray(capabilities) && capabilities.includes("mcp");
+    };
+
+    const deps = await defaultDeps(ctx.organizationId!);
+    const [withTools, withoutTools] = await Promise.all([
+      resolveConnections(enabledIds.filter(hasTools), deps, { needsTools: true }),
+      resolveConnections(
+        enabledIds.filter((id) => !hasTools(id)),
+        deps,
+        { needsTools: false },
+      ),
+    ]);
+    return Object.fromEntries([...withTools, ...withoutTools]);
+  },
+);
 
 /**
  * Get a specific plugin by ID

@@ -338,7 +338,7 @@ Existing documentation (${documents.length} pages):
 ${summaryList}
 
 For each product capability, determine if there is adequate documentation covering it.
-For each required topic, determine if it is covered by any existing page.
+For each required topic, determine if it is covered by any existing page. List at most 3 covering pages per topic.
 Also identify any additional topics that SHOULD be documented given this specific product's nature but are currently missing.
 
 Score from 0-100 based on how well the documentation covers the product's features and expected topics.`;
@@ -356,7 +356,7 @@ Score from 0-100 based on how well the documentation covers the product's featur
               coveredBy: {
                 type: "array" as const,
                 items: { type: "string" as const },
-                description: "Titles of docs that cover this topic",
+                description: "Titles of up to 3 docs that cover this topic",
               },
               adequacy: {
                 type: "string" as const,
@@ -399,7 +399,9 @@ Score from 0-100 based on how well the documentation covers the product's featur
         tier: "medium",
         organizationId,
         temperature: 0.3,
-        max_tokens: 3000,
+        // Topics × covering titles grows with the site: 3000 truncated the JSON
+        // for a 58-page site.
+        max_tokens: 8000,
       });
 
       const response = JSON.parse(responseText as string);

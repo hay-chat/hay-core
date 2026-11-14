@@ -16,7 +16,6 @@
     "users": "Users",
     "sso": "Single sign-on",
     "apiTokens": "API Tokens",
-    "webchat": "Webchat",
     "gitConnections": "Git Connections",
     "llmProviders": "AI Models",
     "customerPrivacy": "Customer Privacy",
@@ -28,6 +27,7 @@
     "evidencePacks": "Evidence packs",
     "tests": "Tests",
     "usage": "Usage",
+    "analytics": "Analytics",
     "insights": "Insights",
     "assistant": "Assistant",
     "identity": "Identity",
@@ -91,6 +91,10 @@
     "tryAgain": "Try Again",
     "showing": "Showing {from} to {to} of {total}",
     "viewDetails": "View Details"
+  },
+  "languageSelect": {
+    "placeholder": "Select a language",
+    "searchPlaceholder": "Search languages…"
   },
   "unauthorized": {
     "pageTitle": "Access Denied",

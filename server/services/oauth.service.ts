@@ -639,32 +639,38 @@ export class OAuthService {
       );
 
       // Optional one-time token transform (e.g. Instagram short-lived → long-lived).
-      // Done here, server-side, because it may need the client secret. Failure is
-      // non-fatal: keep the original token so the connection still works (degraded).
+      // Done here, server-side, because it may need the client secret. A failure
+      // fails the connect: the original token is short-lived (Instagram: 1 hour)
+      // and cannot be refreshed, so keeping it would leave a channel that shows
+      // "Connected" but stops working an hour later.
       if (oauthConfig.tokenExchange && tokens.access_token) {
+        let exchanged: { access_token: string; expires_in?: number; token_type?: string };
         try {
-          const exchanged = await this.performTokenOp(
+          exchanged = await this.performTokenOp(
             oauthConfig.tokenExchange,
             tokens.access_token,
             validCredentials.clientSecret,
             endpointPolicy,
           );
-          tokens.access_token = exchanged.access_token;
-          tokens.expires_in = exchanged.expires_in;
-          tokens.expires_at = exchanged.expires_in
-            ? Math.floor(Date.now() / 1000) + exchanged.expires_in
-            : undefined;
-          tokens.token_type = exchanged.token_type || tokens.token_type;
-          logger.info(
-            { expiresIn: tokens.expires_in },
-            "Token exchange transform applied (long-lived token obtained)",
-          );
         } catch (error) {
-          logger.warn(
+          logger.error(
             { err: error instanceof Error ? error.message : String(error), pluginId },
-            "Token exchange transform failed — keeping original token",
+            "Token exchange transform failed",
+          );
+          throw new Error(
+            "The provider gave a short-lived token and Hay could not swap it for a long-lived one. Try connecting again.",
           );
         }
+        tokens.access_token = exchanged.access_token;
+        tokens.expires_in = exchanged.expires_in;
+        tokens.expires_at = exchanged.expires_in
+          ? Math.floor(Date.now() / 1000) + exchanged.expires_in
+          : undefined;
+        tokens.token_type = exchanged.token_type || tokens.token_type;
+        logger.info(
+          { expiresIn: tokens.expires_in },
+          "Token exchange transform applied (long-lived token obtained)",
+        );
       }
 
       // Combine required and optional scopes for storage
@@ -903,6 +909,7 @@ export class OAuthService {
         accessToken: tokens.access_token, // Plain text - transformer will encrypt
         refreshToken: tokens.refresh_token || undefined, // Plain text - transformer will encrypt
         expiresAt: tokens.expires_at,
+        issuedAt: Math.floor(Date.now() / 1000),
         connectedAt: Math.floor(Date.now() / 1000),
         tokenType: tokens.token_type || "Bearer",
         scope: tokens.scope || scopes?.join(" "),
@@ -1220,6 +1227,7 @@ export class OAuthService {
           ...instance.authState?.credentials,
           accessToken: newTokens.access_token,
           expiresAt: newTokens.expires_at,
+          issuedAt: Math.floor(Date.now() / 1000),
           connectedAt: instance.authState?.credentials?.connectedAt,
           tokenType: newTokens.token_type,
           scope: newTokens.scope,
@@ -1292,6 +1300,7 @@ export class OAuthService {
         accessToken: newTokens.access_token, // Plain text - transformer will encrypt
         refreshToken: newTokens.refresh_token || undefined, // Plain text - transformer will encrypt
         expiresAt: newTokens.expires_at,
+        issuedAt: Math.floor(Date.now() / 1000),
         connectedAt: instance.authState?.credentials?.connectedAt,
         tokenType: newTokens.token_type || "Bearer",
         scope: newTokens.scope,

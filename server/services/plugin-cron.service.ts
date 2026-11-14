@@ -69,7 +69,7 @@ export class PluginCronService {
   async reconcile(): Promise<void> {
     const enabled = await pluginInstanceRepository.findAll({
       where: { enabled: true },
-      relations: ["plugin"],
+      relations: { plugin: true },
     });
 
     const wanted = new Set<string>();

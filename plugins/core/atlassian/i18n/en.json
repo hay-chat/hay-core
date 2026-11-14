@@ -1,6 +1,7 @@
 {
   "name": "Atlassian",
   "description": "Import Confluence pages as documents and let the agent work with Jira issues.",
+  "summary": "Import Confluence pages as documents and give the agent Jira tools.",
   "tools": {},
   "config": {
     "authMode": {

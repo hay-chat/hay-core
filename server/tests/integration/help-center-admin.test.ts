@@ -49,7 +49,7 @@ import {
   resolveHelpCenterHost,
 } from "../../services/help-center/host-resolver";
 import type { Context } from "../../trpc/context";
-import { SupportedLanguage } from "../../types/language.types";
+import type { LanguageCode } from "../../types/language.types";
 import { purgeAuditLogs } from "../helpers/audit-logs";
 
 const ORG_A = "4c000000-0000-4000-8000-0000000000a1";
@@ -267,7 +267,7 @@ describe("help center administration", () => {
       ).create({
         name: "Acme Help",
         subdomain: "  Acme-Support ",
-        defaultLanguage: "en" as SupportedLanguage,
+        defaultLanguage: "en" as LanguageCode,
       });
 
       expect(view.subdomain).toBe("acme-support");
@@ -305,7 +305,7 @@ describe("help center administration", () => {
           caller.create({
             name: "Again",
             subdomain: "acme-two",
-            defaultLanguage: "en" as SupportedLanguage,
+            defaultLanguage: "en" as LanguageCode,
           }),
         ),
       ).toBe("CONFLICT");
@@ -324,7 +324,7 @@ describe("help center administration", () => {
             caller.create({
               name: "Copycat",
               subdomain,
-              defaultLanguage: "en" as SupportedLanguage,
+              defaultLanguage: "en" as LanguageCode,
             }),
           ),
         ).toBe("CONFLICT");
@@ -347,7 +347,7 @@ describe("help center administration", () => {
       const caller = await asAdminA();
       expect(
         await codeOf(
-          caller.create({ name: "Acme", subdomain, defaultLanguage: "en" as SupportedLanguage }),
+          caller.create({ name: "Acme", subdomain, defaultLanguage: "en" as LanguageCode }),
         ),
       ).toBe("BAD_REQUEST");
       expect(await helpCenterService.findByOrganization(ORG_A)).toBeNull();
@@ -365,7 +365,7 @@ describe("help center administration", () => {
           caller.create({
             name: "   ",
             subdomain: "acme",
-            defaultLanguage: "en" as SupportedLanguage,
+            defaultLanguage: "en" as LanguageCode,
           }),
         ),
       ).toBe("BAD_REQUEST");
@@ -470,7 +470,7 @@ describe("help center administration", () => {
           member.create({
             name: "Acme",
             subdomain: "acme",
-            defaultLanguage: "en" as SupportedLanguage,
+            defaultLanguage: "en" as LanguageCode,
           }),
         ),
       ).toBe("FORBIDDEN");
@@ -1331,7 +1331,7 @@ describe("help center administration", () => {
       const created = await caller.create({
         name: "Acme",
         subdomain: "acme",
-        defaultLanguage: "en" as SupportedLanguage,
+        defaultLanguage: "en" as LanguageCode,
       });
       await caller.setPublished({ published: true });
       await caller.setPublished({ published: false });
@@ -1375,7 +1375,7 @@ describe("help center administration", () => {
           caller.create({
             name: "Acme",
             subdomain: "www",
-            defaultLanguage: "en" as SupportedLanguage,
+            defaultLanguage: "en" as LanguageCode,
           }),
         ),
       ).toBe("BAD_REQUEST");

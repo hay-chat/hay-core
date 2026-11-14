@@ -19,6 +19,10 @@ export interface MCPTool extends MCPToolDefinition {
   createdAt: Date;
   /** Read-only, or which kind of write. Unclassified tools count as writes. */
   risk: ToolRisk;
+  /** Webchat progress line while it runs (from the tool definition). */
+  label?: string;
+  /** Webchat line once it is done. */
+  doneLabel?: string;
 }
 
 /**
@@ -90,6 +94,8 @@ export class MCPRegistryService {
           description: descriptor.description,
           input_schema: descriptor.input_schema as MCPTool["input_schema"],
           risk: descriptor.risk,
+          label: descriptor.label,
+          doneLabel: descriptor.doneLabel,
           createdAt,
         });
       }

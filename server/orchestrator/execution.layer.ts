@@ -50,12 +50,14 @@ import { isPageToolResult } from "@server/services/webchat/page-tools.service";
 import { Document } from "@server/entities/document.entity";
 import { describeLocalTime } from "./local-time";
 import { handoffCopy } from "./handoff-copy";
+import type { HandoffReason } from "./handoff-reason";
 import { hasFactualSpecifics } from "@server/services/core/reply-risk";
 import {
   resolveQuickCheckSettings,
   type OrganizationSettings,
 } from "@server/types/organization-settings.types";
 import type { FormSchema } from "@hay/form-schema";
+import { languageName as languageNameOf } from "@server/types/language.types";
 import { formSchemaSchema } from "@hay/form-schema";
 
 function describeBadDate(date: BadDate): string {
@@ -67,6 +69,25 @@ function describeBadDate(date: BadDate): string {
 /** Tool loop steps (15) plus one retry per guardrail and a recheck. */
 const MAX_PLANNER_CALLS_PER_TURN = 20;
 const MAX_RECHECK_DEPTH = 1;
+
+/** Customer intents whose replies skip guardrail Stages 1 and 2 (no factual specifics). */
+const EXEMPT_GUARDRAIL_INTENTS: MessageIntent[] = [
+  MessageIntent.GREET,
+  MessageIntent.CLOSE_SATISFIED,
+  MessageIntent.CLOSE_UNSATISFIED,
+];
+
+/** A reply's grounding score and the context it was judged against. */
+interface GroundingCheck {
+  context: ConfidenceContext;
+  grounding: number;
+}
+
+/** Stage 1 and Stage 2 checks started early, in parallel, for one reply. */
+interface LateStageChecks {
+  companyInterest: Promise<CompanyInterestAssessment>;
+  grounding: Promise<GroundingCheck>;
+}
 
 const BAD_LINK_NOTE: Record<BadLink["reason"], string> = {
   dead: "does not exist",
@@ -168,6 +189,8 @@ export interface ExecutionResult {
   };
   handoff?: {
     reason: string;
+    /** Why, as a fixed code, when a guardrail or fallback caused the hand-off. */
+    code?: HandoffReason;
     fields?: Record<string, unknown>;
   };
   close?: {
@@ -400,23 +423,7 @@ export class ExecutionLayer {
         const shouldEnforceLanguage = customerMessages.length <= 3;
 
         if (shouldEnforceLanguage) {
-          const languageNames: Record<string, string> = {
-            en: "English",
-            pt: "Portuguese",
-            es: "Spanish",
-            de: "German",
-            fr: "French",
-            it: "Italian",
-            nl: "Dutch",
-            pl: "Polish",
-            ru: "Russian",
-            ja: "Japanese",
-            zh: "Chinese",
-            ko: "Korean",
-            ar: "Arabic",
-            hi: "Hindi",
-          };
-          const languageName = languageNames[customerLanguage] || customerLanguage.toUpperCase();
+          const languageName = languageNameOf(customerLanguage);
           const languageInstruction = `\n\nIMPORTANT LANGUAGE REQUIREMENT: The customer is communicating in ${languageName}. You MUST respond ONLY in ${languageName}, regardless of the language used in the prompts, instructions, or system messages. This is a critical requirement that overrides all other language-related instructions.`;
           finalPrompt = responsePrompt + languageInstruction;
         }
@@ -467,6 +474,7 @@ export class ExecutionLayer {
       log.debug("Invoking LLM for execution planning");
 
       const response = await this.llmService.invoke({
+        caller: "planner",
         history: [
           ...(pageToolsTurn ? [pageToolsTurn] : []),
           ...(referenceTurn ? [referenceTurn] : []),
@@ -481,10 +489,12 @@ export class ExecutionLayer {
 
       // ASK_TEAM (D19): only offered when the organization turned quick checks
       // on; the question defaults to the shopper's own words.
+      let unansweredFact = false;
       if (result.step === "ASK_TEAM") {
         if (!quickCheck) {
           result.step = "HANDOFF";
           result.handoffReason ??= "The AI could not answer a fact";
+          unansweredFact = true;
         } else if (!result.teamQuestion?.trim()) {
           result.teamQuestion = lastCustomerContent(messages);
         }
@@ -515,6 +525,7 @@ export class ExecutionLayer {
       if (result.handoffReason) {
         result.handoff = {
           reason: result.handoffReason,
+          ...(unansweredFact ? { code: "unanswered_fact" as const } : {}),
         };
       }
       if (result.closeReason) {
@@ -678,6 +689,23 @@ export class ExecutionLayer {
     });
     log.debug("Applying two-stage guardrails to RESPOND step");
 
+    // Greetings and goodbyes skip Stages 1 and 2, unless the reply states
+    // numbers, amounts or links: those get checked whatever the intent.
+    const lastCustomerMessage = await conversation.getLastCustomerMessage();
+    const isConversationalReply = (message: string): boolean =>
+      !!lastCustomerMessage?.intent &&
+      !hasFactualSpecifics(message) &&
+      EXEMPT_GUARDRAIL_INTENTS.includes(lastCustomerMessage.intent as MessageIntent);
+
+    // Stages 1 and 2 are slow LLM calls that only judge the drafted reply, so
+    // start them now, alongside Stage 0 and the link/date checks. Decisions are
+    // still taken in the original order below; if an earlier stage stops or
+    // rewrites the reply, these results are dropped or recomputed.
+    const draftedMessage = result.userMessage!;
+    let lateChecks = isConversationalReply(draftedMessage)
+      ? null
+      : this.startLateStageChecks(conversation, draftedMessage);
+
     // STAGE 0: Action-claim consistency. Runs BEFORE the intent exemption below
     // so a false "I've cancelled it, glad I could help!" on a closing intent is
     // still caught. May return a re-planned result (retry) or a HANDOFF.
@@ -714,30 +742,22 @@ export class ExecutionLayer {
       return dateResult;
     }
 
-    // Greetings and goodbyes skip the remaining stages, unless the reply states
-    // numbers, amounts or links: those get checked whatever the intent.
-    const lastCustomerMessage = await conversation.getLastCustomerMessage();
-    if (lastCustomerMessage?.intent && !hasFactualSpecifics(result.userMessage ?? "")) {
-      const intent = lastCustomerMessage.intent as MessageIntent;
-
-      const exemptIntents: MessageIntent[] = [
-        MessageIntent.GREET,
-        MessageIntent.CLOSE_SATISFIED,
-        MessageIntent.CLOSE_UNSATISFIED,
-      ];
-
-      if (exemptIntents.includes(intent)) {
-        log.debug({ intent }, "Skipping guardrails - conversational intent detected");
-        return result;
-      }
+    const reply = result.userMessage!;
+    if (isConversationalReply(reply)) {
+      log.debug(
+        { intent: lastCustomerMessage?.intent },
+        "Skipping guardrails - conversational intent detected",
+      );
+      return result;
+    }
+    // The link check may have taken links out of the reply: judge what is sent.
+    if (!lateChecks || reply !== draftedMessage) {
+      lateChecks = this.startLateStageChecks(conversation, reply);
     }
 
     // STAGE 1: Company Interest Protection
     log.debug("Stage 1: Assessing company interest");
-    const companyInterestAssessment = await this.assessCompanyInterest(
-      conversation,
-      result.userMessage!,
-    );
+    const companyInterestAssessment = await lateChecks.companyInterest;
 
     result.companyInterest = companyInterestAssessment;
 
@@ -819,6 +839,7 @@ export class ExecutionLayer {
           reason: companyInterestAssessment.evaluationFailed
             ? "Company interest check unavailable"
             : `Company interest violation: ${companyInterestAssessment.violationType}`,
+          code: "company_interest",
           fields: {
             violationType: companyInterestAssessment.violationType,
             severity: companyInterestAssessment.severity,
@@ -839,9 +860,10 @@ export class ExecutionLayer {
     //   untouched, so low retrieval quality alone never escalates a
     //   claim-free reply; a low score falls into the same full assessment →
     //   recheck → escalate/fallback path as a flagged reply.
+    const groundingCheck = await lateChecks.grounding;
     const confidenceAssessment = companyInterestAssessment.requiresFactCheck
-      ? await this.assessResponseConfidence(conversation, result.userMessage!)
-      : await this.assessUnflaggedResponseGrounding(conversation, result.userMessage!);
+      ? await this.assessResponseConfidence(conversation, reply, groundingCheck)
+      : await this.assessUnflaggedResponseGrounding(conversation, groundingCheck);
 
     if (confidenceAssessment) {
       log.debug(
@@ -921,6 +943,7 @@ export class ExecutionLayer {
             userMessage: fallbackMessage,
             handoff: {
               reason: "Low confidence in AI response - unverified company claims",
+              code: "low_confidence",
               fields: {
                 confidenceScore: result.confidence?.score,
                 confidenceTier: result.confidence?.tier,
@@ -1079,6 +1102,7 @@ export class ExecutionLayer {
           reason: assessment.evaluationFailed
             ? "Action claim check unavailable"
             : "Claimed action without tool execution",
+          code: "action_claim",
           fields: {
             claimedActions: assessment.claimedActions,
             toolsCalledThisTurn: options.toolsCalledThisTurn ?? [],
@@ -1126,6 +1150,7 @@ export class ExecutionLayer {
     });
 
     let badLinks: BadLink[];
+    const startedAt = Date.now();
     try {
       const messages = await conversation.getMessages();
       const { website, siteUrls } = await this.getLinkContext(conversation);
@@ -1135,6 +1160,10 @@ export class ExecutionLayer {
         siteUrls,
         website,
       });
+      log.info(
+        { durationMs: Date.now() - startedAt, badLinks: badLinks.length },
+        "Link check completed",
+      );
     } catch (error) {
       // The check must never break a turn.
       log.warn({ error }, "Link check failed, sending the reply unchecked");
@@ -1197,6 +1226,7 @@ export class ExecutionLayer {
       userMessage: fallbackMessage,
       handoff: {
         reason: "Reply linked to a page that does not exist",
+        code: "broken_link",
         fields: { deadLinks: badLinks.map((link) => link.url) },
       },
       badLinks,
@@ -1296,6 +1326,7 @@ export class ExecutionLayer {
       ),
       handoff: {
         reason: "Reply stated a date that could not be verified",
+        code: "unverified_date",
         fields: { badDates: badDates.map((date) => date.raw) },
       },
       badDates,
@@ -1365,10 +1396,40 @@ export class ExecutionLayer {
   private async assessResponseConfidence(
     conversation: Conversation,
     response: string,
+    groundingCheck?: GroundingCheck,
   ): Promise<ConfidenceAssessment> {
-    const context = await this.buildConfidenceContext(conversation, response);
+    const context =
+      groundingCheck?.context ?? (await this.buildConfidenceContext(conversation, response));
     const config = await this.getConfidenceConfig(conversation);
-    return await this.confidenceService.assessConfidence(context, config);
+    return await this.confidenceService.assessConfidence(
+      context,
+      config,
+      groundingCheck ? { grounding: groundingCheck.grounding } : undefined,
+    );
+  }
+
+  /**
+   * Start the Stage 1 company-interest check and the Stage 2 grounding check
+   * for a reply, in parallel. Both only judge the reply, so they can run before
+   * the earlier stages have decided. Callers that drop the result (an earlier
+   * stage stopped the reply) must not cause unhandled rejections, hence the
+   * no-op catch; awaiting the promises still throws as before.
+   */
+  private startLateStageChecks(conversation: Conversation, response: string): LateStageChecks {
+    const companyInterest = this.assessCompanyInterest(conversation, response);
+    const grounding = this.checkGrounding(conversation, response);
+    companyInterest.catch(() => undefined);
+    grounding.catch(() => undefined);
+    return { companyInterest, grounding };
+  }
+
+  /** Stage 2 grounding-only LLM call for a reply, with the context it was judged against. */
+  private async checkGrounding(
+    conversation: Conversation,
+    response: string,
+  ): Promise<GroundingCheck> {
+    const context = await this.buildConfidenceContext(conversation, response);
+    return { context, grounding: await this.confidenceService.assessGrounding(context) };
   }
 
   /**
@@ -1380,11 +1441,10 @@ export class ExecutionLayer {
    */
   private async assessUnflaggedResponseGrounding(
     conversation: Conversation,
-    response: string,
+    groundingCheck: GroundingCheck,
   ): Promise<ConfidenceAssessment | null> {
-    const context = await this.buildConfidenceContext(conversation, response);
+    const { context, grounding } = groundingCheck;
     const config = await this.getConfidenceConfig(conversation);
-    const grounding = await this.confidenceService.assessGrounding(context);
 
     logger.debug(
       {
@@ -1935,6 +1995,7 @@ export class ExecutionLayer {
       });
 
       const composed = await this.llmService.invoke<string>({
+        caller: "contextual-fallback",
         prompt,
         temperature: 0.3,
         // Keeps the call on the org's provider and AI region (EU-only orgs).

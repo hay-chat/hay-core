@@ -6,13 +6,14 @@
     "moduleResolution": "bundler",
     "skipLibCheck": true,
     "types": ["node"],
-    "typeRoots": ["./node_modules/@types", "./types"],
+    "typeRoots": ["./node_modules/@types", "../node_modules/@types", "./types"],
     "paths": {
       "@/*": ["./*"],
       "~/*": ["./*"],
       "@server/*": ["../server/*"],
       "@plugins/*": ["../plugins/*"],
-      "@hay/form-schema": ["../packages/form-schema/src/index.ts"]
+      "@hay/form-schema": ["../packages/form-schema/src/index.ts"],
+      "@hay/languages": ["../server/types/language.types.ts"]
     }
   },
   "include": [

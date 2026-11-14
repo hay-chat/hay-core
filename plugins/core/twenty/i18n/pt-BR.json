@@ -1,6 +1,7 @@
 {
   "name": "Twenty CRM",
   "description": "Conecte seu workspace do Twenty CRM para gerenciar pessoas, empresas, notas, tarefas e objetos personalizados.",
+  "summary": "Gerencie pessoas, empresas, notas, tarefas e qualquer objeto personalizado.",
   "tools": {},
   "config": {
     "baseUrl": {

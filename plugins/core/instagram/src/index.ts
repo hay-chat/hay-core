@@ -2,6 +2,7 @@ import { defineHayPlugin } from "@hay/plugin-sdk";
 import { GraphClient } from "./graph-client.js";
 import { webhookHandler } from "./webhook.js";
 import { deliverHandler } from "./deliver.js";
+import { PluginApiClient } from "./plugin-api.js";
 import { SentMessageTracker } from "./echo.js";
 
 /**
@@ -168,6 +169,11 @@ export default defineHayPlugin((globalCtx) => {
           getAccessToken: () => accessToken,
           logger,
           tracker,
+          revokeConnection: async () => {
+            await new PluginApiClient(logger).mutation("connection.revoke", {
+              reason: "graph_190",
+            });
+          },
         });
       });
 

@@ -3,7 +3,7 @@ import { t } from "@server/trpc";
 import { scopedProcedure } from "@server/trpc/middleware/auth";
 import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
 import { ACTIONS, RESOURCES } from "@server/types/scopes";
-import { SupportedLanguage } from "@server/types/language.types";
+import { LANGUAGE_CODES } from "@server/types/language.types";
 import {
   HELP_CENTER_FONTS,
   HELP_CENTER_LAYOUTS,
@@ -26,7 +26,7 @@ const adminProcedure = scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.
 
 const nameSchema = z.string().trim().min(1).max(120);
 const subdomainSchema = z.string().trim().min(1).max(63);
-const languageSchema = z.nativeEnum(SupportedLanguage);
+const languageSchema = z.enum(LANGUAGE_CODES);
 
 export const helpCenterThemeSchema = z.object({
   accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),

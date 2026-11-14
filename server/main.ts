@@ -120,8 +120,6 @@ async function startServer() {
   const { orchestratorWorker } = await import("@server/workers/orchestrator.worker");
   const { pluginManagerService } = await import("@server/services/plugin-manager.service");
   const { getPluginRunnerService } = await import("@server/services/plugin-runner.service");
-  const { pluginInstanceManagerService } =
-    await import("@server/services/plugin-instance-manager.service");
   const { pluginInstanceRepository: _pluginInstanceRepository } =
     await import("@server/repositories/plugin-instance.repository");
   const { pluginAssetService } = await import("@server/services/plugin-asset.service");
@@ -653,10 +651,6 @@ async function startServer() {
       await pluginPagesService.initialize();
       logger.info("Plugin pages synced with dashboard");
 
-      // Start plugin instance lifecycle management
-      pluginInstanceManagerService.startCleanup();
-      logger.info("Plugin instance lifecycle manager started");
-
       const { initPluginIsolation } = await import("@server/services/plugin-isolation.service");
       await initPluginIsolation();
 
@@ -693,7 +687,6 @@ async function startServer() {
     metricsServer?.close();
     const httpClosed = new Promise<void>((resolve) => httpServer.close(() => resolve()));
     await step("orchestrator", () => orchestratorWorker.stop());
-    await step("plugin-cleanup", () => pluginInstanceManagerService.stopCleanup());
     await step("websocket", () => websocketService.shutdown());
     await step("background-work", () =>
       Promise.all([

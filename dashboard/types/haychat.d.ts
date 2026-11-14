@@ -25,17 +25,19 @@ declare global {
         pluginId?: string;
         baseUrl?: string;
         widgetTitle?: string;
-        widgetSubtitle?: string;
         position?: string;
-        theme?: string;
+        brandColor?: string;
+        themeMode?: "light" | "dark" | "system";
         showGreeting?: boolean;
         greetingMessage?: string;
+        teaserMessage?: string;
         context?: Record<string, unknown>;
       };
       addContext?: (key: string, value: unknown) => void;
       registerTool?: (tool: HayPageTool) => void;
       unregisterTool?: (name: string) => void;
       highlight?: (target: Element | string | null, label?: string) => boolean;
+      setTeaserMessage?: (message: string) => void;
     };
   }
   interface Navigator {

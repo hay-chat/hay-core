@@ -16,14 +16,14 @@ export class MessageFeedbackRepository {
   ): Promise<MessageFeedback | null> {
     return this.repository.findOne({
       where: { id, organizationId },
-      relations: ["message", "message.source", "reviewer"],
+      relations: { message: { source: true }, reviewer: true },
     });
   }
 
   async findByMessage(messageId: string): Promise<MessageFeedback[]> {
     return this.repository.find({
       where: { messageId },
-      relations: ["reviewer"],
+      relations: { reviewer: true },
       order: { createdAt: "DESC" },
     });
   }
@@ -47,6 +47,10 @@ export class MessageFeedbackRepository {
 
     if (filter?.rating) {
       query.andWhere("feedback.rating = :rating", { rating: filter.rating });
+    }
+
+    if (filter?.source) {
+      query.andWhere("feedback.source = :source", { source: filter.source });
     }
 
     if (filter?.reviewerId) {

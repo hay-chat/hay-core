@@ -1,0 +1,33 @@
+{
+  "name": "Correios",
+  "description": "Conecte seu contrato dos Correios para que o agente rastreie uma encomenda pelo código de rastreamento: status atual, último evento, histórico, data de entrega e se o objeto parou de se movimentar.",
+  "summary": "Rastreie uma encomenda pelo código: status atual, histórico e previsão de entrega.",
+  "tools": {
+    "correios_track_shipment": {
+      "label": "Rastrear encomenda",
+      "description": "Rastreia uma encomenda dos Correios pelo código de rastreamento: status atual, último evento, histórico e data de entrega. Somente objetos postados no seu próprio contrato dos Correios."
+    }
+  },
+  "config": {
+    "username": {
+      "label": "Usuário dos Correios",
+      "description": "O usuário do Meu Correios da conta da sua empresa (idCorreios, normalmente o CNPJ) vinculada ao contrato."
+    },
+    "accessCode": {
+      "label": "Código de acesso às APIs",
+      "description": "O código de acesso gerado no CWS (cws.correios.com.br → Gestão de acesso a APIs). Não é a sua senha do Meu Correios."
+    },
+    "postingCard": {
+      "label": "Cartão de postagem",
+      "description": "O número do cartão de postagem usado nas suas postagens. Informe o cartão, o número do contrato ou os dois."
+    },
+    "contractNumber": {
+      "label": "Número do contrato",
+      "description": "O número do seu contrato com os Correios. Necessário apenas se você não informar um cartão de postagem."
+    },
+    "staleTrackingDomesticDays": {
+      "label": "Rastreamento parado (dias)",
+      "description": "Considera a encomenda parada quando o rastreamento não tem movimentação há mais do que este número de dias."
+    }
+  }
+}

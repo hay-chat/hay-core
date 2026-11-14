@@ -1,0 +1,52 @@
+{
+  "suspended": {
+    "title": {
+      "trial_expired": "Je proefperiode is afgelopen",
+      "payment_failed": "Je agent is gepauzeerd",
+      "cancelled": "Je abonnement is opgezegd",
+      "manual": "Deze workspace is opgeschort"
+    },
+    "description": {
+      "trial_expired": "Je gratis proefperiode is voorbij en de AI-agent beantwoordt geen klanten meer.",
+      "payment_failed": "We konden je laatste betaling niet innen, dus de AI-agent beantwoordt geen klanten meer.",
+      "cancelled": "Het abonnement voor deze workspace is beëindigd, dus de AI-agent beantwoordt geen klanten meer.",
+      "manual": "De toegang tot deze workspace is opgeschort."
+    },
+    "ownerHint": "Inkomende berichten worden nog steeds opgeslagen. Herstel de toegang om verder te gaan waar je gebleven was.",
+    "memberHint": "Inkomende berichten worden nog steeds opgeslagen. Vraag een eigenaar of beheerder van de workspace om de toegang te herstellen.",
+    "openBilling": "Toegang herstellen",
+    "checkAgain": "Opnieuw controleren",
+    "switchOrg": "Overschakelen naar een andere workspace",
+    "logout": "Uitloggen",
+    "loggingOut": "Uitloggen…"
+  },
+  "accessNotice": {
+    "trial_ending": "Je gratis proefperiode eindigt op {date}. Kies een abonnement om je agent actief te houden.",
+    "payment_failed": "Je laatste betaling is mislukt. Werk je betaalmethode bij vóór {lockDate} om een onderbreking te voorkomen.",
+    "usage_warning": "Je hebt {percent}% van je {included} inbegrepen resoluties voor deze periode gebruikt ({used} tot nu toe).",
+    "usage_exceeded": "Je hebt alle {included} inbegrepen resoluties voor deze periode gebruikt. Tot {periodEnd} wordt elke extra resolutie gefactureerd tegen {rate}.",
+    "usage_paused": "Je AI-agent is gepauzeerd: alle {included} inbegrepen resoluties voor deze periode zijn gebruikt. Sta extra resoluties toe of upgrade om nu te hervatten; hij start vanzelf weer op {periodEnd}.",
+    "usage_cap_reached": "Je AI-agent is gepauzeerd: je hebt je bestedingslimiet voor extra resoluties in deze periode bereikt ({used} van {cap}). Nieuwe gesprekken gaan naar je team. Verhoog de limiet of upgrade om nu te hervatten; hij start vanzelf weer op {periodEnd}.",
+    "trial_grace": "Je gratis proefperiode is afgelopen en je AI-agent is gepauzeerd, dus nieuwe gesprekken gaan naar je team. Kies een abonnement vóór {lockDate} om hem weer in te schakelen. Na die datum wordt het account vergrendeld.",
+    "manual_suspension_pending": "Je Hay.chat-account wordt op {date} opgeschort. Neem contact op met de support van Hay.chat als je vragen hebt.",
+    "defaultCta": "Facturatie beheren",
+    "dismiss": "Sluiten"
+  },
+  "accessNoticeCta": {
+    "trial_ending": "Kies een abonnement",
+    "payment_failed": "Betaalmethode bijwerken",
+    "usage_warning": "Verbruik bekijken",
+    "usage_exceeded": "Abonnement upgraden",
+    "usage_paused": "Verbruik beheren",
+    "usage_cap_reached": "Bestedingslimiet verhogen",
+    "trial_grace": "Kies een abonnement",
+    "manual_suspension_pending": "Contact opnemen met Hay.chat"
+  },
+  "noAccess": {
+    "title": "Je hebt geen toegang tot deze organisatie",
+    "description": "Deze link hoort bij een organisatie waar je account geen deel van uitmaakt. Vraag een van de beheerders om je uit te nodigen.",
+    "signedInAs": "Je bent ingelogd als {email}.",
+    "goToMyOrganization": "Naar mijn organisatie",
+    "useAnotherAccount": "Inloggen met een ander account"
+  }
+}

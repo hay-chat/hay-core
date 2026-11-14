@@ -135,24 +135,22 @@ export async function getKeypair(conversationId: string): Promise<StoredKeypair 
 }
 
 /**
- * Clear a specific conversation's keypair
+ * Every stored keypair: one per conversation this browser started.
  */
-export async function clearKeypair(conversationId: string): Promise<void> {
+export async function listKeypairs(): Promise<StoredKeypair[]> {
   const db = await openDatabase();
 
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE_NAME], "readwrite");
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.delete(conversationId);
+    const request = db.transaction([STORE_NAME], "readonly").objectStore(STORE_NAME).getAll();
 
     request.onsuccess = () => {
       db.close();
-      resolve();
+      resolve(request.result as StoredKeypair[]);
     };
 
     request.onerror = () => {
       db.close();
-      reject(new Error("Failed to clear keypair"));
+      reject(new Error("Failed to list keypairs"));
     };
   });
 }

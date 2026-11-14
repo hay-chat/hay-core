@@ -10,9 +10,13 @@ import { auditLogService } from "@server/services/audit-log.service";
 import { handoffTicketsService } from "@server/services/handoff-tickets/handoff-tickets.service";
 import { softLaunchReadinessService } from "@server/services/soft-launch-readiness.service";
 import type { Organization } from "@server/entities/organization.entity";
+import { handleUpload } from "@server/lib/upload-helper";
+import { ASSISTANT_AVATAR_PRESETS } from "@server/types/organization-settings.types";
 
 export const updateAssistantSchema = z.object({
   name: z.string().max(255).nullable().optional(),
+  /** The assistant's icon when no avatar is uploaded. */
+  avatarPreset: z.enum(ASSISTANT_AVATAR_PRESETS).optional(),
   description: z.string().nullable().optional(),
   instructions: tiptapDocSchema.nullable().optional(),
   tone: z.string().nullable().optional(),
@@ -36,6 +40,7 @@ function toAssistant(organization: Organization) {
     avatarUrl: organization.assistantAvatarUpload
       ? storageService.getUrl(organization.assistantAvatarUpload)
       : null,
+    avatarPreset: organization.settings?.assistantAvatarPreset ?? "sparkle",
     instructions: organization.assistantInstructions ?? null,
     tone: organization.assistantTone ?? null,
     avoid: organization.assistantAvoid ?? null,
@@ -54,6 +59,30 @@ async function loadOrganization(organizationId: string): Promise<Organization> {
   return organization;
 }
 
+async function deleteAvatar(uploadId: string): Promise<void> {
+  await storageService.delete(uploadId).catch(() => undefined);
+}
+
+async function recordAvatarChange(
+  ctx: {
+    user?: { id: string } | null;
+    organizationId?: string | null;
+    ipAddress?: string;
+    userAgent?: string;
+  },
+  change: "uploaded" | "removed",
+): Promise<void> {
+  await auditLogService.record({
+    userId: ctx.user?.id,
+    organizationId: ctx.organizationId!,
+    action: "assistant.update",
+    resource: "assistant",
+    changes: { fields: ["avatar"], avatar: change },
+    ipAddress: ctx.ipAddress,
+    userAgent: ctx.userAgent,
+  });
+}
+
 /** The organization's AI assistant: one per organization (name, persona, hand-off). */
 export const assistantRouter = t.router({
   get: scopedProcedure(RESOURCES.ASSISTANT, ACTIONS.READ).query(async ({ ctx }) =>
@@ -64,7 +93,6 @@ export const assistantRouter = t.router({
     .input(updateAssistantSchema)
     .mutation(async ({ ctx, input }) => {
       const organizationId = ctx.organizationId!;
-      await loadOrganization(organizationId);
 
       // A ticket hand-off must name a helpdesk plugin this organization has enabled.
       const ticket = input.humanHandoffUnavailableTicket;
@@ -75,7 +103,11 @@ export const assistantRouter = t.router({
         });
       }
 
+      const organization = await loadOrganization(organizationId);
       const updated = await organizationService.update(organizationId, {
+        ...(input.avatarPreset && {
+          settings: { ...(organization.settings || {}), assistantAvatarPreset: input.avatarPreset },
+        }),
         assistantName: textOrNull(input.name),
         assistantDescription: textOrNull(input.description),
         assistantInstructions: input.instructions,
@@ -97,6 +129,35 @@ export const assistantRouter = t.router({
       });
       return toAssistant(updated);
     }),
+
+  /** The assistant's picture (a base64 data URI); it wins over the preset icon. */
+  uploadAvatar: scopedProcedure(RESOURCES.ASSISTANT, ACTIONS.UPDATE)
+    .input(z.object({ avatar: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const organizationId = ctx.organizationId!;
+      const previous = (await loadOrganization(organizationId)).assistantAvatarUploadId;
+      const result = await handleUpload(input.avatar, "avatars", organizationId, ctx.user!.id, {
+        maxSize: 2 * 1024 * 1024,
+      });
+      const updated = await organizationService.update(organizationId, {
+        assistantAvatarUploadId: result.upload.id,
+      });
+      if (previous && previous !== result.upload.id) await deleteAvatar(previous);
+      await recordAvatarChange(ctx, "uploaded");
+      return toAssistant(updated);
+    }),
+
+  /** Remove the assistant's picture; its preset icon shows again. */
+  removeAvatar: scopedProcedure(RESOURCES.ASSISTANT, ACTIONS.UPDATE).mutation(async ({ ctx }) => {
+    const organizationId = ctx.organizationId!;
+    const previous = (await loadOrganization(organizationId)).assistantAvatarUploadId;
+    const updated = await organizationService.update(organizationId, {
+      assistantAvatarUploadId: null,
+    });
+    if (previous) await deleteAvatar(previous);
+    await recordAvatarChange(ctx, "removed");
+    return toAssistant(updated);
+  }),
 
   /**
    * Soft-launch readiness (D7-13): weekly approve/edit/block counts of the

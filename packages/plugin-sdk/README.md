@@ -586,6 +586,41 @@ retry 5xx and network errors only for reads, and turn a failed write into
 `codeForNetworkFailure({ idempotent })`). See `plugins/core/shopify/mcp/lib/client.js`
 and `plugins/core/woocommerce/mcp/lib/client.js`.
 
+### Tool progress labels (`label` / `doneLabel`)
+
+While the AI runs a tool, the webchat replaces its typing dots with a progress line,
+then keeps a short "done" line above the answer. A tool definition can name both
+(optional, under 80 characters, written for the shopper, in sentence case):
+
+| field       | shown                       | example                 |
+| ----------- | --------------------------- | ----------------------- |
+| `label`     | while the tool runs         | `Looking up your order` |
+| `doneLabel` | once it finished (with a ✓) | `Checked your order`    |
+
+Without them the widget says "Working on it…" and "Done". Tools listed as plain
+objects (an in-process server's `listTools()`) set `label` / `doneLabel` on the tool.
+MCP SDK servers only send standard fields in `tools/list`, so they set the same in
+the tool's `_meta` (`ToolActivityLabels` / `ToolActivityLabelsMeta` in
+`@hay/plugin-sdk/types`):
+
+```js
+server.registerTool(
+  "store_get_order",
+  {
+    description: "…",
+    inputSchema: shape,
+    _meta: {
+      "chat.hay/label": "Looking up your order",
+      "chat.hay/doneLabel": "Checked your order",
+    },
+  },
+  handler,
+);
+```
+
+Core reads them from the tool cache (refreshed when the worker starts), so a change
+shows after the plugin restarts.
+
 ## HTTP Routes
 
 Register custom API endpoints:

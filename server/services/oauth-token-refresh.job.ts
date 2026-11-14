@@ -5,9 +5,30 @@ import { createLogger } from "@server/lib/logger";
 const logger = createLogger("oauth-refresh");
 
 /**
- * Background job to refresh OAuth tokens before they expire
- * Runs every 10 minutes and refreshes tokens expiring within 15 minutes
+ * Background job to refresh OAuth tokens before they expire.
+ * Runs every 10 minutes and refreshes a token once 80% of its lifetime has
+ * passed (a 60-day Instagram token at day 48), so a failed refresh or a
+ * server outage still leaves many retries before it dies. Tokens stored
+ * before `issuedAt` was recorded fall back to the last 15 minutes.
  */
+
+/** Share of a token's lifetime after which it is refreshed. */
+export const REFRESH_AT_LIFETIME_SHARE = 0.8;
+const FALLBACK_THRESHOLD_SECONDS = 15 * 60;
+
+/** True when a token with this expiry (and issue time, if known) should be refreshed now. */
+export function shouldRefresh(
+  expiresAt: number,
+  issuedAt: number | undefined,
+  now: number,
+): boolean {
+  if (expiresAt <= now) return false;
+  if (issuedAt === undefined || issuedAt >= expiresAt) {
+    return expiresAt - now < FALLBACK_THRESHOLD_SECONDS;
+  }
+  const refreshAt = issuedAt + (expiresAt - issuedAt) * REFRESH_AT_LIFETIME_SHARE;
+  return now >= refreshAt || expiresAt - now < FALLBACK_THRESHOLD_SECONDS;
+}
 export async function refreshOAuthTokens(): Promise<void> {
   try {
     // Get all plugin instances with OAuth auth_method
@@ -16,7 +37,6 @@ export async function refreshOAuthTokens(): Promise<void> {
     logger.debug(`Checking ${instances.length} OAuth instances for token refresh`);
 
     const now = Math.floor(Date.now() / 1000);
-    const refreshThreshold = 15 * 60; // 15 minutes in seconds
 
     for (const instance of instances) {
       try {
@@ -25,6 +45,8 @@ export async function refreshOAuthTokens(): Promise<void> {
         // (epoch seconds) before using it in arithmetic.
         const rawExpiresAt = instance.authState?.credentials?.expiresAt;
         const expiresAt = typeof rawExpiresAt === "number" ? rawExpiresAt : undefined;
+        const rawIssuedAt = instance.authState?.credentials?.issuedAt;
+        const issuedAt = typeof rawIssuedAt === "number" ? rawIssuedAt : undefined;
         const hasRefreshToken = !!instance.authState?.credentials?.refreshToken;
         // Plugins can declare a custom refresh strategy (e.g. Instagram's
         // ig_refresh_token) that re-issues from the access token without a
@@ -43,8 +65,7 @@ export async function refreshOAuthTokens(): Promise<void> {
 
         const timeUntilExpiry = expiresAt - now;
 
-        // Refresh if expiring within threshold
-        if (timeUntilExpiry > 0 && timeUntilExpiry < refreshThreshold) {
+        if (shouldRefresh(expiresAt, issuedAt, now)) {
           logger.debug(
             {
               organizationId: instance.organizationId,

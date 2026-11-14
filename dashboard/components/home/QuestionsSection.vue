@@ -24,7 +24,7 @@
             :to="`/conversations/${item.conversationId}`"
             class="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline sm:min-h-0"
           >
-            {{ item.customerName || item.conversationTitle || $t("home.questions.untitled") }}
+            {{ item.customerName || conversationTitle(item) || $t("home.questions.untitled") }}
           </NuxtLink>
           <span class="text-xs text-neutral-muted">
             {{ $t("home.questions.asked", { time: age(item.askedAt) }) }}
@@ -44,13 +44,20 @@
 
         <!-- Untrusted shopper/AI text: plain interpolation only -->
         <blockquote class="whitespace-pre-line border-l-2 border-border pl-3 text-sm">
-          {{ item.question }}
+          {{ textFor(item, "question") }}
         </blockquote>
         <p
           v-if="item.customerMessage && item.customerMessage !== item.question"
           class="whitespace-pre-line text-xs text-neutral-muted"
         >
-          {{ $t("home.questions.customerSaid", { message: item.customerMessage }) }}
+          {{ $t("home.questions.customerSaid", { message: textFor(item, "customerMessage") }) }}
+        </p>
+        <p
+          v-if="isTranslated(item, 'question') || isTranslated(item, 'customerMessage')"
+          class="text-xs text-neutral-muted"
+          :data-testid="`question-translated-${item.id}`"
+        >
+          {{ $t("home.questions.translated") }}
         </p>
 
         <div class="space-y-3">
@@ -112,12 +119,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, nextTick } from "vue";
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from "vue";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 import { useWebSocket } from "@/composables/useWebSocket";
 import { useNow } from "@/composables/useNow";
 import { formatWaitTime } from "@/utils/conversation";
+import {
+  useConversationTextTranslations,
+  useTeamQuestionTranslations,
+} from "@/composables/useTextTranslations";
 
 /**
  * Quick checks with the team (D19-3): facts the AI asked the team about
@@ -149,6 +160,21 @@ const saveToKnowledge = reactive<Record<string, boolean>>({});
 const busyId = ref<string | null>(null);
 const action = ref<"answer" | "dismiss" | null>(null);
 const highlightedId = ref<string | null>(null);
+
+// Questions, customer messages and untitled rows' conversation titles in the
+// reader's translation language (the original until the translation arrives).
+const { textFor, isTranslated } = useTeamQuestionTranslations(items);
+const titledConversations = computed(() =>
+  items.value
+    .filter((item) => !item.customerName && item.conversationTitle)
+    .map((item) => ({ id: item.conversationId, title: item.conversationTitle })),
+);
+const { textFor: conversationTextFor } = useConversationTextTranslations(titledConversations, [
+  "title",
+]);
+function conversationTitle(item: QuestionItem): string | null {
+  return conversationTextFor({ id: item.conversationId, title: item.conversationTitle }, "title");
+}
 
 function age(askedAt: string): string {
   return formatWaitTime((now.value.getTime() - new Date(askedAt).getTime()) / 1000);

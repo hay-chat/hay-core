@@ -82,6 +82,8 @@ export type {
   LocalMcpOptions,
   ToolRiskSpec,
   ToolWriteCategory,
+  ToolActivityLabels,
+  ToolActivityLabelsMeta,
   HayMcpRuntimeAPI,
 } from "./mcp";
 
@@ -187,6 +189,7 @@ export type {
   HayPluginSetupHints,
   HayPluginPackageJson,
   PluginCategory,
+  PluginMarketplaceCategory,
   PluginCapability,
 } from "./manifest";
 

@@ -71,6 +71,7 @@
     },
     "groups": {
       "commerce": "Onde você vende",
+      "shipping": "Envio e entrega",
       "payments": "Pagamentos",
       "crm": "Clientes e CRM",
       "helpdesk": "Atendimento",
@@ -306,9 +307,6 @@
       "copy": "Copiar código",
       "copied": "Copiado",
       "copyError": "Não conseguimos copiar. Selecione o código e copie manualmente.",
-      "loading": "Carregando o código de instalação…",
-      "error": "Não conseguimos carregar o código de instalação.",
-      "retry": "Tentar de novo",
       "moreOptions": "Aparência e mais opções",
       "notReadyOne": "{count} pedido da sua lista ainda não está pronto. Seu assistente passa esses para a sua equipe em vez de chutar.",
       "notReadyOther": "{count} pedidos da sua lista ainda não estão prontos. Seu assistente passa esses para a sua equipe em vez de chutar.",

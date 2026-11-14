@@ -59,7 +59,7 @@
       v-if="installOpen"
       :not-ready="board.totalCount - board.readyCount"
       :total="board.totalCount"
-      :settings-to="canOpen('/settings/webchat') ? '/settings/webchat' : null"
+      :settings-to="canOpen('/channels/webchat') ? '/channels/webchat' : null"
       @close="closeInstall"
     />
 
@@ -102,22 +102,15 @@
             role="group"
             :aria-label="$t('setup.board.filtersLabel')"
           >
-            <button
+            <FilterPill
               v-for="option in filterOptions"
               :key="option.value"
-              type="button"
-              :aria-pressed="filter === option.value"
-              :class="[
-                'inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8',
-                filter === option.value
-                  ? 'border-neutral-900 bg-neutral-900 text-white'
-                  : 'border-neutral-300 text-neutral-700 hover:bg-accent',
-              ]"
+              :pressed="filter === option.value"
+              :count="option.count"
               @click="filter = option.value"
             >
               {{ option.label }}
-              <span class="tabular-nums opacity-70">{{ option.count }}</span>
-            </button>
+            </FilterPill>
           </div>
         </div>
 
@@ -410,7 +403,7 @@ const connectTo = computed(() => {
 });
 
 // --- Add to your site: an inline panel, available whatever the state of the list.
-const canInstall = computed(() => canOpen("/settings/webchat"));
+const canInstall = computed(() => canOpen("/channels/webchat"));
 const installOpen = ref(false);
 const openInstall = () => {
   installOpen.value = true;

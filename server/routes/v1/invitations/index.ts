@@ -82,7 +82,9 @@ async function assertInviterCanStillGrant(invitation: OrganizationInvitation): P
 }
 
 /**
- * Send invitation email using the email service
+ * Send invitation email using the email service. An invitee who already has an
+ * account reads it in their interface language; anyone else in the
+ * organization's.
  */
 async function sendInvitationEmail(
   email: string,
@@ -94,6 +96,7 @@ async function sendInvitationEmail(
   expiresAt: Date,
   isNewUser: boolean,
   organizationId: string,
+  inviteeLanguage: string | null | undefined,
   message?: string,
 ): Promise<void> {
   const dashboardUrl = getDashboardUrl();
@@ -109,7 +112,7 @@ async function sendInvitationEmail(
   // Ensure email service is initialized
   await emailService.initialize();
 
-  const locale = await getOrganizationLocale(organizationId);
+  const locale = inviteeLanguage || (await getOrganizationLocale(organizationId));
 
   await emailService.sendTemplateEmail({
     template: "organization-invitation",
@@ -255,6 +258,7 @@ export const invitationsRouter = t.router({
         invitation.expiresAt,
         !existingUser, // isNewUser: true if user doesn't exist yet
         ctx.organizationId!,
+        existingUser?.interfaceLanguage,
         input.message,
       );
 
@@ -315,7 +319,7 @@ export const invitationsRouter = t.router({
 
       const invitations = await invitationRepository.find({
         where,
-        relations: ["invitedByUser"],
+        relations: { invitedByUser: true },
         order: { createdAt: "DESC" },
         take: INVITATION_LIST_LIMIT,
       });
@@ -411,7 +415,7 @@ export const invitationsRouter = t.router({
       // Find invitation by token
       const invitation = await invitationRepository.findOne({
         where: { tokenHash },
-        relations: ["organization"],
+        relations: { organization: true },
       });
 
       if (!invitation) {
@@ -578,7 +582,7 @@ export const invitationsRouter = t.router({
 
       const invitation = await invitationRepository.findOne({
         where: { tokenHash },
-        relations: ["organization", "organization.logoUpload", "invitedByUser"],
+        relations: { organization: { logoUpload: true }, invitedByUser: true },
       });
 
       if (!invitation) {
@@ -643,7 +647,7 @@ export const invitationsRouter = t.router({
           id: input.invitationId,
           organizationId: ctx.organizationId,
         },
-        relations: ["organization"],
+        relations: { organization: true },
       });
 
       if (!invitation) {
@@ -730,10 +734,14 @@ export const invitationsRouter = t.router({
         });
       }
 
-      // Send invitation email
+      // Send invitation email (in the invitee's language if they have an account by now)
       const inviter = ctx.user?.getUser();
       const inviterName = inviter?.getFullName() || "Someone";
       const inviterEmail = inviter?.email || "";
+      const invitee = await AppDataSource.getRepository(User).findOne({
+        where: { email: invitation.email.toLowerCase() },
+        select: { id: true, interfaceLanguage: true },
+      });
 
       await sendInvitationEmail(
         invitation.email,
@@ -745,6 +753,7 @@ export const invitationsRouter = t.router({
         invitation.expiresAt,
         !invitation.invitedUserId, // isNewUser: true if invitedUserId is null
         ctx.organizationId!,
+        invitee?.interfaceLanguage,
         invitation.message,
       );
 

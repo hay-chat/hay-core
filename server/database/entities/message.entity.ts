@@ -12,6 +12,9 @@ import { Conversation } from "./conversation.entity";
 import { Source } from "./source.entity";
 import { User } from "../../entities/user.entity";
 import { DeliveryState } from "../../types/message-feedback.types";
+import type { LanguageCode } from "../../types/language.types";
+
+export type MessageTranslations = Partial<Record<LanguageCode, string>>;
 
 export enum MessageType {
   CUSTOMER = "Customer",
@@ -109,6 +112,9 @@ export interface MessageAttachment {
 
 @Entity("messages")
 @Index("idx_messages_conversation_created", ["conversation_id", "created_at"])
+// Trigram (pg_trgm) GIN indexes for the conversation search; TypeORM can't express them.
+@Index("idx_messages_content_trgm", { synchronize: false })
+@Index("idx_messages_translations_trgm", { synchronize: false })
 export class Message {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
@@ -180,6 +186,10 @@ export class Message {
     confidenceDetails?: string;
     /** `excerpt`: the knowledge-base text the AI read (dispute evidence, G5). */
     documentsUsed?: Array<{ id: string; title: string; similarity: number; excerpt?: string }>;
+    /** The public ones of documentsUsed, as the widget links them under the answer. */
+    sources?: Array<{ title: string; url: string }>;
+    /** Customer messages: the id the webchat widget gave the message (echoed in acks). */
+    clientMessageId?: string;
     recheckAttempted?: boolean;
     recheckCount?: number;
     // Tool execution metadata
@@ -305,6 +315,14 @@ export class Message {
   @Column({ type: "text", nullable: true })
   originalContent!: string | null;
 
+  /**
+   * The message in team members' languages, keyed by language code. `content`
+   * stays the customer-facing text; for a team member's reply, the text they
+   * typed is stored here under their language.
+   */
+  @Column({ type: "jsonb", nullable: true })
+  translations!: MessageTranslations | null;
+
   async saveIntent(intent: MessageIntent): Promise<Message | null> {
     const { MessageRepository } = await import("../../repositories/message.repository");
     const messageRepository = new MessageRepository();
@@ -320,7 +338,7 @@ export class Message {
   async savePerception(perception: {
     intent: MessageIntent;
     sentiment: MessageSentiment;
-    language?: string;
+    language: LanguageCode | null;
   }): Promise<Message | null> {
     const { MessageRepository } = await import("../../repositories/message.repository");
     const messageRepository = new MessageRepository();

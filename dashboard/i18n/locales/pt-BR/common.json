@@ -16,7 +16,6 @@
     "users": "Usuários",
     "sso": "Login único (SSO)",
     "apiTokens": "Tokens de API",
-    "webchat": "Webchat",
     "customerPrivacy": "Privacidade do Cliente",
     "myProfile": "Meu Perfil",
     "gitConnections": "Conexões Git",
@@ -28,6 +27,7 @@
     "evidencePacks": "Pacotes de evidências",
     "tests": "Testes",
     "usage": "Uso",
+    "analytics": "Análises",
     "insights": "Insights",
     "assistant": "Assistente",
     "identity": "Identidade",
@@ -91,6 +91,10 @@
     "tryAgain": "Tentar Novamente",
     "showing": "Mostrando {from} a {to} de {total}",
     "viewDetails": "Ver Detalhes"
+  },
+  "languageSelect": {
+    "placeholder": "Selecione um idioma",
+    "searchPlaceholder": "Buscar idiomas…"
   },
   "unauthorized": {
     "pageTitle": "Acesso Negado",

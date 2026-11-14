@@ -56,7 +56,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
   override async findById(id: string): Promise<Customer | null> {
     return await this.getLegacyRepository().findOne({
       where: { id },
-      relations: ["conversations"],
+      relations: { conversations: true },
     });
   }
 
@@ -69,7 +69,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
   ): Promise<Customer | null> {
     return await this.getLegacyRepository().findOne({
       where: { id, organization_id: organizationId },
-      relations: ["conversations"],
+      relations: { conversations: true },
     });
   }
 

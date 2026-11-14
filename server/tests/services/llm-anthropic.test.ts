@@ -224,18 +224,20 @@ describe("AnthropicChatProvider", () => {
     expect(params.tools[0].cache_control).toEqual({ type: "ephemeral" });
   });
 
-  it("strips temperature for opus (reasoning) models but keeps it otherwise", async () => {
+  it("never sends temperature: the API rejects sampling parameters on every model", async () => {
     mockCreate.mockResolvedValue({
-      model: "claude-opus-4-8",
+      model: "claude-sonnet-4-6",
       content: [{ type: "text", text: "x" }],
       stop_reason: "end_turn",
       usage: { input_tokens: 1, output_tokens: 1 },
     });
     await provider.chat(req({ model: "claude-opus-4-8" }));
-    expect((mockCreate.mock.calls[0][0] as { temperature?: number }).temperature).toBeUndefined();
+    await provider.chat(req()); // sonnet, with temperature 0.7 on the request
 
-    await provider.chat(req()); // sonnet
-    expect((mockCreate.mock.calls[1][0] as { temperature?: number }).temperature).toBe(0.7);
+    for (const [params] of mockCreate.mock.calls as Array<[Record<string, unknown>]>) {
+      expect(params).not.toHaveProperty("temperature");
+      expect(params.max_tokens).toBe(2000);
+    }
   });
 
   it("maps refusal and truncation stop reasons", async () => {

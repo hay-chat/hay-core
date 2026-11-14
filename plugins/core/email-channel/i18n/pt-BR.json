@@ -1,6 +1,7 @@
 {
   "name": "Caixa de e-mail",
   "description": "Conecte sua caixa de suporte: encaminhe os e-mails de support{'@'} para o Hay.chat e deixe a IA responder por e-mail, na mesma conversa. A IA também pode enviar e-mails para a sua equipe.",
+  "summary": "Encaminhe o support{'@'} para o Hay e deixe o agente responder por e-mail, na mesma conversa.",
   "tools": {
     "send-email": {
       "label": "Enviar e-mail para a equipe",

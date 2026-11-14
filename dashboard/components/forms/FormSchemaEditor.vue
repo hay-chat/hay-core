@@ -17,8 +17,9 @@
       />
     </div>
 
-    <Textarea
+    <Input
       :id="`form-description-${uid}`"
+      type="textarea"
       :model-value="modelValue.description"
       :label="$t('webchat.preChatFormFormDescription')"
       :placeholder="$t('webchat.preChatFormFormDescriptionPlaceholder')"
@@ -122,8 +123,8 @@
         <div class="flex items-center gap-2">
           <Switch
             :id="`field-required-${uid}-${index}`"
-            :checked="!!field.required"
-            @update:checked="(v: boolean) => updateField(index, { required: v })"
+            :model-value="!!field.required"
+            @update:model-value="(v: boolean) => updateField(index, { required: v })"
           />
           <Label :for="`field-required-${uid}-${index}`">{{
             $t("webchat.preChatFormFieldRequired")

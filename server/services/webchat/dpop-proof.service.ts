@@ -30,7 +30,9 @@ export type PublicConversationProcedure =
   | "setContactEmail"
   | "submitCsat"
   | "rotateKeys"
-  | "submitForm";
+  | "submitForm"
+  | "rateMessage"
+  | "listMine";
 
 /**
  * The API's configured hostname, plus the Host the request arrived on so that

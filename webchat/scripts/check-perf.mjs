@@ -29,7 +29,18 @@ const BUDGETS = {
   // page tools, and the pre-chat gating + form message plumbing add 2.6 KB
   // (the form components themselves load on demand). 52 → 53 KB for the Vue
   // 3.5.24 → 3.5.44 patch upgrade, which adds 1.5 KB to the runtime.
-  chat: 53 * KB,
+  // 53 → 54 KB for the widget redesign (brand-colour tokens, grouped thread
+  // with avatars and day dividers, end card with SVG faces, file chip in the
+  // composer): +2.6 KB, of which 1.2 KB is paid back by "Powered by Hay" as
+  // text instead of the inline logo SVG.
+  // 54 → 58 KB for widget wave 2 (+3.6 KB): delivery ticks and "Seen", the
+  // AI's progress line and done labels, clientMessageId on every send, thumbs
+  // (rateMessage), the home view's navigation (back arrow, opening an earlier
+  // conversation) and the phone sheet forced by the dashboard preview. The new
+  // views themselves load on demand and are not counted here: the home view
+  // with "Your conversations" (3.2 KB), the sources/thumbs row (1.5 KB) and
+  // the preview's sample content (1.3 KB, dashboard only).
+  chat: 58 * KB,
   locale: 2 * KB, // one locale chunk, loaded with the chat
 };
 

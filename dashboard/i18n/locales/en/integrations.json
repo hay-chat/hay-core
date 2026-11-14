@@ -1,75 +1,94 @@
 {
   "channels": {
     "title": "Channels",
-    "description": "Active communication channels connecting your customers to Hay.chat",
+    "description": "Where your customers can reach you. Each channel brings its conversations to the same inbox.",
     "headTitle": "Channels - Hay.chat",
     "browseMarketplace": "Browse Marketplace",
-    "loading": "Loading channels...",
-    "empty": {
-      "title": "No active channels",
-      "description": "Install a channel integration from the marketplace to start receiving conversations.",
-      "action": "Browse Marketplace"
+    "add": {
+      "title": "Add a channel",
+      "description": "WhatsApp, Instagram, email and more"
     },
-    "actions": {
-      "configure": "Configure"
+    "webchat": {
+      "description": "The chat for your website.",
+      "liveOn": "The chat on your website, {host}.",
+      "notInstalled": "The chat for your website. Add one line of code to go live.",
+      "off": "The chat for your website. It is switched off."
     }
   },
   "marketplace": {
-    "title": "Integration Marketplace",
-    "description": "Discover and install integrations to extend your platform capabilities",
-    "headTitle": "Integration Marketplace - Hay.chat",
-    "uploadPlugin": "Upload Integration",
-    "manageCustom": "Manage Custom ({count})",
-    "refresh": "Refresh",
-    "stats": {
-      "totalPlugins": "Total Integrations",
-      "availablePlugins": "Available integrations",
-      "installed": "Installed",
-      "activePlugins": "Active integrations",
-      "channels": "Channels",
-      "communicationChannels": "Communication channels",
-      "mcpConnectors": "MCP Connectors",
-      "modelContextProtocol": "Model Context Protocol"
+    "title": "Marketplace",
+    "description": "Connect the tools you already run on, so your agent can answer with real orders, payments and bookings instead of guesses.",
+    "headTitle": "Marketplace - Hay.chat",
+    "uploadPlugin": "Upload plugin",
+    "manageCustom": "Manage custom ({count})",
+    "requestIntegration": "Request an integration",
+    "custom": "Custom",
+    "search": {
+      "label": "Search integrations",
+      "placeholder": "Search by name or by what you need, e.g. refunds"
     },
     "categories": {
-      "label": "Categories:",
-      "all": "All Integrations",
-      "channels": "Channels",
-      "mcpConnectors": "MCP Connectors",
-      "documentImporters": "Document Importers",
-      "retrievers": "Retrievers",
-      "playbooks": "Playbooks"
+      "label": "Categories",
+      "all": "All"
     },
-    "search": "Search integrations...",
-    "empty": {
-      "title": "No integrations found",
-      "searchHint": "Try adjusting your search terms.",
-      "categoryHint": "No integrations match your selected category."
+    "sections": {
+      "channels": {
+        "label": "Channels",
+        "blurb": "Where customers reach you."
+      },
+      "commerce": {
+        "label": "E-commerce",
+        "blurb": "Orders, products and stock from your store."
+      },
+      "payments": {
+        "label": "Payments and shipping",
+        "blurb": "Refunds, payment status and parcel tracking."
+      },
+      "crm": {
+        "label": "CRM and support",
+        "blurb": "Customer records and tickets."
+      },
+      "knowledge": {
+        "label": "Knowledge and bookings",
+        "blurb": "Docs to learn from and calendars to book in."
+      },
+      "security": {
+        "label": "Security",
+        "blurb": "Protect the webchat."
+      },
+      "other": {
+        "label": "Other",
+        "blurb": "Everything else, including plugins you uploaded."
+      }
     },
-    "pluginTypes": {
+    "tags": {
       "channel": "Channel",
-      "mcpConnector": "MCP Connector",
-      "documentImporter": "Document Importer",
-      "retriever": "Retriever",
-      "playbook": "Playbook"
+      "knowledge": "Knowledge source",
+      "tools": "Agent tools",
+      "catalog": "Catalog sync",
+      "disputes": "Disputes",
+      "tickets": "Tickets",
+      "webchat": "Webchat"
     },
-    "actions": {
+    "status": {
+      "connected": "Connected",
+      "needsSetup": "Needs setup",
+      "finishSetup": "Finish setup"
+    },
+    "connected": {
+      "title": "Connected",
       "configure": "Configure",
-      "remove": "Remove",
-      "removing": "Removing...",
-      "delete": "Delete",
-      "deleting": "Deleting...",
-      "connect": "Connect",
-      "connecting": "Connecting…"
+      "configureNamed": "Configure {name}"
     },
-    "custom": "Custom",
-    "confirmDelete": "Are you sure you want to delete this integration? This action cannot be undone.",
-    "toast": {
-      "disabledSuccess": "Integration {name} disabled successfully",
-      "deletedSuccess": "Integration deleted successfully",
-      "enableFailed": "Failed to enable integration",
-      "disableFailed": "Failed to disable integration",
-      "deleteFailed": "Failed to delete integration"
+    "empty": {
+      "title": "Nothing matches that search",
+      "description": "Try a tool name or a task like \"tracking\". If we don't have it yet, tell us and we'll look at building it.",
+      "clear": "Clear search"
+    },
+    "footer": {
+      "title": "Run something we don't list?",
+      "description": "Build a plugin with the Hay SDK, or wrap any MCP server, and upload it for your organisation only.",
+      "docs": "Read the plugin docs"
     }
   },
   "manage": {
@@ -185,6 +204,12 @@
       "description": "{name} stops working for your workspace and its settings are kept in case you connect it again.",
       "confirm": "Disconnect"
     },
+    "deletePlugin": "Delete plugin",
+    "deleteConfirm": {
+      "title": "Delete this plugin?",
+      "description": "{name} is removed from your organisation. This can't be undone.",
+      "confirm": "Delete"
+    },
     "error": {
       "loadFailed": "Failed to load integration",
       "returnToMarketplace": "Return to Marketplace"
@@ -276,7 +301,9 @@
       "oauthConnectFailed": "Failed to connect to {name}",
       "oauthConnectedTo": "Successfully connected to {name}!",
       "oauthDisconnectedFrom": "Disconnected from {name}",
-      "oauthDisconnectFailed": "Failed to disconnect"
+      "oauthDisconnectFailed": "Failed to disconnect",
+      "deletedSuccess": "Plugin deleted",
+      "deleteFailed": "Couldn't delete the plugin"
     },
     "channelHealth": {
       "failingTitle": "This channel is failing",
@@ -337,7 +364,6 @@
       "error": "Not working"
     },
     "actions": {
-      "connect": "Connect",
       "finishSetup": "Finish setup",
       "reviewSetup": "Review setup",
       "more": "More options",
@@ -359,6 +385,97 @@
       "failedTitle": "We couldn't start the connection",
       "networkError": "Hay.chat didn't answer in time. Check your connection and try again.",
       "retry": "Try again"
+    },
+    "preConnect": {
+      "breadcrumb": "Breadcrumb",
+      "tags": "Category and capabilities",
+      "connect": "Connect {name}",
+      "setupGuide": "Read the setup guide",
+      "note": "Remove it any time.",
+      "noteOAuth": "You approve access in {name}. Remove it any time.",
+      "abilities": {
+        "title": "What your agent can do",
+        "handles": {
+          "orders": {
+            "title": "Answer order questions",
+            "description": "Finds a customer's orders and tells them where things stand."
+          },
+          "refunds": {
+            "title": "Handle refunds",
+            "description": "Refunds an order or payment for the customer."
+          },
+          "order_changes": {
+            "title": "Change orders",
+            "description": "Cancels an order or updates it before it ships."
+          },
+          "billing": {
+            "title": "Answer billing questions",
+            "description": "Looks up the customer's invoices and payments."
+          },
+          "subscriptions": {
+            "title": "Manage subscriptions",
+            "description": "Checks, changes or cancels a customer's subscription."
+          },
+          "bookings": {
+            "title": "Take bookings",
+            "description": "Finds open slots and books, moves or cancels for the customer."
+          }
+        }
+      },
+      "how": {
+        "title": "How connecting works",
+        "steps": {
+          "connect": {
+            "title": "Click Connect",
+            "description": "Hay adds {name} to your workspace and opens its setup."
+          },
+          "approve": {
+            "title": "Approve access in {name}",
+            "description": "Sign in to {name} and approve what Hay can use."
+          },
+          "details": {
+            "title": "Add your {name} details",
+            "description": "Setup tells you what it needs and where to find it."
+          },
+          "setup": {
+            "title": "Finish setup",
+            "description": "Follow the steps Hay shows. It tells you what it needs and where to find it."
+          },
+          "verify": {
+            "title": "Test the connection",
+            "description": "Hay checks it can reach {name} before your agent uses it."
+          }
+        }
+      },
+      "details": {
+        "title": "Details",
+        "builtBy": "Built by",
+        "builtByHay": "Hay",
+        "builtByCustom": "Your organisation",
+        "category": "Category",
+        "signIn": "Sign-in",
+        "signInMethods": {
+          "oauth": "OAuth",
+          "apiKey": "API key"
+        },
+        "version": "Version",
+        "documentation": "Documentation"
+      },
+      "data": {
+        "title": "Data it works with",
+        "noteOAuth": "{name} shows the exact permissions before you approve.",
+        "items": {
+          "messages": "Customer messages",
+          "customers": "Customer profiles",
+          "orders": "Orders",
+          "products": "Products and stock",
+          "payments": "Payments and refunds",
+          "disputes": "Disputes",
+          "bookings": "Bookings",
+          "tickets": "Tickets",
+          "documents": "Pages and documents"
+        }
+      }
     }
   },
   "pluginConnect": {

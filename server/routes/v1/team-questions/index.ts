@@ -11,9 +11,15 @@ import {
 } from "@server/types/organization-settings.types";
 import {
   MAX_ANSWER_LENGTH,
+  TEAM_QUESTION_TEXT_FIELDS,
   teamQuestionService,
 } from "@server/services/team-questions/team-question.service";
 import { verifyAnswerToken } from "@server/services/team-questions/answer-token";
+import { LANGUAGE_CODES, isLanguageCode } from "@server/types/language.types";
+import { userRepository } from "@server/repositories/user.repository";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("team-questions-route");
 
 /**
  * Quick check with the team (D19): the questions the AI asked the team, the
@@ -60,11 +66,68 @@ async function questionForToken(token: string) {
   return { question, userId: claims.userId };
 }
 
+/**
+ * The question in the translation language of the teammate an answer link
+ * was sent to. Null when they have none, or the translation failed (the page
+ * shows the original).
+ */
+async function translationForLinkReader(
+  questionId: string,
+  organizationId: string,
+  userId: string,
+) {
+  try {
+    const user = await userRepository.findById(userId);
+    const language = user?.translationLanguage;
+    if (!isLanguageCode(language)) return null;
+    const [translation] = await teamQuestionService.translateForReader({
+      organizationId,
+      questionIds: [questionId],
+      language,
+    });
+    return translation ?? null;
+  } catch (error) {
+    logger.warn({ err: error, questionId }, "Could not translate the question for its link");
+    return null;
+  }
+}
+
+/** A translation's text, or null when there is none or it is the original. */
+function differentText(translation: { source: string; text: string } | null | undefined) {
+  return translation && translation.text !== translation.source ? translation.text : null;
+}
+
 export const teamQuestionsRouter = t.router({
   /** Questions the team can still answer (Inbox "Questions" card). */
   list: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ).query(async ({ ctx }) => {
     return teamQuestionService.listAnswerable(ctx.organizationId!);
   }),
+
+  /** The listed questions in the reader's translation language (translated once, cached). */
+  translate: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
+    .input(
+      z.object({
+        questionIds: z.array(z.string().uuid()).min(1).max(100),
+        language: z.enum(LANGUAGE_CODES),
+        fields: z
+          .array(z.enum(TEAM_QUESTION_TEXT_FIELDS))
+          .min(1)
+          .default([...TEAM_QUESTION_TEXT_FIELDS]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await teamQuestionService.translateForReader({
+          organizationId: ctx.organizationId!,
+          questionIds: [...new Set(input.questionIds)],
+          language: input.language,
+          fields: input.fields,
+        });
+      } catch (error) {
+        logger.error({ err: error, language: input.language }, "Team question translation failed");
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "TRANSLATION_FAILED" });
+      }
+    }),
 
   answer: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
     .input(z.object({ questionId: z.string().uuid(), ...answerInput }))
@@ -119,12 +182,18 @@ export const teamQuestionsRouter = t.router({
   byToken: publicProcedure
     .input(z.object({ token: z.string().min(10).max(512) }))
     .query(async ({ input }) => {
-      const { question } = await questionForToken(input.token);
-      const organization = await organizationRepository.findById(question.organizationId);
+      const { question, userId } = await questionForToken(input.token);
+      const [organization, translation] = await Promise.all([
+        organizationRepository.findById(question.organizationId),
+        translationForLinkReader(question.id, question.organizationId, userId),
+      ]);
       return {
         organizationName: organization?.name ?? null,
         question: question.question,
         customerMessage: question.customerMessage,
+        /** In the teammate's translation language, when they have one and it differs. */
+        translatedQuestion: differentText(translation?.question),
+        translatedCustomerMessage: differentText(translation?.customerMessage),
         askedAt: question.askedAt.toISOString(),
         answerable: question.status === "open" || question.status === "timed_out",
         status: question.status,

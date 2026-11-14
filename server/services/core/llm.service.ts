@@ -81,6 +81,8 @@ export interface ChatOptions {
   max_tokens?: number;
   stream?: boolean;
   signal?: AbortSignal;
+  /** Short name of the call site ("planner", "perception"), logged with each call's duration. */
+  caller?: string;
 }
 
 export interface EmbeddingOptions {
@@ -172,12 +174,20 @@ export class LLMService {
    */
   async invokeWithMeta<T = string>(options: ChatOptions): Promise<ChatMeta<T>> {
     const { bundle, request, organizationId, tier } = await this.resolveChat(options);
+    const { caller } = options;
+    const startedAt = Date.now();
 
     let result: ChatResult;
+    let repaired = false;
     try {
-      result = await this.chatWithRetry(bundle.chat, request);
-      result = await this.coerceStructured(bundle.chat, request, result);
+      const first = await this.chatWithRetry(bundle.chat, request);
+      result = await this.coerceStructured(bundle.chat, request, first);
+      repaired = result !== first;
     } catch (error) {
+      logger.warn(
+        { err: error, caller, tier, model: request.model, durationMs: Date.now() - startedAt },
+        "LLM chat failed",
+      );
       if (error instanceof StructuredOutputError) throw error;
       throw this.wrapError(error, "chat response");
     }
@@ -191,8 +201,13 @@ export class LLMService {
       tier,
       region: bundle.region,
     });
-    logger.debug(
+    // Info level on purpose: it is the only per-call timing a production log has.
+    logger.info(
       {
+        caller,
+        tier,
+        durationMs: Date.now() - startedAt,
+        repaired,
         provider: result.provider,
         model: result.model,
         finishReason: result.finishReason,
@@ -276,6 +291,7 @@ export class LLMService {
 
     try {
       const embedRequest: EmbeddingRequest = { model, input: text };
+      const startedAt = Date.now();
       const result = await this.runWithTimeout(30000, embedRequest, (req) =>
         bundle.embedding.embed(req),
       );
@@ -288,6 +304,15 @@ export class LLMService {
         organizationId,
         region: bundle.region,
       });
+      logger.info(
+        {
+          durationMs: Date.now() - startedAt,
+          provider: result.provider,
+          model: result.model,
+          promptTokens: result.usage.promptTokens,
+        },
+        "LLM embedding completed",
+      );
 
       return result.embeddings[0] ?? [];
     } catch (error) {
@@ -355,6 +380,13 @@ export class LLMService {
   }
 
   private prepareMessages(history: string | Message[], systemPrompt?: string): ChatMessage[] {
+    // A prompt-only call (perception, playbook selection, guardrails) is one user
+    // message. Sending it as a system message plus an empty user turn makes some
+    // providers (DeepSeek V4, GLM on DigitalOcean) reject the request outright.
+    if (systemPrompt && history === "") {
+      return [{ role: "user", content: systemPrompt }];
+    }
+
     const messages: ChatMessage[] = [];
 
     if (systemPrompt) {

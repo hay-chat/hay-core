@@ -77,6 +77,7 @@ async function classify(
     { organizationId: conversation.organization_id },
   );
   const result = await llm.invokeWithMeta<string>({
+    caller: "spam-check",
     prompt,
     jsonSchema: CLASSIFIER_SCHEMA,
     tier: "easy",
@@ -123,7 +124,7 @@ export async function holdIfSpam(conversation: Conversation, log: HoldLogger): P
       where: { conversation_id: conversation.id, type: MessageType.CUSTOMER },
       order: { created_at: "ASC" },
       take: MAX_SCREENED_MESSAGES,
-      select: ["id", "content"],
+      select: { id: true, content: true },
     });
     const messages = rows.map((row) => row.content ?? "");
     if (messages.length === 0 || messages.length <= (previous?.screened ?? 0)) return false;
@@ -143,7 +144,7 @@ export async function holdIfSpam(conversation: Conversation, log: HoldLogger): P
     if (!isSpam && score >= SUSPICIOUS_THRESHOLD) {
       const settings = await AppDataSource.getRepository(WebchatSettings).findOne({
         where: { organizationId: conversation.organization_id },
-        select: ["id", "spamClassifierEnabled", "spamGuidance"],
+        select: { id: true, spamClassifierEnabled: true, spamGuidance: true },
       });
       if (settings?.spamClassifierEnabled) {
         try {

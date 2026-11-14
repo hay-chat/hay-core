@@ -12,6 +12,8 @@ export interface DeliverContext {
   logger: HayLogger;
   /** Remembers the mids sent here so their echoes are not mistaken for the owner's (D11-11). */
   tracker?: SentMessageTracker;
+  /** Tells core the token is dead (Graph 190) so it disconnects and alerts the org. */
+  revokeConnection?: () => Promise<void>;
 }
 
 interface DeliverPayload {
@@ -71,7 +73,9 @@ export function is24hWindowError(error: unknown): boolean {
  *
  * Error semantics (chatwoot pattern — never retry permanent provider errors):
  *   - 24h window expired           → 200 { success:false, error:"24h_window_expired" }
- *   - other non-retryable Graph 4xx → 200 { success:false, error:"graph_<status>" }
+ *   - token expired/revoked (190)  → 200 { success:false, error:"token_revoked" },
+ *     and core is told to disconnect the channel
+ *   - other non-retryable Graph 4xx → 200 { success:false, error:"graph_<code>" }
  *   - unknown / network errors      → 500 (Hay may retry)
  *   - a failure after part of the message went out → 200 { success:false,
  *     error:"partial_delivery" }, never a retry that would send it twice
@@ -148,9 +152,12 @@ export async function deliverHandler(
         if (sentIds.length || !is24hWindowError(error) || messageType !== "HumanAgent") {
           throw error;
         }
-        logger.info("Instagram window closed — resending a person's reply with the Human Agent tag", {
-          messageId,
-        });
+        logger.info(
+          "Instagram window closed — resending a person's reply with the Human Agent tag",
+          {
+            messageId,
+          },
+        );
         await run("human_agent");
       }
     } catch (error) {
@@ -192,6 +199,21 @@ export async function deliverHandler(
         return;
       }
 
+      if (error.code === 190) {
+        logger.error("Instagram access token expired or revoked — disconnecting", {
+          subcode: error.subcode,
+          message: error.message,
+          messageId: req.body?.messageId,
+        });
+        res.status(200).json({ success: false, error: "token_revoked" });
+        await ctx.revokeConnection?.().catch((revokeError: unknown) => {
+          logger.error("Instagram connection.revoke failed after Graph 190", {
+            error: revokeError instanceof Error ? revokeError.message : String(revokeError),
+          });
+        });
+        return;
+      }
+
       // Non-retryable provider error (4xx, or a structured Graph error with no
       // network failure). status 0 means a network-level failure → retryable.
       if (error.status >= 400 && error.status < 500) {
@@ -202,7 +224,7 @@ export async function deliverHandler(
           message: error.message,
           messageId: req.body?.messageId,
         });
-        res.status(200).json({ success: false, error: `graph_${error.status}` });
+        res.status(200).json({ success: false, error: `graph_${error.code ?? error.status}` });
         return;
       }
 

@@ -17,21 +17,21 @@
         :title="$t('dashboard.metrics.totalConversations')"
         :icon="MessageSquare"
         :metric="conversationMetrics.totalConversations"
-        :subtitle="`${conversationMetrics.resolvedConversations}`"
+        :subtitle="`${resolution.current.aiResolved}`"
         :subtitle-suffix="$t('dashboard.metrics.resolved')"
         subtitle-color="green"
-        :loading="!metricsQuery.data.value"
+        :loading="!metricsQuery.data.value || !overviewQuery.data.value"
       />
 
       <MetricCard
         :title="$t('dashboard.metrics.resolutionRate')"
         :icon="CheckCircle"
-        :metric="`${conversationMetrics.resolutionRate.toFixed(1)}%`"
-        :subtitle="$t('dashboard.metrics.ofConversations')"
-        :subtitle-suffix="$t('dashboard.metrics.resolved')"
-        subtitle-color="green"
+        :metric="formatRate(resolution.current.aiResolutionRate)"
         :format-metric="false"
-        :loading="!metricsQuery.data.value"
+        :loading="!overviewQuery.data.value"
+        v-bind="
+          delta(resolution.current.aiResolutionRate, resolution.previous.aiResolutionRate, 'points')
+        "
       />
 
       <MetricCard
@@ -207,6 +207,9 @@
           </div>
         </CardContent>
       </Card>
+      <!-- Billable resolutions against the plan (owner and admin) -->
+      <ResolutionQuotaWidget v-if="userStore.isAdmin" ref="quotaWidget" />
+
       <!-- Active Conversations (Live) -->
       <ActiveConversationsWidget />
       <!-- Escalations -->
@@ -302,12 +305,18 @@ import {
 import { HayApi } from "@/utils/api";
 import { formatWaitTime } from "@/utils/conversation";
 import { toISODateRange } from "@/utils/date";
+import { formatRate, type ReportRange } from "@/utils/analytics";
+import { useDelta } from "@/composables/useDelta";
+import { useUserStore } from "@/stores/user";
 import type { RouterOutputs } from "@/types/trpc";
 
 // State
 const { t } = useI18n();
 const router = useRouter();
+const userStore = useUserStore();
+const delta = useDelta();
 const documentStatsWidget = ref<{ refresh: () => void } | null>(null);
+const quotaWidget = ref<{ refresh: () => void } | null>(null);
 
 // The selector fills this in on mount; queries wait for it.
 const dateRange = ref({
@@ -370,7 +379,24 @@ const responseTimeQuery = useCachedQuery(
   () => analyticsKey("responseTime"),
   ([, , range]) => HayApi.analytics.responseTime.query(toISODateRange(range)),
 );
-const queries = [recentQuery, activityQuery, sentimentQuery, metricsQuery, responseTimeQuery];
+// AI resolution rate from close outcomes, with the previous period for the change.
+const overviewQuery = useCachedQuery(
+  () => {
+    const { startDate, endDate } = toISODateRange(dateRange.value);
+    return startDate && endDate
+      ? (["analytics", "overview", { startDate, endDate } as ReportRange] as const)
+      : null;
+  },
+  ([, , range]) => HayApi.analytics.overview.query(range),
+);
+const queries = [
+  recentQuery,
+  activityQuery,
+  sentimentQuery,
+  metricsQuery,
+  responseTimeQuery,
+  overviewQuery,
+];
 
 const refreshing = computed(() => queries.some((query) => query.refreshing.value));
 
@@ -390,11 +416,17 @@ const conversationMetrics = computed(() => {
   const metrics = (metricsQuery.data.value?.data ?? {}) as Partial<Record<string, number>>;
   return {
     totalConversations: metrics.totalConversations ?? 0,
-    resolvedConversations: metrics.resolvedConversations ?? 0,
-    resolutionRate: metrics.resolutionRate ?? 0,
     avgMessagesPerConversation: metrics.avgMessagesPerConversation ?? 0,
   };
 });
+
+const resolution = computed(() => ({
+  current: {
+    aiResolved: overviewQuery.data.value?.current.aiResolved ?? 0,
+    aiResolutionRate: overviewQuery.data.value?.current.aiResolutionRate ?? null,
+  },
+  previous: { aiResolutionRate: overviewQuery.data.value?.previous.aiResolutionRate ?? null },
+}));
 
 type ResponseTime = RouterOutputs["analytics"]["responseTime"]["data"];
 const responseTime = computed<ResponseTime>(
@@ -500,6 +532,7 @@ const formatTimeAgo = (date: Date) => {
 const refreshData = () => {
   queries.forEach((query) => void query.refresh());
   documentStatsWidget.value?.refresh();
+  quotaWidget.value?.refresh();
 };
 
 const viewAllConversations = () => {

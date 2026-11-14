@@ -1,6 +1,5 @@
 import { Router, type Request, type Response } from "express";
 import { pluginManagerService } from "@server/services/plugin-manager.service";
-import { pluginInstanceManagerService } from "@server/services/plugin-instance-manager.service";
 import { webhookRouterService } from "@server/services/webhook-router.service";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
@@ -113,10 +112,6 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response): Promise<vo
     let worker;
     try {
       worker = await pluginManagerService.startPluginWorker(organizationId, pluginId);
-      // Update activity timestamp so the instance cleanup job doesn't kill the worker
-      pluginInstanceManagerService
-        .updateActivityTimestamp(organizationId, pluginId)
-        .catch(() => {});
     } catch (error) {
       logger.error({ err: error, organizationId, pluginId }, "Failed to start worker");
       res.status(503).json({

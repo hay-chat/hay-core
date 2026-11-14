@@ -4,6 +4,7 @@ import { documentSourceSyncService } from "@server/services/document-source-sync
 import {
   WEBSITE_PLUGIN_ID,
   WEBSITE_SOURCE_TYPE,
+  toPathPrefix,
 } from "@server/services/importers/website-importer";
 import { validateUrlForSSRF } from "@server/utils/ssrf";
 import type { DocumentSource } from "@server/entities/document-source.entity";
@@ -40,24 +41,37 @@ export async function findWebsiteSource(
 /**
  * Creates a website source and starts its first full sweep. SSRF-validates the URL first.
  * Shared by `documentSources.createWebsite` and in-app setup.
+ *
+ * By default the whole site (the URL's origin) is imported. `limitToPath` keeps only pages
+ * under the URL's path (example.com/docs -> /docs/...), and `maxPages` caps the page count.
  */
 export async function createWebsiteSource(
   organizationId: string,
   url: string,
-  options: { displayName?: string; syncIntervalMs?: number | null } = {},
+  options: {
+    displayName?: string;
+    syncIntervalMs?: number | null;
+    limitToPath?: boolean;
+    maxPages?: number;
+  } = {},
 ): Promise<{ source: DocumentSource; jobId: string }> {
   // Block SSRF (internal IPs, link-local, etc.) before we ever store or fetch.
   await validateUrlForSSRF(url);
   const { origin, hostname } = normalizeWebsiteUrl(url);
+  const pathPrefix = options.limitToPath ? toPathPrefix(new URL(url).pathname) : undefined;
 
   const source = await documentSourceRepository.create({
     organizationId,
     pluginId: WEBSITE_PLUGIN_ID,
-    displayName: options.displayName?.trim() || hostname,
+    displayName: options.displayName?.trim() || `${hostname}${pathPrefix ?? ""}`,
     sourceType: WEBSITE_SOURCE_TYPE,
     externalRootId: origin,
     externalRootLabel: hostname,
-    config: { url: origin },
+    config: {
+      url: origin,
+      ...(pathPrefix ? { pathPrefix } : {}),
+      ...(options.maxPages ? { maxPages: options.maxPages } : {}),
+    },
     syncIntervalMs:
       options.syncIntervalMs === undefined
         ? WEBSITE_DEFAULT_SYNC_INTERVAL_MS

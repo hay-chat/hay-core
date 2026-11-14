@@ -9,6 +9,9 @@ jest.mock("@server/repositories/webchat-settings.repository", () => ({
 jest.mock("@server/repositories/organization.repository", () => ({ organizationRepository: {} }));
 jest.mock("@server/services/storage.service", () => ({ storageService: {} }));
 jest.mock("@server/database/data-source", () => ({ AppDataSource: { isInitialized: false } }));
+jest.mock("@server/lib/logger", () => ({
+  createLogger: () => ({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() }),
+}));
 
 import { matchesAllowedDomains } from "@server/services/webchat/webchat-settings.service";
 import { isPageToolsOrigin } from "@server/lib/webchat-origin";

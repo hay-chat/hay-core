@@ -9,7 +9,7 @@ import { PlaybookStatus } from "@server/database/entities/playbook.entity";
 import type { Playbook } from "@server/database/entities/playbook.entity";
 import { shouldReselectPlaybook } from "./playbook-gate";
 import { withOverridePlaybook } from "@server/services/playbook-version-override";
-import { MessageType } from "@server/database/entities/message.entity";
+import { MessageIntent, MessageType } from "@server/database/entities/message.entity";
 import { ToolExecutionService } from "@server/services/core/tool-execution.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import type { ConversationContext, GuardrailLogEntry, ProcessingPhase } from "./types";
@@ -17,8 +17,10 @@ import { LLMService } from "@server/services/core/llm.service";
 import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
 import { hasTiptapContent } from "@server/types/tiptap.types";
+import { shouldAdoptLanguage } from "@server/types/language.types";
 import { closureCopy } from "./closure-copy";
 import { availabilityContext, availabilityHandoffLine, handoffCopy } from "./handoff-copy";
+import { resolveHandoffReason } from "./handoff-reason";
 import { getAvailability, typicalFirstReplyMinutes } from "@server/services/business-hours.service";
 import {
   handoffTicketsService,
@@ -36,6 +38,9 @@ import { checkReplyMedia } from "./reply-media";
 import { decidedActionsLedger } from "./decided-actions";
 import { isToolEnabled } from "@server/services/core/enabled-tools";
 import { isPageTool, PAGE_TOOL_MESSAGE_SOURCE } from "@server/services/webchat/page-tools.service";
+import { markVisitorMessageDelivered } from "@server/services/widget-events.service";
+import { publicAnswerSources } from "./answer-sources";
+import { runToolWithActivity } from "./tool-activity";
 import type { Message } from "@server/database/entities/message.entity";
 import type pino from "pino";
 
@@ -355,6 +360,25 @@ async function saveConfidenceLog(
  * message yet (widget just opened) only has its needs_processing flag cleared,
  * so no greeting is sent and the sweep stops.
  */
+/**
+ * The visitor's latest message reached Hay, with the AI or in the team's queue:
+ * the widget shows it delivered. Best effort; pass the message when the caller
+ * already read it, so the run's input read stays the only one under the lock.
+ */
+async function ackVisitorMessageDelivered(
+  conversation: Conversation,
+  log: pino.Logger,
+  message?: Message | null,
+): Promise<void> {
+  if (conversation.channel !== "web") return;
+  try {
+    const latest = message === undefined ? await conversation.getLastCustomerMessage() : message;
+    await markVisitorMessageDelivered(conversation, latest);
+  } catch (err) {
+    log.warn({ err }, "Could not mark the visitor's message delivered");
+  }
+}
+
 async function parkForPausedAgent(conversation: Conversation, log: pino.Logger): Promise<void> {
   const lastCustomerMessage = await conversation.getLastCustomerMessage();
   const shouldQueue = !!lastCustomerMessage && conversation.status !== "pending-human";
@@ -450,6 +474,7 @@ export const runConversation = async (conversationId: string) => {
       "Skipping - organization suspended",
     );
     if (conversation.needs_processing) {
+      await ackVisitorMessageDelivered(conversation, log);
       const updates: Partial<Conversation> = { needs_processing: false };
       if (conversation.status === "open") updates.status = "pending-human";
       await conversationRepository.update(conversation.id, conversation.organization_id, updates);
@@ -489,6 +514,7 @@ export const runConversation = async (conversationId: string) => {
     if (withinHours && readHandoffTicket(conversation)?.status !== "requested") {
       log.debug("Skipping - waiting for the team within business hours");
       if (conversation.needs_processing) {
+        await ackVisitorMessageDelivered(conversation, log);
         await conversationRepository.update(conversation.id, conversation.organization_id, {
           needs_processing: false,
         });
@@ -503,6 +529,7 @@ export const runConversation = async (conversationId: string) => {
   // as pending-human so the team sees it, and needs_processing is cleared so
   // the sweep stops re-enqueuing it.
   if (isOrganizationAiPaused(conversation.organization)) {
+    if (conversation.needs_processing) await ackVisitorMessageDelivered(conversation, log);
     await parkForPausedAgent(conversation, log);
     return;
   }
@@ -510,6 +537,7 @@ export const runConversation = async (conversationId: string) => {
   // AI switched off on this channel (D7-14, "start on Web Chat only"): the
   // team answers. No notice to the shopper; test conversations still run.
   if (await isChannelAiOff(conversation)) {
+    if (conversation.needs_processing) await ackVisitorMessageDelivered(conversation, log);
     await parkForTeam(conversation, log);
     return;
   }
@@ -589,6 +617,9 @@ export const runConversation = async (conversationId: string) => {
       throw new Error("Last customer message not found");
     }
 
+    // The run holds the visitor's latest message: the widget shows it delivered.
+    await ackVisitorMessageDelivered(conversation, log, lastCustomerMessage);
+
     // Update processing state to perceiving
     await updateProcessingState(conversation, "perceiving", "Analyzing your message");
 
@@ -611,6 +642,18 @@ export const runConversation = async (conversationId: string) => {
       sentiment: sentiment.label,
       language,
     });
+
+    // Follow the customer when they switch language mid-conversation.
+    if (shouldAdoptLanguage(lastCustomerMessage.content, language, conversation.language)) {
+      log.debug(
+        { from: conversation.language, to: language },
+        "Customer switched language, updating conversation language",
+      );
+      await conversationRepository.update(conversation.id, conversation.organization_id, {
+        language,
+      });
+      conversation.language = language;
+    }
 
     // Check if user indicated potential closure intent
     const hasClosureIntent =
@@ -696,6 +739,7 @@ export const runConversation = async (conversationId: string) => {
         );
 
         closingMessage = await llmService.invoke({
+          caller: "closing-message",
           history: messages,
           prompt,
           // Short closing line; falls back to a hardcoded string on error.
@@ -844,7 +888,7 @@ export const runConversation = async (conversationId: string) => {
     );
 
     // 04. Execution - Handle iterative execution with tool calls
-    await handleExecutionLoop(conversation, processingStartedAt, language);
+    await handleExecutionLoop(conversation, processingStartedAt, language ?? undefined);
 
     // Update processing state to idle (done)
     await updateProcessingState(conversation, "idle");
@@ -1341,6 +1385,7 @@ async function handleExecutionLoop(
         step: "HANDOFF",
         handoff: executionResult.handoff ?? {
           reason: executionResult.handoffReason ?? "The AI could not answer a fact",
+          code: "unanswered_fact",
         },
       };
     }
@@ -1373,10 +1418,10 @@ async function handleExecutionLoop(
       });
 
       // Execute the tool
-      const toolExecResult1 = await toolExecutionService.handleToolExecution(
+      const toolExecResult1 = await runToolWithActivity(
         conversation,
         executionResult.tool,
-        toolMessageId?.id,
+        (tool) => toolExecutionService.handleToolExecution(conversation, tool, toolMessageId?.id),
       );
       toolsCalledThisTurn.push({
         name: executionResult.tool.name,
@@ -1402,10 +1447,10 @@ async function handleExecutionLoop(
       });
 
       // Execute the tool with the message ID for updating
-      const toolExecResult2 = await toolExecutionService.handleToolExecution(
+      const toolExecResult2 = await runToolWithActivity(
         conversation,
         executionResult.tool,
-        toolMessageId?.id,
+        (tool) => toolExecutionService.handleToolExecution(conversation, tool, toolMessageId?.id),
       );
       toolsCalledThisTurn.push({
         name: executionResult.tool.name,
@@ -1487,16 +1532,31 @@ async function handleExecutionLoop(
         !executionResult.aiUnavailable &&
         !executionResult.planningExhausted;
 
+      // Why, for the hand-offs report. The first hand-off's reason is kept,
+      // like handed_off_at.
+      const handoffMetadata = {
+        ...(conversation.metadata ?? {}),
+        ...(plannedHandoff ? { plannedHandoff: true } : {}),
+        ...(conversation.metadata?.handoffReason
+          ? {}
+          : {
+              handoffReason: resolveHandoffReason({
+                code: executionResult.handoff?.code,
+                aiUnavailable: executionResult.aiUnavailable,
+                planningExhausted: executionResult.planningExhausted,
+                plannedHandoff,
+                customerAskedForHuman:
+                  (await conversation.getLastCustomerMessage())?.intent === MessageIntent.HANDOFF,
+              }),
+            }),
+      };
+
       // Every hand-off queues the conversation for the team.
       await conversationRepository.update(conversation.id, conversation.organization_id, {
         status: "pending-human",
-        ...(plannedHandoff
-          ? { metadata: { ...(conversation.metadata ?? {}), plannedHandoff: true } }
-          : {}),
+        metadata: handoffMetadata,
       });
-      if (plannedHandoff) {
-        conversation.metadata = { ...(conversation.metadata ?? {}), plannedHandoff: true };
-      }
+      conversation.metadata = handoffMetadata;
       await publishStatusChange(
         conversation.organization_id,
         conversation.id,
@@ -1633,6 +1693,12 @@ async function handleExecutionLoop(
           );
         }
 
+        // The public documents behind the answer, linked under it in the widget.
+        const sources = await publicAnswerSources(
+          conversation.organization_id,
+          executionResult.confidence?.documentsUsed,
+        );
+
         await sendBotMessage(
           conversation,
           {
@@ -1640,6 +1706,7 @@ async function handleExecutionLoop(
             type: MessageType.BOT_AGENT,
             metadata: {
               ...buildMessageMetadata(executionResult),
+              ...(sources.length > 0 ? { sources } : {}),
               ...(executionResult.tool
                 ? { potentialHallucination: true, claimedTool: executionResult.tool.name }
                 : {}),

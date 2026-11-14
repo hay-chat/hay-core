@@ -1,75 +1,94 @@
 {
   "channels": {
     "title": "Canais",
-    "description": "Canais de comunicação ativos conectando seus clientes ao Hay.chat",
+    "description": "Onde seus clientes podem falar com você. Cada canal traz as conversas para a mesma caixa de entrada.",
     "headTitle": "Canais - Hay.chat",
     "browseMarketplace": "Ver Marketplace",
-    "loading": "Carregando canais...",
-    "empty": {
-      "title": "Nenhum canal ativo",
-      "description": "Instale uma integração de canal no marketplace para começar a receber conversas.",
-      "action": "Ver Marketplace"
+    "add": {
+      "title": "Adicionar um canal",
+      "description": "WhatsApp, Instagram, e-mail e mais"
     },
-    "actions": {
-      "configure": "Configurar"
+    "webchat": {
+      "description": "O chat para o seu site.",
+      "liveOn": "O chat no seu site, {host}.",
+      "notInstalled": "O chat para o seu site. Adicione uma linha de código para colocar no ar.",
+      "off": "O chat para o seu site. Ele está desligado."
     }
   },
   "marketplace": {
-    "title": "Marketplace de Integrações",
-    "description": "Descubra e instale integrações para ampliar as capacidades da sua plataforma",
-    "headTitle": "Marketplace de Integrações - Hay.chat",
-    "uploadPlugin": "Enviar Integração",
-    "manageCustom": "Gerenciar Personalizados ({count})",
-    "refresh": "Atualizar",
-    "stats": {
-      "totalPlugins": "Total de Integrações",
-      "availablePlugins": "Integrações disponíveis",
-      "installed": "Instalados",
-      "activePlugins": "Integrações ativas",
-      "channels": "Canais",
-      "communicationChannels": "Canais de comunicação",
-      "mcpConnectors": "Conectores MCP",
-      "modelContextProtocol": "Model Context Protocol"
+    "title": "Marketplace",
+    "description": "Conecte as ferramentas que você já usa, para que o seu agente responda com pedidos, pagamentos e agendamentos reais, sem adivinhar.",
+    "headTitle": "Marketplace - Hay.chat",
+    "uploadPlugin": "Enviar plugin",
+    "manageCustom": "Gerenciar personalizados ({count})",
+    "requestIntegration": "Pedir uma integração",
+    "custom": "Personalizado",
+    "search": {
+      "label": "Buscar integrações",
+      "placeholder": "Busque pelo nome ou pelo que você precisa, ex.: reembolsos"
     },
     "categories": {
-      "label": "Categorias:",
-      "all": "Todas as Integrações",
-      "channels": "Canais",
-      "mcpConnectors": "Conectores MCP",
-      "documentImporters": "Importadores de Documentos",
-      "retrievers": "Recuperadores",
-      "playbooks": "Playbooks"
+      "label": "Categorias",
+      "all": "Todas"
     },
-    "search": "Buscar integrações...",
-    "empty": {
-      "title": "Nenhuma integração encontrada",
-      "searchHint": "Tente ajustar os termos da sua busca.",
-      "categoryHint": "Nenhuma integração corresponde à categoria selecionada."
+    "sections": {
+      "channels": {
+        "label": "Canais",
+        "blurb": "Por onde os clientes falam com você."
+      },
+      "commerce": {
+        "label": "E-commerce",
+        "blurb": "Pedidos, produtos e estoque da sua loja."
+      },
+      "payments": {
+        "label": "Pagamentos e envios",
+        "blurb": "Reembolsos, status de pagamento e rastreio de encomendas."
+      },
+      "crm": {
+        "label": "CRM e suporte",
+        "blurb": "Cadastros de clientes e tickets."
+      },
+      "knowledge": {
+        "label": "Conhecimento e agendamentos",
+        "blurb": "Documentos para aprender e agendas para marcar horários."
+      },
+      "security": {
+        "label": "Segurança",
+        "blurb": "Proteja o webchat."
+      },
+      "other": {
+        "label": "Outros",
+        "blurb": "Todo o resto, incluindo os plugins que você enviou."
+      }
     },
-    "pluginTypes": {
+    "tags": {
       "channel": "Canal",
-      "mcpConnector": "Conector MCP",
-      "documentImporter": "Importador de Documentos",
-      "retriever": "Recuperador",
-      "playbook": "Playbook"
+      "knowledge": "Fonte de conhecimento",
+      "tools": "Ferramentas do agente",
+      "catalog": "Sincronização de catálogo",
+      "disputes": "Disputas",
+      "tickets": "Tickets",
+      "webchat": "Webchat"
     },
-    "actions": {
+    "status": {
+      "connected": "Conectado",
+      "needsSetup": "Precisa de configuração",
+      "finishSetup": "Concluir configuração"
+    },
+    "connected": {
+      "title": "Conectados",
       "configure": "Configurar",
-      "remove": "Remover",
-      "removing": "Removendo...",
-      "delete": "Excluir",
-      "deleting": "Excluindo...",
-      "connect": "Conectar",
-      "connecting": "Conectando…"
+      "configureNamed": "Configurar {name}"
     },
-    "custom": "Personalizado",
-    "confirmDelete": "Tem certeza de que deseja excluir esta integração? Esta ação não pode ser desfeita.",
-    "toast": {
-      "disabledSuccess": "Integração {name} desativada com sucesso",
-      "deletedSuccess": "Integração excluída com sucesso",
-      "enableFailed": "Falha ao ativar integração",
-      "disableFailed": "Falha ao desativar integração",
-      "deleteFailed": "Falha ao excluir integração"
+    "empty": {
+      "title": "Nada corresponde a essa busca",
+      "description": "Tente o nome de uma ferramenta ou uma tarefa como \"rastreio\". Se ainda não temos, conte para nós e vamos avaliar.",
+      "clear": "Limpar busca"
+    },
+    "footer": {
+      "title": "Usa algo que não está na lista?",
+      "description": "Crie um plugin com o SDK do Hay, ou encapsule qualquer servidor MCP, e envie só para a sua organização.",
+      "docs": "Ler a documentação de plugins"
     }
   },
   "manage": {
@@ -185,6 +204,12 @@
       "description": "{name} deixa de funcionar no seu workspace. As configurações ficam guardadas caso você conecte de novo.",
       "confirm": "Desconectar"
     },
+    "deletePlugin": "Excluir plugin",
+    "deleteConfirm": {
+      "title": "Excluir este plugin?",
+      "description": "{name} é removido da sua organização. Esta ação não pode ser desfeita.",
+      "confirm": "Excluir"
+    },
     "error": {
       "loadFailed": "Falha ao carregar integração",
       "returnToMarketplace": "Voltar ao Marketplace"
@@ -276,7 +301,9 @@
       "oauthConnectFailed": "Falha ao conectar ao {name}",
       "oauthConnectedTo": "Conectado com sucesso ao {name}!",
       "oauthDisconnectedFrom": "Desconectado do {name}",
-      "oauthDisconnectFailed": "Falha ao desconectar"
+      "oauthDisconnectFailed": "Falha ao desconectar",
+      "deletedSuccess": "Plugin excluído",
+      "deleteFailed": "Não foi possível excluir o plugin"
     },
     "channelHealth": {
       "failingTitle": "Este canal está com falhas",
@@ -337,7 +364,6 @@
       "error": "Com problema"
     },
     "actions": {
-      "connect": "Conectar",
       "finishSetup": "Concluir configuração",
       "reviewSetup": "Revisar configuração",
       "more": "Mais opções",
@@ -359,6 +385,97 @@
       "failedTitle": "Não conseguimos iniciar a conexão",
       "networkError": "O Hay.chat não respondeu a tempo. Verifique sua conexão e tente novamente.",
       "retry": "Tentar novamente"
+    },
+    "preConnect": {
+      "breadcrumb": "Trilha de navegação",
+      "tags": "Categoria e capacidades",
+      "connect": "Conectar {name}",
+      "setupGuide": "Ler o guia de configuração",
+      "note": "Remova quando quiser.",
+      "noteOAuth": "Você aprova o acesso em {name}. Remova quando quiser.",
+      "abilities": {
+        "title": "O que o seu agente pode fazer",
+        "handles": {
+          "orders": {
+            "title": "Responder sobre pedidos",
+            "description": "Encontra os pedidos do cliente e informa em que pé estão."
+          },
+          "refunds": {
+            "title": "Cuidar de reembolsos",
+            "description": "Reembolsa um pedido ou pagamento para o cliente."
+          },
+          "order_changes": {
+            "title": "Alterar pedidos",
+            "description": "Cancela um pedido ou o atualiza antes do envio."
+          },
+          "billing": {
+            "title": "Responder sobre cobranças",
+            "description": "Consulta as faturas e os pagamentos do cliente."
+          },
+          "subscriptions": {
+            "title": "Gerenciar assinaturas",
+            "description": "Consulta, altera ou cancela a assinatura do cliente."
+          },
+          "bookings": {
+            "title": "Fazer agendamentos",
+            "description": "Encontra horários livres e agenda, remarca ou cancela para o cliente."
+          }
+        }
+      },
+      "how": {
+        "title": "Como funciona a conexão",
+        "steps": {
+          "connect": {
+            "title": "Clique em Conectar",
+            "description": "O Hay adiciona {name} ao seu workspace e abre a configuração."
+          },
+          "approve": {
+            "title": "Aprove o acesso em {name}",
+            "description": "Entre em {name} e aprove o que o Hay pode usar."
+          },
+          "details": {
+            "title": "Informe os dados de {name}",
+            "description": "A configuração mostra o que é preciso e onde encontrar."
+          },
+          "setup": {
+            "title": "Conclua a configuração",
+            "description": "Siga os passos que o Hay mostra. Ele diz o que é preciso e onde encontrar."
+          },
+          "verify": {
+            "title": "Teste a conexão",
+            "description": "O Hay verifica se consegue acessar {name} antes de o seu agente usar."
+          }
+        }
+      },
+      "details": {
+        "title": "Detalhes",
+        "builtBy": "Criado por",
+        "builtByHay": "Hay",
+        "builtByCustom": "Sua organização",
+        "category": "Categoria",
+        "signIn": "Login",
+        "signInMethods": {
+          "oauth": "OAuth",
+          "apiKey": "Chave de API"
+        },
+        "version": "Versão",
+        "documentation": "Documentação"
+      },
+      "data": {
+        "title": "Dados com que trabalha",
+        "noteOAuth": "{name} mostra as permissões exatas antes de você aprovar.",
+        "items": {
+          "messages": "Mensagens dos clientes",
+          "customers": "Perfis de clientes",
+          "orders": "Pedidos",
+          "products": "Produtos e estoque",
+          "payments": "Pagamentos e reembolsos",
+          "disputes": "Disputas",
+          "bookings": "Agendamentos",
+          "tickets": "Tickets",
+          "documents": "Páginas e documentos"
+        }
+      }
     }
   },
   "pluginConnect": {

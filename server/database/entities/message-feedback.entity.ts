@@ -5,13 +5,19 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from "typeorm";
 import { Message } from "./message.entity";
 import { Organization } from "../../entities/organization.entity";
 import { User } from "../../entities/user.entity";
-import { FeedbackRating } from "../../types/message-feedback.types";
+import { FeedbackRating, FeedbackSource } from "../../types/message-feedback.types";
 
 @Entity("message_feedback")
+// A visitor has one rating per AI answer: rating again replaces it.
+@Index("uq_message_feedback_visitor_message", ["messageId"], {
+  unique: true,
+  where: `"source" = 'visitor'`,
+})
 export class MessageFeedback {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
@@ -30,12 +36,16 @@ export class MessageFeedback {
   @JoinColumn()
   organization!: Organization;
 
-  @Column({ type: "uuid" })
-  reviewerId!: string;
+  /** The team member who rated; null for visitor feedback. */
+  @Column({ type: "uuid", nullable: true })
+  reviewerId!: string | null;
 
-  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @ManyToOne(() => User, { onDelete: "CASCADE", nullable: true })
   @JoinColumn()
-  reviewer!: User;
+  reviewer!: User | null;
+
+  @Column({ type: "varchar", length: 16, default: FeedbackSource.OPERATOR })
+  source!: FeedbackSource;
 
   @Column({
     type: "enum",

@@ -33,12 +33,13 @@
             v-for="subItem in item.items"
             :key="subItem.title"
             :to="subItem.url"
-            class="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm text-neutral-muted transition-colors hover:bg-accent hover:text-accent-foreground md:min-h-0"
+            class="flex min-h-11 items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-neutral-muted transition-colors hover:bg-accent hover:text-accent-foreground md:min-h-0"
             :class="{
               'bg-accent text-accent-foreground': subItem.isActive,
             }"
           >
-            {{ subItem.title }}
+            <span class="min-w-0 truncate">{{ subItem.title }}</span>
+            <PluginStatusDot v-if="subItem.needsSetup" status="needs_setup" side="right" />
           </NuxtLink>
         </div>
       </div>
@@ -49,6 +50,7 @@
 <script setup lang="ts">
 import { reactive, watchEffect, type Component } from "vue";
 import { ChevronRight } from "lucide-vue-next";
+import PluginStatusDot from "@/components/plugins/PluginStatusDot.vue";
 
 interface NavItem {
   title: string;
@@ -60,6 +62,8 @@ interface NavItem {
     title: string;
     url: string;
     isActive?: boolean;
+    /** An enabled plugin that still needs setup: shows an amber dot. */
+    needsSetup?: boolean;
   }[];
 }
 

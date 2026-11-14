@@ -581,7 +581,7 @@ describe("WebSocket dashboard authentication", () => {
 
     expect(mockUserOrgFindOne).toHaveBeenCalledWith({
       where: { userId: "user-1", organizationId: ORG_ID, isActive: true },
-      relations: ["organization"],
+      relations: { organization: true },
     });
     expect(orgMembers(service).get(ORG_ID)?.has(clientId) ?? false).toBe(false);
     expect(ws.closedWith).toBe(1008);
@@ -673,6 +673,64 @@ describe("WebSocket message events for webchat clients", () => {
         metadata: { isClosureMessage: true },
       },
     });
+  });
+
+  it("forwards widget events (acks, Seen, tool progress) to the conversation's widget only", async () => {
+    jest.clearAllMocks();
+    const service = new WebSocketService();
+    mockConversationRepo.findById.mockResolvedValue(webConversation());
+    mockVerifyDPoP.mockResolvedValue({ success: true });
+    const { ws, send } = connect(service);
+    await send(identifyFrame());
+    const dashboard = jest.spyOn(service, "sendToOrganization");
+
+    const handle = (service as unknown as { handleRedisEvent(e: unknown): void }).handleRedisEvent;
+    handle.call(service, {
+      type: "agent_activity",
+      organizationId: ORG_ID,
+      conversationId: CONV_ID,
+      payload: {
+        state: "start",
+        toolName: "shop:get_order",
+        label: "Looking up your order",
+        doneLabel: "Checked your order",
+        args: { orderId: "1001" },
+      },
+    });
+    expect(ws.last()).toEqual({
+      type: "agent_activity",
+      state: "start",
+      toolName: "shop:get_order",
+      label: "Looking up your order",
+      doneLabel: "Checked your order",
+    });
+
+    const before = ws.sent.length;
+    handle.call(service, {
+      type: "message_ack",
+      organizationId: ORG_ID,
+      conversationId: CONV_ID,
+      payload: { messageId: "m1", status: "bogus" },
+    });
+    expect(ws.sent.length).toBe(before);
+    expect(dashboard).not.toHaveBeenCalled();
+  });
+
+  it("acknowledges a socket message with the widget's own id", async () => {
+    jest.clearAllMocks();
+    const service = new WebSocketService();
+    const conversation = webConversation();
+    mockConversationRepo.findById.mockResolvedValue(conversation);
+    mockVerifyDPoP.mockResolvedValue({ success: true, newNonce: "nonce-2" });
+    mockRateLimited.mockResolvedValue(false);
+    const { send } = connect(service);
+
+    await send(identifyFrame());
+    await send({ ...validFrame, clientMessageId: "local-1" });
+
+    expect(conversation.addMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: { clientMessageId: "local-1" } }),
+    );
   });
 
   it("no longer serves load_history to unauthenticated clients", async () => {

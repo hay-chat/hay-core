@@ -48,8 +48,25 @@
                   : $t("usage.meter.calendarNote")
               }}
             </p>
-            <!-- TODO: core does not receive the plan allowance or overage state from the
-                 billing operator; show them here once it does (no backoffice call from core). -->
+            <template v-if="summary.includedResolutions !== null">
+              <Progress
+                :value="
+                  summary.includedResolutions > 0
+                    ? (summary.billable / summary.includedResolutions) * 100
+                    : 100
+                "
+                class="h-2"
+              />
+              <p class="text-sm text-muted-foreground" data-testid="usage-included">
+                {{
+                  $t("usage.meter.included", {
+                    included: summary.includedResolutions.toLocaleString(),
+                  })
+                }}
+              </p>
+            </template>
+            <!-- TODO: core does not receive the overage state from the billing operator;
+                 show it here once it does (no backoffice call from core). -->
             <p class="text-xs text-muted-foreground">{{ $t("usage.meter.planNote") }}</p>
           </CardContent>
         </Card>

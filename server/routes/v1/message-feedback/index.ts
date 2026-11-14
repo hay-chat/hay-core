@@ -5,7 +5,7 @@ import {
   FeedbackMessageNotFoundError,
   MessageFeedbackService,
 } from "../../../services/message-feedback.service";
-import { FeedbackRating } from "../../../types/message-feedback.types";
+import { FeedbackRating, FeedbackSource } from "../../../types/message-feedback.types";
 import { TRPCError } from "@trpc/server";
 import { auditLogService } from "@server/services/audit-log.service";
 
@@ -20,6 +20,8 @@ const createFeedbackSchema = z.object({
 const listFeedbackSchema = z.object({
   messageId: z.string().uuid().optional(),
   rating: z.nativeEnum(FeedbackRating).optional(),
+  /** "operator" (team ratings) or "visitor" (webchat thumbs); both when omitted. */
+  source: z.nativeEnum(FeedbackSource).optional(),
   reviewerId: z.string().uuid().optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
@@ -57,7 +59,7 @@ export const messageFeedbackRouter = t.router({
   getByMessage: scopedProcedure(RESOURCES.MESSAGES, ACTIONS.READ)
     .input(z.object({ messageId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const feedback = await feedbackService.getFeedbackByMessage(input.messageId);
+      const feedback = await feedbackService.getOperatorFeedbackByMessage(input.messageId);
       // Filter to only return feedback from the user's organization
       return feedback.filter((f) => f.organizationId === ctx.organizationId);
     }),
@@ -68,6 +70,7 @@ export const messageFeedbackRouter = t.router({
       const filter = {
         messageId: input.messageId,
         rating: input.rating,
+        source: input.source,
         reviewerId: input.reviewerId,
         startDate: input.startDate ? new Date(input.startDate) : undefined,
         endDate: input.endDate ? new Date(input.endDate) : undefined,
@@ -89,6 +92,7 @@ export const messageFeedbackRouter = t.router({
       const filter = {
         messageId: input.messageId,
         rating: input.rating,
+        source: input.source,
         reviewerId: input.reviewerId,
         startDate: input.startDate ? new Date(input.startDate) : undefined,
         endDate: input.endDate ? new Date(input.endDate) : undefined,

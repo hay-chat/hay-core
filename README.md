@@ -206,11 +206,17 @@ Embed the chat widget on any website:
       position: "right",
       theme: "blue",
       greetingMessage: "Hi! How can we help?",
+      // Shown next to the chat button before it is opened. Overrides Settings > Webchat.
+      teaserMessage: "Questions? Chat with us!",
     },
   };
 </script>
 <script src="https://your-api-domain.com/v1/webchat/widget.js" async></script>
 ```
+
+To show or change the teaser later (after a delay, on scroll, on a given page), call
+`window.HayChat.setTeaserMessage("Still deciding? Ask us anything")` once `widget.js` has loaded; an
+empty string removes it.
 
 If you use a cookie banner, set `window.HayChat.config` only after the user accepts:
 

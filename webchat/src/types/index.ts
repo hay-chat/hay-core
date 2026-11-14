@@ -4,11 +4,21 @@ export interface HayChatConfig {
   organizationId: string;
   baseUrl: string;
   widgetTitle?: string;
-  widgetSubtitle?: string;
   position?: "left" | "right";
-  theme?: "blue" | "green" | "purple" | "black";
+  /** Brand colour ("#rrggbb"); overrides the one in Settings > Webchat (the dashboard preview sets it). */
+  brandColor?: string;
+  /** Light, dark, or following the visitor's system; overrides the one in Settings > Webchat. */
+  themeMode?: ThemeMode;
   showGreeting?: boolean;
   greetingMessage?: string;
+  /**
+   * Short message shown next to the chat button until the visitor opens the
+   * chat or dismisses it. Overrides the one set in Settings > Webchat; an empty
+   * string shows none on this page. With `loading: 'interaction'` the settings
+   * are not fetched up front, so only a message given here shows. To set it
+   * later (after a delay, on scroll...), call `window.HayChat.setTeaserMessage`.
+   */
+  teaserMessage?: string;
   /** Whether to show a 1–5 satisfaction rating when a conversation ends. Populated from public config. */
   csatEnabled?: boolean;
   /** Question shown above the satisfaction rating. Populated from public config. */
@@ -38,10 +48,8 @@ export interface HayChatConfig {
   onConversationStarted?: (conversation: { id: string }) => void | Promise<void>;
   /** Agent name displayed in the header. Populated from public config. */
   agentName?: string;
-  /** Agent avatar image URL (relative path). Falls back to organizationLogoUrl. */
+  /** The AI assistant's avatar image URL (relative path). Populated from public config. */
   agentAvatarUrl?: string;
-  /** Organization logo URL (relative path). Used as fallback for agent avatar. */
-  organizationLogoUrl?: string;
   /**
    * ePrivacy consent mode for device storage.
    * - `'implicit'` (default): persistent storage (localStorage, IndexedDB) is
@@ -67,16 +75,73 @@ export interface HayChatConfig {
    * straight away, so replies show on the badge.
    */
   loading?: LoadingMode;
+  /** The shop's logo; overrides the one in Settings > Webchat (the dashboard preview sets it). */
+  logoUrl?: string | null;
+  /** Home view heading; overrides the one in Settings > Webchat (the dashboard preview sets it). */
+  homeHeading?: string | null;
+  /** The assistant's icon when it has no avatar picture; overrides Settings > Webchat. */
+  agentAvatarPreset?: AssistantAvatarPreset;
+  /** The chat button's icon; overrides Settings > Webchat. "custom" needs `launcherIconUrl`. */
+  launcherIcon?: LauncherIcon;
+  /** Whether a preset button icon is drawn solid or as an outline. */
+  launcherIconStyle?: LauncherIconStyle;
+  /** The merchant's own button icon (an image), shown in white. */
+  launcherIconUrl?: string | null;
+  /**
+   * The dashboard's live preview (C4): the widget opens straight away on sample
+   * content, and never calls the server, stores anything or opens a socket.
+   */
+  preview?: PreviewOptions;
+}
+
+export type AssistantAvatarPreset = "sparkle" | "sparkles" | "robot";
+export type LauncherIcon = "chat" | "sparkle" | "robot" | "custom";
+export type LauncherIconStyle = "filled" | "outline";
+
+/** What the dashboard's live preview shows. */
+export interface PreviewOptions {
+  /** "closed" shows the chat button (and the teaser) with the chat closed. */
+  state: "home" | "chat" | "ended" | "closed";
+  /** "mobile" forces the full-screen sheet, "desktop" the floating window. */
+  device: "desktop" | "mobile";
 }
 
 export type LoadingMode = "eager" | "idle" | "interaction";
 
+export type ThemeMode = "light" | "dark" | "system";
+
+/** A person who can take over the conversation, shown in the header. */
+export interface TeamMember {
+  firstName: string;
+  avatarUrl: string | null;
+}
+
 /** `webchat.getPublicConfig` response, fetched by the loader. */
 export interface PublicConfig {
   enabled?: boolean;
+  widgetTitle?: string | null;
+  /** The organization's display name ("Support team · {name}"). */
+  organizationName?: string | null;
+  position?: "left" | "right";
+  showGreeting?: boolean;
+  greetingMessage?: string | null;
   agentName?: string | null;
   agentAvatarUrl?: string | null;
-  organizationLogoUrl?: string | null;
+  /** The assistant's icon when it has no avatar picture. */
+  agentAvatarPreset?: AssistantAvatarPreset;
+  launcherIcon?: LauncherIcon;
+  launcherIconStyle?: LauncherIconStyle;
+  /** Set when launcherIcon is "custom". */
+  launcherIconUrl?: string | null;
+  /** Hex "#rrggbb"; the widget applies the brand-colour rule (utils/brandColor). */
+  brandColor?: string;
+  themeMode?: ThemeMode;
+  /** The webchat logo, else the organization logo, else null. */
+  logoUrl?: string | null;
+  /** Home view heading; null = the localized default. */
+  homeHeading?: string | null;
+  /** Up to 2 people who can take over (only when handoff is on). */
+  team?: TeamMember[];
   /** Whether AI replies carry the AI label (D14-6). Missing = shown. */
   aiLabelShown?: boolean;
   /** The org's label text; null = the localized default. */
@@ -89,6 +154,8 @@ export interface PublicConfig {
   contributions?: WidgetContribution[];
   /** The org's pre-chat form, asked before the first message. */
   preChatForm?: FormSchema | null;
+  /** Message shown next to the button before the chat is opened; null = none. */
+  teaserMessage?: string | null;
 }
 
 /** A declarative plugin contribution, rendered by the widget's own code. */
@@ -102,6 +169,10 @@ export interface WidgetContribution {
 export interface LauncherBridge {
   setOpen(open: boolean): void;
   setUnread(count: number): void;
+  /** Focus the button (the chat was closed). */
+  focus(): void;
+  /** The chat is a full-screen sheet (phones, or the mobile preview): the button hides while it is open. */
+  setSheet(sheet: boolean): void;
 }
 
 /**
@@ -180,6 +251,35 @@ export interface Message {
   attachments?: Attachment[];
 }
 
+/** A row of the home view's "Your conversations" (`publicConversations.listMine`). */
+export interface VisitorConversation {
+  id: string;
+  status: "open" | "closed";
+  lastMessagePreview: string;
+  /** ISO time. */
+  lastMessageAt: string;
+  /** The assistant's or a team member's name; null when the visitor wrote last. */
+  lastSenderName: string | null;
+  /** False for a signed-in customer's conversation from another browser: listed, not openable. */
+  resumable: boolean;
+}
+
+/** How far a visitor message got (`message_ack`). */
+export type DeliveryStatus = "received" | "delivered";
+
+/** A link the AI used for its answer (`metadata.sources`). */
+export interface AnswerSource {
+  title: string;
+  url: string;
+}
+
+/** The AI is running a tool (`agent_activity`): the label while it runs, then the done label. */
+export interface AgentActivity {
+  running: boolean;
+  label: string;
+  doneLabel: string;
+}
+
 /** Shown under the input when the server refuses a message; `text` goes back into the input. */
 export interface SendFailure {
   reason:
@@ -214,6 +314,12 @@ declare global {
        * with an optional label; call it from a tool while it acts on the page.
        */
       highlight?: (target: Element | string | null, label?: string) => boolean;
+      /**
+       * Show (or replace) the message next to the chat button, from the moment
+       * widget.js has run; an empty string removes it. It shows even if the
+       * visitor dismissed an earlier one, but not while the chat is open.
+       */
+      setTeaserMessage?: (message: string) => void;
     };
   }
   interface Navigator {

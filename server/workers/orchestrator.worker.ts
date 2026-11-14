@@ -2,6 +2,7 @@ import { Orchestrator } from "../orchestrator";
 import { AppDataSource } from "../database/data-source";
 import { createLogger, withLogContext } from "@server/lib/logger";
 import { metrics } from "@server/lib/metrics";
+import { config } from "@server/config/env";
 import { rabbitmqService } from "@server/services/rabbitmq.service";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { simulationHarnessService } from "@server/services/simulation/simulation-harness.service";
@@ -89,11 +90,13 @@ export class OrchestratorWorker {
       async (msg) => {
         const data = rabbitmqService.parseMessage<OrchestratorMessage>(msg);
 
-        logger.debug(
+        // Info level on purpose: queue wait is part of the customer's wait.
+        logger.info(
           {
             conversationId: data.conversationId,
             trigger: data.trigger,
             attempt: data.attempt,
+            queueWaitMs: Date.now() - Date.parse(data.timestamp),
           },
           "Processing conversation from queue",
         );
@@ -181,7 +184,7 @@ export class OrchestratorWorker {
           }
         }
       },
-      { prefetch: 2 },
+      { prefetch: config.orchestrator.concurrency },
     );
 
     await rabbitmqService.consume(

@@ -1,7 +1,4 @@
 jest.mock("@server/services/plugin-manager.service", () => ({ pluginManagerService: {} }));
-jest.mock("@server/services/plugin-instance-manager.service", () => ({
-  pluginInstanceManagerService: {},
-}));
 jest.mock("@server/services/webhook-router.service", () => ({ webhookRouterService: {} }));
 jest.mock("@server/repositories/organization.repository", () => ({
   organizationRepository: {},

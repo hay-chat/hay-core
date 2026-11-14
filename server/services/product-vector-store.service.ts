@@ -121,8 +121,31 @@ export class ProductVectorStoreService {
   ): Promise<string[]> {
     if (!chunks.length) return [];
 
-    const texts = chunks.map((c) => c.content);
-    const vectors = await this.embed(organizationId, texts);
+    const vectors = await this.embed(
+      organizationId,
+      chunks.map((c) => c.content),
+    );
+    return this.writeProductEmbeddings(organizationId, chunks, vectors, manager);
+  }
+
+  /**
+   * Embed texts without touching the database connection, so callers can do it
+   * before opening a transaction: an embedding call inside a transaction holds
+   * a pooled connection idle for a network round trip.
+   */
+  async embedTexts(organizationId: string, texts: string[]): Promise<number[][]> {
+    if (!texts.length) return [];
+    return this.embed(organizationId, texts);
+  }
+
+  /** Store already-computed vectors, one row per product (replacing any existing row). */
+  async writeProductEmbeddings(
+    organizationId: string,
+    chunks: ProductVectorChunk[],
+    vectors: number[][],
+    manager?: EntityManager,
+  ): Promise<string[]> {
+    if (!chunks.length) return [];
     const runner = manager?.queryRunner || AppDataSource;
 
     const ids: string[] = [];
