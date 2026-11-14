@@ -206,7 +206,9 @@ export function useConversation(config: HayChatConfig) {
         conversationId,
         content,
         proof,
-        pageUrl: window.location.href,
+        // The server caps pageUrl at 2048 characters and would refuse the whole
+        // message, so a longer URL (tracking parameters) is left out.
+        ...(window.location.href.length <= 2048 ? { pageUrl: window.location.href } : {}),
         ...(clientMessageId ? { clientMessageId } : {}),
         ...(context && Object.keys(context).length > 0 ? { context } : {}),
       }),

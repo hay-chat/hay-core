@@ -4,8 +4,8 @@ import { MigrationInterface, QueryRunner } from "typeorm";
  * `shopping_events`: clicks on recommended product cards and their buy links,
  * the funnel steps after a recommendation is shown.
  */
-export class CreateShoppingEvents1794800000000 implements MigrationInterface {
-  name = "CreateShoppingEvents1794800000000";
+export class CreateShoppingEvents1795000100000 implements MigrationInterface {
+  name = "CreateShoppingEvents1795000100000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
