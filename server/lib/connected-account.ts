@@ -19,6 +19,7 @@ const RESERVED_CREDENTIAL_KEYS = new Set([
   "accessToken",
   "refreshToken",
   "expiresAt",
+  "issuedAt",
   "connectedAt",
   "tokenType",
   "scope",
