@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { defineComponent, h, provide, ref } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
-import { cartContextKey } from "@/utils/cart";
+import { cartContextKey } from "@/utils/cartContext";
 import type { CartContribution } from "@/types";
 import ProductCards from "../ProductCards.vue";
 import { provideI18n } from "@/i18n";

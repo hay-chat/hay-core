@@ -2,7 +2,6 @@ import { ref, shallowRef, computed, watch } from "vue";
 import { useWebSocket, type PageToolCall, type WidgetEvent } from "./useWebSocket";
 import { executePageTool, listPageTools, pageToolsVersion } from "./usePageTools";
 import { startActivity, endActivity } from "@/utils/agentActivity";
-import { runStoreAction } from "@/utils/cart";
 import { useConversation, WidgetRequestError } from "./useConversation";
 import { useMessageQueue } from "./useMessageQueue";
 import { initContext, getContext } from "./useWidgetContext";
@@ -184,7 +183,10 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     startActivity(config.agentName || "Hay", describeToolCall(call.name));
     try {
       const result = call.builtin
-        ? await runStoreAction(storeContributions, call.name, call.args, conversationId.value)
+        ? // Loaded on demand: few conversations add to a cart.
+          await (
+            await import("@/utils/cart")
+          ).runStoreAction(storeContributions, call.name, call.args, conversationId.value)
         : await executePageTool(call.name, call.args);
       sendToolResult(call.callId, { result: result === undefined ? null : result });
     } catch (error) {

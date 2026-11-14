@@ -92,7 +92,7 @@ import { safeStorage } from "./composables/useConsent";
 import { provideI18n, type Translations } from "./i18n";
 import { resolveLocale } from "./i18n/resolve";
 import { resumeConversationId } from "./utils/resume";
-import { cartContextKey } from "./utils/cart";
+import { cartContextKey } from "./utils/cartContext";
 import {
   fetchAvailability,
   headerStatus,

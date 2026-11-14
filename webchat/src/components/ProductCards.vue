@@ -70,7 +70,8 @@
 <script setup lang="ts">
 import { inject, reactive } from "vue";
 import { safeHttpUrl } from "@/utils/markdown";
-import { addToCart, cartContextKey, cartFor, storePath } from "@/utils/cart";
+import { addToCart, cartFor, storePath } from "@/utils/cart";
+import { cartContextKey } from "@/utils/cartContext";
 import { useI18n } from "@/i18n";
 import type { ProductClickType, RecommendedProduct } from "@/types";
 

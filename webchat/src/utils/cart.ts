@@ -1,4 +1,3 @@
-import type { InjectionKey, Ref } from "vue";
 import type { CartContribution, RecommendedProduct, WidgetContribution } from "@/types";
 
 /**
@@ -8,13 +7,6 @@ import type { CartContribution, RecommendedProduct, WidgetContribution } from "@
  * the only code that sends them. Requests go to the page's own origin, with
  * the shopper's own session, and only when the shopper clicks the button.
  */
-
-/** What the product cards need to add to the cart: provided by the widget root. */
-export interface CartContext {
-  contributions: WidgetContribution[];
-  conversationId: Ref<string | null | undefined>;
-}
-export const cartContextKey: InjectionKey<CartContext> = Symbol("hay-cart");
 
 const SAME_ORIGIN_PATH = /^\/(?!\/)[^\s\\]*$/;
 const CART_ITEM_ID = /^[A-Za-z0-9_-]{1,64}$/;
