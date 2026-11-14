@@ -121,6 +121,10 @@
       "label": "Validade do cupom (dias)",
       "description": "Os códigos criados pelo agente expiram em no máximo este número de dias."
     },
+    "cartActions": {
+      "label": "Adicionar ao carrinho pelo chat",
+      "description": "Mostra um botão Adicionar ao carrinho nos produtos que o Hay.chat recomenda no chat da sua loja. O produto vai para o carrinho do próprio cliente sem sair da página. Desative para mostrar apenas o link do produto."
+    },
     "staleTrackingDomesticDays": {
       "label": "Rastreio parado: nacional (dias)",
       "description": "Considera uma entrega nacional parada quando o rastreio não se move há mais do que este número de dias."

@@ -17,7 +17,8 @@
       "cron",
       "products",
       "disputes",
-      "privacy"
+      "privacy",
+      "webchat"
     ],
     "setup": {
       "businessTypes": [
