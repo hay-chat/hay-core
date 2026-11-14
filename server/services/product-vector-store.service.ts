@@ -36,6 +36,14 @@ export interface ProductSearchResult {
   similarity: number;
 }
 
+interface ProductSearchRow {
+  id: string;
+  productId: string;
+  content: string;
+  metadata: Record<string, unknown> | null;
+  similarity: string | number;
+}
+
 export class ProductVectorStoreService {
   private readonly model: string;
   private readonly dimensions: number;
@@ -186,12 +194,15 @@ export class ProductVectorStoreService {
 
   /**
    * Vector similarity search for products within an organization.
-   * Returns one row per product with the best similarity score.
+   * Returns one row per product with the best similarity score: the `k`
+   * nearest first, then any of `alsoScoreProductIds` that were not among them,
+   * so a caller merging in another search still gets a similarity for each.
    */
   async search(
     organizationId: string,
     query: string,
     k: number = 10,
+    alsoScoreProductIds: string[] = [],
   ): Promise<ProductSearchResult[]> {
     if (!this._initialized) {
       throw new Error("ProductVectorStore not initialized. Call initialize() first.");
@@ -200,36 +211,42 @@ export class ProductVectorStoreService {
     const [queryVector] = await this.embed(organizationId, [query]);
     const vectorParam = `[${queryVector.join(",")}]`;
 
-    const searchQuery = `
-      SELECT
+    const columns = `
         id,
         "product_id" AS "productId",
         "page_content" AS content,
         metadata,
-        1 - (embedding <=> $1::vector) AS similarity
-      FROM product_embeddings
-      WHERE "organization_id" = $2
-      ORDER BY embedding <=> $1::vector
-      LIMIT $3
-    `;
+        1 - (embedding <=> $1::vector) AS similarity`;
 
-    const rows = await AppDataSource.query(searchQuery, [vectorParam, organizationId, k]);
-
-    return rows.map(
-      (row: {
-        id: string;
-        productId: string;
-        content: string;
-        metadata: Record<string, unknown> | null;
-        similarity: string | number;
-      }) => ({
-        id: row.id,
-        productId: row.productId,
-        content: row.content,
-        metadata: row.metadata ?? {},
-        similarity: parseFloat(String(row.similarity)),
-      }),
+    const nearest: ProductSearchRow[] = await AppDataSource.query(
+      `SELECT ${columns}
+         FROM product_embeddings
+        WHERE "organization_id" = $2
+        ORDER BY embedding <=> $1::vector
+        LIMIT $3`,
+      [vectorParam, organizationId, k],
     );
+
+    const found = new Set(nearest.map((row) => row.productId));
+    const missing = alsoScoreProductIds.filter((id) => !found.has(id));
+    const extra: ProductSearchRow[] = missing.length
+      ? await AppDataSource.query(
+          `SELECT ${columns}
+             FROM product_embeddings
+            WHERE "organization_id" = $2
+              AND "product_id" = ANY($3::uuid[])
+            ORDER BY embedding <=> $1::vector`,
+          [vectorParam, organizationId, missing],
+        )
+      : [];
+
+    return [...nearest, ...extra].map((row) => ({
+      id: row.id,
+      productId: row.productId,
+      content: row.content,
+      metadata: row.metadata ?? {},
+      similarity: parseFloat(String(row.similarity)),
+    }));
   }
 
   async deleteByProductId(
