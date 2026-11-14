@@ -107,13 +107,22 @@ if (!isMigrationProcess) {
   );
 }
 
+/**
+ * Startup settings for a direct connection. A transaction pooler does not pass
+ * them on to Postgres: there they are set on the role (ALTER ROLE ... SET).
+ */
+const directExtra = { options: connectionOptions.join(" ") };
+
+// Migrations need one session for the whole run, so they bypass the pooler.
+const viaPooler = config.database.transactionPooler && !isMigrationProcess;
+
 export const AppDataSource = new DataSource({
   type: config.database.type,
   host: config.database.host,
-  port: config.database.port,
+  port: viaPooler ? config.database.port : config.database.directPort,
   username: useMigratorRole ? config.database.migratorUsername : config.database.username,
   password: useMigratorRole ? config.database.migratorPassword : config.database.password,
-  database: config.database.database,
+  database: viaPooler ? config.database.database : config.database.directDatabase,
   synchronize: false, // IMPORTANT: Never use synchronize in production, always use migrations
   logging: false, // Disable verbose logging
   ssl: buildSslOptions(config.database.ssl, config.database.sslCa),
@@ -122,9 +131,7 @@ export const AppDataSource = new DataSource({
   // hnsw.iterative_scan: keeps probing the HNSW graph until LIMIT is satisfied
   // post-filter (e.g. WHERE organization_id = ...). Required for correct top-K
   // results on small tenants. Available in pgvector ≥ 0.8.
-  extra: {
-    options: connectionOptions.join(" "),
-  },
+  extra: viaPooler ? {} : directExtra,
   entities: [
     User,
     ApiKey,
@@ -226,4 +233,24 @@ export async function initializeDatabase(maxRetries = 3, retryDelay = 2000) {
 
   // Throw the last error to prevent server from starting
   throw lastError;
+}
+
+/**
+ * A small data source on the direct connection, for session-level state a
+ * transaction pooler cannot keep (the scheduler's advisory locks).
+ */
+export function createDirectDataSource(poolSize = 1): DataSource {
+  return new DataSource({
+    type: config.database.type,
+    host: config.database.host,
+    port: config.database.directPort,
+    username: config.database.username,
+    password: config.database.password,
+    database: config.database.directDatabase,
+    ssl: buildSslOptions(config.database.ssl, config.database.sslCa),
+    poolSize,
+    connectTimeoutMS: config.database.connectionTimeout,
+    extra: directExtra,
+    entities: [],
+  });
 }

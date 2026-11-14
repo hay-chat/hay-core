@@ -126,7 +126,8 @@ const EXPORT_TABLES: ExportTable[] = [
   },
   {
     name: "webchat_settings",
-    select: `w.id, w.widget_title, w.widget_subtitle, w.position, w.theme, w.show_greeting,
+    select: `w.id, w.widget_title, w.position, w.theme_mode, w.brand_color, w.home_heading,
+      w.show_greeting,
       w.greeting_message, w.teaser_message, w.allowed_domains, w.is_enabled, w.custom_css,
       w.spam_classifier_enabled, w.spam_guidance, w.created_at, w.updated_at`,
     from: `webchat_settings w WHERE w.organization_id = $1`,

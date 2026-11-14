@@ -1,30 +1,39 @@
 /* Hay Webchat Widget - Global Styles */
 
-/* Theme colours, the root reset and the button live in the loader
-   (src/loader/launcher.css), which paints before this chunk loads. */
+/* Colour tokens (light/dark), the root reset and the button live in the loader
+   (src/loader/launcher.css), which paints before this chunk loads. Typography
+   sits on the wrapper, so the root's `all: initial` never overrides it. */
 
-#hay-webchat-root {
-  --color-neutral-50: oklch(98.5% 0.002 247.839);
-  --color-neutral-100: oklch(96.7% 0.003 264.542);
-  --color-neutral-200: oklch(92.8% 0.006 264.531);
-  --color-neutral-300: oklch(87.2% 0.01 258.338);
-  --color-neutral-400: oklch(70.7% 0.022 261.325);
-  --color-neutral-500: oklch(55.1% 0.027 264.364);
-  --color-neutral-600: oklch(44.6% 0.03 256.802);
-  --color-neutral-700: oklch(37.3% 0.034 259.733);
-  --color-neutral-800: oklch(27.8% 0.033 256.848);
-  --color-neutral-900: oklch(21% 0.034 264.665);
-  --color-neutral-950: oklch(13% 0.028 261.692);
-}
-
-/* Typography */
-#hay-webchat-root {
+#hay-webchat-root .hay-webchat-widget {
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans",
     sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  font-size: 16px;
-  line-height: 1.5;
-  color: var(--color-neutral-800);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--hay-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#hay-webchat-root *,
+#hay-webchat-root *::before,
+#hay-webchat-root *::after {
+  box-sizing: border-box;
+}
+
+/* :where() keeps these at zero specificity, so components set their own colours. */
+:where(#hay-webchat-root) :where(button, input, textarea, select) {
+  font: inherit;
+  color: inherit;
+}
+
+:where(#hay-webchat-root) button {
+  cursor: pointer;
+}
+
+#hay-webchat-root :focus-visible {
+  outline: 2px solid var(--hay-accent);
+  outline-offset: 2px;
 }
 
 /* Scrollbar styling */
@@ -33,59 +42,63 @@
 }
 
 #hay-webchat-root ::-webkit-scrollbar-track {
-  background: var(--color-neutral-100);
+  background: transparent;
 }
 
 #hay-webchat-root ::-webkit-scrollbar-thumb {
-  background: var(--color-neutral-300);
+  background: var(--hay-line);
   border-radius: 3px;
 }
 
-#hay-webchat-root ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-neutral-400);
+/* Read by screen readers only */
+.hay-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
-/* Focus styles */
-#hay-webchat-root button:focus-visible,
-#hay-webchat-root input:focus-visible {
-  outline: 2px solid var(--hay-primary);
-  outline-offset: 2px;
+/* Avatars: a photo, an initial or the assistant's icon */
+.hay-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
 }
 
-/* Animations */
-@keyframes hay-slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.hay-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-@keyframes hay-fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* The assistant's preset icon (utils/icons). */
+.hay-avatar__icon {
+  display: grid;
+  place-items: center;
+  width: 55%;
+  height: 55%;
 }
 
-@keyframes hay-bounce {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
+.hay-avatar__icon svg {
+  width: 100%;
+  height: 100%;
 }
 
-/* Mobile adjustments */
-@media (max-width: 480px) {
-  #hay-webchat-root {
-    font-size: 14px;
-  }
+.hay-avatar--ai {
+  background: var(--hay-ai-bg);
+  color: var(--hay-ai-fg);
+}
+
+.hay-avatar--human {
+  background: var(--hay-human-bg);
+  color: var(--hay-human-fg);
 }

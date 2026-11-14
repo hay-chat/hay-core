@@ -55,7 +55,6 @@ function embed(loading) {
     organizationId: "perf-test",
     baseUrl: "",
     position: "right",
-    theme: "blue",
     showGreeting: true,
     loading,
   };

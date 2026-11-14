@@ -2,7 +2,12 @@ import { describe, it, expect } from "vitest";
 import enUs from "@/i18n/locales/en-us";
 import ptBr from "@/i18n/locales/pt-br";
 import type { TranslationKey } from "@/i18n";
-import { headerStatus, waitingDetail, type WidgetAvailability } from "../availability";
+import {
+  headerStatus,
+  waitingDetail,
+  waitingTypical,
+  type WidgetAvailability,
+} from "../availability";
 import { resumeConversationId } from "../resume";
 
 const en = (key: TranslationKey) => enUs[key];
@@ -17,26 +22,47 @@ const base: WidgetAvailability = {
 };
 
 describe("headerStatus", () => {
-  it("says nothing for orgs without business hours", () => {
+  it("says nothing without business hours or reply-time data", () => {
     expect(headerStatus({ ...base, hasSchedule: false }, en, "en-us")).toBeNull();
     expect(headerStatus(null, en, "en-us")).toBeNull();
   });
 
+  it("prefers the typical reply time while the team is around", () => {
+    expect(headerStatus({ ...base, typicalReplyMinutes: 4 }, en, "en-us")).toEqual({
+      text: "Typically replies in ~4 min",
+      online: true,
+    });
+    expect(
+      headerStatus({ ...base, hasSchedule: false, typicalReplyMinutes: 90 }, en, "en-us"),
+    ).toEqual({ text: "Typically replies in ~2 h", online: true });
+  });
+
   it("shows open or when the team is back", () => {
-    expect(headerStatus(base, en, "en-us")).toBe("Open now");
-    const closed = { ...base, state: "closed" as const, nextOpening: "2026-11-02T09:00:00Z" };
-    expect(headerStatus(closed, en, "en-us")).toMatch(/^Back Mon/);
-    expect(headerStatus(closed, pt, "pt-br")).toMatch(/^Retorno: seg/);
-    expect(headerStatus({ ...base, state: "closed" }, en, "en-us")).toBe("Away right now");
+    expect(headerStatus(base, en, "en-us")).toEqual({ text: "Open now", online: true });
+    const closed = {
+      ...base,
+      state: "closed" as const,
+      nextOpening: "2026-11-02T09:00:00Z",
+      typicalReplyMinutes: 4,
+    };
+    expect(headerStatus(closed, en, "en-us")?.text).toMatch(/^Back Mon/);
+    expect(headerStatus(closed, en, "en-us")?.online).toBe(false);
+    expect(headerStatus(closed, pt, "pt-br")?.text).toMatch(/^Retorno: seg/);
+    expect(headerStatus({ ...base, state: "closed" }, en, "en-us")?.text).toBe("Away right now");
+  });
+});
+
+describe("waitingTypical", () => {
+  it("is the short reply estimate, hidden without data or outside hours", () => {
+    expect(waitingTypical(base, en)).toBeNull();
+    expect(waitingTypical({ ...base, typicalReplyMinutes: 5 }, en)).toBe("usually ~5 min");
+    expect(waitingTypical({ ...base, state: "closed", typicalReplyMinutes: 5 }, en)).toBeNull();
   });
 });
 
 describe("waitingDetail", () => {
-  it("hides the typical reply time without enough data", () => {
-    expect(waitingDetail(base, en, "en-us")).toBeNull();
-    expect(waitingDetail({ ...base, typicalReplyMinutes: 90 }, en, "en-us")).toBe(
-      "Usually replies in ~2 h",
-    );
+  it("says nothing while the team is simply open", () => {
+    expect(waitingDetail({ ...base, typicalReplyMinutes: 90 }, en, "en-us")).toBeNull();
   });
 
   it("tells the shopper the team was alerted when nobody is online", () => {
@@ -45,13 +71,8 @@ describe("waitingDetail", () => {
     );
   });
 
-  it("says when the team is back outside hours, without a reply estimate", () => {
-    const closed = {
-      ...base,
-      state: "closed" as const,
-      nextOpening: "2026-11-02T09:00:00Z",
-      typicalReplyMinutes: 5,
-    };
+  it("says when the team is back outside hours", () => {
+    const closed = { ...base, state: "closed" as const, nextOpening: "2026-11-02T09:00:00Z" };
     expect(waitingDetail(closed, en, "en-us")).toMatch(/^The team is back Mon .*keep helping/);
   });
 });

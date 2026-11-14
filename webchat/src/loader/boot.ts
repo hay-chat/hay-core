@@ -2,8 +2,11 @@ import { resolveLocale } from "@/i18n/resolve";
 import type { ChatHandle, ChatMountOptions, HayChatConfig, PublicConfig } from "@/types";
 import { installHostApi } from "./hostApi";
 import { launcherLabels } from "./labels";
-import { createLauncher } from "./launcher";
+import { buttonIcon, createLauncher } from "./launcher";
 import { fetchPublicConfig } from "./publicConfig";
+
+/** Longest the button stays hidden waiting for the merchant's colour. */
+const APPEARANCE_WAIT_MS = 2000;
 
 export interface ChatModule {
   mountChat(options: ChatMountOptions): Promise<ChatHandle>;
@@ -42,6 +45,7 @@ export function boot(
 ): { chatReady: () => Promise<ChatHandle | null> } {
   if (!config.organizationId) console.error("[Hay Webchat] organizationId is required in config");
   if (!config.baseUrl) console.error("[Hay Webchat] baseUrl is required in config");
+  if (config.preview) return bootPreview(config, loadChat);
 
   const hostCalls = installHostApi();
   const launcher = createLauncher(config, launcherLabels[resolveLocale(config.locale)]);
@@ -58,9 +62,32 @@ export function boot(
     launcher.showTeaser(String(message ?? ""), true);
   };
 
+  const mode = hasConversationInTab() ? "eager" : (config.loading ?? "idle");
+
+  // The button takes the merchant's colour from the settings. When the settings
+  // are fetched straight away (idle, eager) and the page set no colour, the
+  // button waits for them (or APPEARANCE_WAIT_MS) instead of flashing the
+  // default colour first. "interaction" fetches nothing up front, so it paints
+  // at once, in the page's colour or the default.
+  const waitForAppearance = mode !== "interaction" && !config.brandColor;
+  let appearanceTimer: ReturnType<typeof setTimeout> | undefined;
+  if (waitForAppearance) {
+    launcher.setPending(true);
+    appearanceTimer = setTimeout(() => launcher.setPending(false), APPEARANCE_WAIT_MS);
+  }
+
   let publicConfig: Promise<PublicConfig | null> | null = null;
   const getPublicConfig = () =>
     (publicConfig ??= fetchPublicConfig(config).then((settings) => {
+      // The page's own colour, theme and corner win over the settings.
+      launcher.setAppearance(
+        config.brandColor ?? settings?.brandColor,
+        config.themeMode ?? settings?.themeMode,
+      );
+      if (!config.position && settings?.position) launcher.setPosition(settings.position);
+      if (!config.launcherIcon && settings?.launcherIcon) launcher.setIcon(buttonIcon(settings));
+      clearTimeout(appearanceTimer);
+      launcher.setPending(false);
       if (wantsTeaser && !pageSetTeaser && settings?.teaserMessage) {
         launcher.showTeaser(settings.teaserMessage);
       }
@@ -124,7 +151,6 @@ export function boot(
   launcher.button.addEventListener("focus", onIntent, { once: true });
   launcher.button.addEventListener("touchstart", onIntent, { once: true, passive: true });
 
-  const mode = hasConversationInTab() ? "eager" : (config.loading ?? "idle");
   if (mode === "eager") {
     void startChat(true);
   } else if (mode === "idle") {
@@ -134,4 +160,38 @@ export function boot(
   // "interaction": nothing is fetched until the visitor reaches for the button.
 
   return { chatReady: () => chat ?? Promise.resolve(null) };
+}
+
+/**
+ * The dashboard's live preview (C4), in a sandboxed iframe with no origin of
+ * its own: the chat opens straight away on the config it was given. Nothing
+ * is fetched but the chat's own files, and nothing is stored.
+ */
+function bootPreview(
+  config: HayChatConfig,
+  loadChat: () => Promise<ChatModule>,
+): { chatReady: () => Promise<ChatHandle | null> } {
+  const launcher = createLauncher(config, launcherLabels[resolveLocale(config.locale)]);
+  // "closed" previews the button (and the teaser) with the chat not open yet.
+  const open = config.preview?.state !== "closed";
+  if (!open && config.teaserMessage) launcher.showTeaser(config.teaserMessage);
+  let handle: ChatHandle | null = null;
+  const chat = loadChat()
+    .then((module) =>
+      module.mountChat({
+        container: launcher.chatContainer,
+        config,
+        publicConfig: null,
+        launcher,
+        hostCalls: [],
+        open,
+      }),
+    )
+    .then((mounted) => (handle = mounted))
+    .catch((error) => {
+      console.error("[Hay Webchat] Failed to load the chat preview:", error);
+      return null;
+    });
+  launcher.button.addEventListener("click", () => handle?.toggle());
+  return { chatReady: () => chat };
 }

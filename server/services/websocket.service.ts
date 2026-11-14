@@ -37,6 +37,12 @@ import {
   validatePageTools,
 } from "./webchat/page-tools.service";
 import { registerStoreCart } from "./webchat/store-cart.service";
+import {
+  WIDGET_EVENT_TYPES,
+  acknowledgeVisitorMessage,
+  toWidgetEvent,
+  validClientMessageId,
+} from "./widget-events.service";
 
 // Largest frame a client may send. Clients only send small JSON control frames
 // and chat messages (capped at PUBLIC_WIDGET_LIMITS.maxMessageLength); the ws
@@ -151,6 +157,8 @@ interface ChatMessage extends WebSocketMessage {
   timestamp?: number;
   proof?: string; // DPoP proof JWT
   conversationId?: string; // Conversation ID for DPoP validation
+  /** The widget's own id for the message, echoed in its message_ack events. */
+  clientMessageId?: unknown;
 }
 
 interface TypingMessage extends WebSocketMessage {
@@ -332,6 +340,14 @@ export class WebSocketService {
           "Broadcasted QUEUED message to org clients only",
         );
       }
+    } else if ((WIDGET_EVENT_TYPES as readonly string[]).includes(type) && conversationId) {
+      // Delivery ticks, "Seen" and tool progress: for the widget only.
+      const widgetEvent = toWidgetEvent(type, payload);
+      if (!widgetEvent) {
+        logger.warn({ type }, "Dropped a malformed widget event");
+        return;
+      }
+      this.sendToConversation(conversationId, { ...widgetEvent });
     } else if (type === PAGE_TOOL_CALL_EVENT && conversationId) {
       // Only the page that registered the tool may run it: never the dashboard.
       const sent = this.sendToConversation(conversationId, { type: "tool_call", ...payload });
@@ -888,10 +904,12 @@ export class WebSocketService {
       }
 
       // addMessage() broadcasts the message and enqueues the orchestrator run.
+      const clientMessageId = validClientMessageId(message.clientMessageId);
       const savedMessage = await conversation.addMessage({
         content: message.content,
         type: MessageType.CUSTOMER,
         sender: "customer",
+        ...(clientMessageId ? { metadata: { clientMessageId } } : {}),
       });
 
       client.ws.send(
@@ -901,6 +919,7 @@ export class WebSocketService {
           nonce: dpopVerification.newNonce,
         }),
       );
+      await acknowledgeVisitorMessage(conversation, savedMessage);
     } catch (error) {
       logger.error({ err: error }, "Failed to process webchat message");
       this.sendError(client, "Failed to send message");

@@ -97,6 +97,34 @@ describe("WebScraperService page fetches", () => {
   });
 });
 
+describe("WebScraperService page titles", () => {
+  it("uses the document title, not the titles of inline SVG icons", async () => {
+    mockAxiosGet.mockResolvedValueOnce(
+      reply(
+        200,
+        "<html><head><title>How can we help? · Sketch</title></head><body>" +
+          '<button><svg><title>icon-close</title><path d="M0 0"/></svg></button>' +
+          "<h1>Help</h1><p>Answer</p></body></html>",
+      ),
+    );
+    const page = await new WebScraperService().fetchPageContent("https://site.example/help");
+
+    expect(page?.title).toBe("How can we help? · Sketch");
+  });
+
+  it("falls back to the first h1 when the page has no title", async () => {
+    mockAxiosGet.mockResolvedValueOnce(
+      reply(
+        200,
+        "<html><body><svg><title>icon</title></svg><h1>Getting started</h1></body></html>",
+      ),
+    );
+    const page = await new WebScraperService().fetchPageContent("https://site.example/start");
+
+    expect(page?.title).toBe("Getting started");
+  });
+});
+
 describe("WebScraperService sitemap fetches", () => {
   const SITEMAP =
     '<?xml version="1.0"?><urlset><url><loc>https://site.example/a</loc></url></urlset>';

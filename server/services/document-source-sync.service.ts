@@ -24,6 +24,7 @@ import { WebsiteImporter, isWebsiteSource } from "./importers/website-importer";
 import { vectorStoreService } from "./vector-store.service";
 import { splitTextIntoChunks, createChunkMetadata } from "@server/utils/text-chunking";
 import { createLogger } from "@server/lib/logger";
+import { forEachConcurrently } from "@server/utils/for-each-concurrently";
 import type {
   DocumentImporterContract,
   DocumentImporterExternalPage,
@@ -39,6 +40,22 @@ const BUDGET_MS = 50_000;
 const FULL_SWEEP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 /** Don't persist live progress more often than this (keeps DB writes bounded). */
 const PROGRESS_THROTTLE_MS = 750;
+/**
+ * Pages fetched in parallel for website sources (each page is about 2 s of
+ * network + extraction + embedding). Plugin importers stay sequential: their
+ * upstream APIs (Notion, Confluence, ...) have their own rate limits.
+ */
+const WEBSITE_PAGE_CONCURRENCY = 4;
+
+/** What processSyncJob tells its caller about the run. */
+export type SyncRunOutcome = {
+  /**
+   * The run hit the time budget after making progress and has work left:
+   * the caller should queue the next run now instead of leaving it to the
+   * 60 s dispatcher.
+   */
+  continueNow: boolean;
+};
 
 /**
  * Live, per-run progress persisted onto the job's `data.progress` so the
@@ -103,6 +120,16 @@ function mergeStats(a: SyncStats, b: SyncStats): SyncStats {
   };
 }
 
+/**
+ * `sourceUrl` is a document's public web address: the agent cites it, the site
+ * index shares it with customers, and the audit reads its URL structure. Only a
+ * website source's pages are public; a Notion/Confluence page URL stays in
+ * `externalUrl` only.
+ */
+function publicUrl(source: DocumentSource, url: string | undefined): string | undefined {
+  return isWebsiteSource(source) ? url : undefined;
+}
+
 export class DocumentSourceSyncService {
   /**
    * Injectable monotonic clock — tests can override. All elapsed-time
@@ -161,7 +188,7 @@ export class DocumentSourceSyncService {
   /**
    * Entry point invoked by JobQueueService.dispatchBackgroundJob.
    */
-  async processSyncJob(job: Job): Promise<void> {
+  async processSyncJob(job: Job): Promise<SyncRunOutcome> {
     const data = (job.data ?? {}) as {
       documentSourceId?: string;
       forceFullSweep?: boolean;
@@ -169,23 +196,23 @@ export class DocumentSourceSyncService {
     const documentSourceId = data.documentSourceId;
     if (!documentSourceId) {
       logger.warn({ jobId: job.id }, "Sync job missing documentSourceId");
-      return;
+      return { continueNow: false };
     }
 
     const source = await documentSourceRepository.findByIdInternal(documentSourceId);
     if (!source) {
       logger.warn({ jobId: job.id, documentSourceId }, "DocumentSource not found");
-      return;
+      return { continueNow: false };
     }
     if (!source.enabled) {
       logger.debug({ documentSourceId }, "Source disabled, skipping sync");
-      return;
+      return { continueNow: false };
     }
 
     const locked = await documentSourceRepository.markRunning(source.id);
     if (!locked) {
       logger.debug({ documentSourceId }, "Source already running, skipping");
-      return;
+      return { continueNow: false };
     }
 
     const startedAt = this.now();
@@ -267,6 +294,10 @@ export class DocumentSourceSyncService {
         logger.error({ err: recordErr, documentSourceId }, "Failed to record sync result");
       }
     }
+
+    // processedCount counts skipped pages too, so a resumed sweep over unchanged
+    // pages still counts as progress; a run that did nothing does not loop.
+    return { continueNow: status === "partial" && this.processedCount(stats) + stats.deleted > 0 };
   }
 
   /**
@@ -314,22 +345,29 @@ export class DocumentSourceSyncService {
       });
       if (typeof page.total === "number") total = page.total;
 
-      for (const item of page.pages) {
-        if (this.elapsed(startedAt) > BUDGET_MS) {
-          return { complete: false, cursor: cursor ?? null, stats, liveExternalIds };
-        }
-        liveExternalIds.add(item.externalId);
-        await report({
-          phase: "importing",
-          total,
-          discovered: liveExternalIds.size,
-          processed: this.processedCount(stats),
-          ...stats,
-          currentTitle: item.title,
-          currentUrl: item.externalUrl,
-        });
-        const outcome = await this.safeUpsert(source, importer, item, stats);
-        stats = this.bumpStats(stats, outcome);
+      const allStarted = await forEachConcurrently(
+        page.pages,
+        this.pageConcurrency(source),
+        async (item) => {
+          liveExternalIds.add(item.externalId);
+          await report({
+            phase: "importing",
+            total,
+            discovered: liveExternalIds.size,
+            processed: this.processedCount(stats),
+            ...stats,
+            currentTitle: item.title,
+            currentUrl: item.externalUrl,
+          });
+          const outcome = await this.safeUpsert(source, importer, item, stats);
+          stats = this.bumpStats(stats, outcome);
+        },
+        () => this.elapsed(startedAt) > BUDGET_MS,
+      );
+      // The cursor only moves past a batch that fully ran; a cut-short batch
+      // is redone next run (its finished pages are then skipped as current).
+      if (!allStarted) {
+        return { complete: false, cursor: cursor ?? null, stats, liveExternalIds };
       }
 
       cursor = page.nextCursor;
@@ -379,33 +417,38 @@ export class DocumentSourceSyncService {
         cursor,
       });
 
-      for (const change of page.changes) {
-        if (this.elapsed(startedAt) > BUDGET_MS) {
-          return { complete: false, cursor: cursor ?? null, stats };
-        }
-        discovered += 1;
-        await report({
-          phase: "importing",
-          discovered,
-          processed: this.processedCount(stats),
-          ...stats,
-          currentUrl: change.externalId,
-        });
-        try {
-          if (change.op === "upsert") {
-            const outcome = await this.upsertPage(source, importer, this.changeToPage(change));
-            stats = this.bumpStats(stats, outcome);
-          } else {
-            const deleted = await this.archiveRemovedDoc(source, change.externalId);
-            if (deleted) stats.deleted += 1;
+      const allStarted = await forEachConcurrently(
+        page.changes,
+        this.pageConcurrency(source),
+        async (change) => {
+          discovered += 1;
+          await report({
+            phase: "importing",
+            discovered,
+            processed: this.processedCount(stats),
+            ...stats,
+            currentUrl: change.externalId,
+          });
+          try {
+            if (change.op === "upsert") {
+              const outcome = await this.upsertPage(source, importer, this.changeToPage(change));
+              stats = this.bumpStats(stats, outcome);
+            } else {
+              const deleted = await this.archiveRemovedDoc(source, change.externalId);
+              if (deleted) stats.deleted += 1;
+            }
+          } catch (err) {
+            stats.failed += 1;
+            logger.error(
+              { err, documentSourceId: source.id, externalId: change.externalId },
+              "Failed to process change",
+            );
           }
-        } catch (err) {
-          stats.failed += 1;
-          logger.error(
-            { err, documentSourceId: source.id, externalId: change.externalId },
-            "Failed to process change",
-          );
-        }
+        },
+        () => this.elapsed(startedAt) > BUDGET_MS,
+      );
+      if (!allStarted) {
+        return { complete: false, cursor: cursor ?? null, stats };
       }
 
       cursor = page.nextCursor;
@@ -452,6 +495,7 @@ export class DocumentSourceSyncService {
         externalId: page.externalId,
         externalUpdatedAt: incomingUpdatedAt ?? undefined,
         externalUrl: page.externalUrl,
+        sourceUrl: publicUrl(source, page.externalUrl),
       });
     } else {
       document = existing;
@@ -471,6 +515,7 @@ export class DocumentSourceSyncService {
       content: fetched.markdown,
       externalUpdatedAt: fetchedUpdatedAt,
       externalUrl: fetched.externalUrl ?? page.externalUrl,
+      sourceUrl: publicUrl(source, fetched.externalUrl ?? page.externalUrl),
       status: DocumentationStatus.PUBLISHED,
       lastCrawledAt: new Date(),
     });
@@ -580,6 +625,11 @@ export class DocumentSourceSyncService {
     else if (outcome === "skipped") stats.skipped += 1;
     // 'failed' is already counted by safeUpsert.
     return stats;
+  }
+
+  /** How many pages of this source to fetch at once. */
+  private pageConcurrency(source: DocumentSource): number {
+    return isWebsiteSource(source) ? WEBSITE_PAGE_CONCURRENCY : 1;
   }
 
   private processedCount(stats: SyncStats): number {

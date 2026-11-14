@@ -1,6 +1,5 @@
 import type { Request, Response } from "express";
 import { pluginManagerService } from "./plugin-manager.service";
-import { pluginInstanceManagerService } from "./plugin-instance-manager.service";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { pluginWebhookRouteRepository } from "../repositories/plugin-webhook-route.repository";
@@ -569,7 +568,6 @@ export class WebhookRouterService {
     req: Request,
   ): Promise<void> {
     const worker = await pluginManagerService.startPluginWorker(organizationId, pluginId);
-    pluginInstanceManagerService.updateActivityTimestamp(organizationId, pluginId).catch(() => {});
 
     const reconstructedBody =
       itemsPath === "." ? originalBody : setPath({ ...originalBody }, itemsPath, orgItems);

@@ -75,3 +75,14 @@ describe("LLMService conversation history roles", () => {
     });
   });
 });
+
+describe("LLMService.prepareMessages prompt-only calls", () => {
+  it("sends the prompt as the only user message, with no empty turn", () => {
+    const prep = (
+      new LLMService() as unknown as {
+        prepareMessages: (history: string, prompt?: string) => ChatMessage[];
+      }
+    ).prepareMessages("", "Classify this.");
+    expect(prep).toEqual([{ role: "user", content: "Classify this." }]);
+  });
+});

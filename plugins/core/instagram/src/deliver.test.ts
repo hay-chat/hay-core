@@ -129,7 +129,15 @@ describe("deliverHandler echo tracking (D11-11)", () => {
     const graph = client();
     const { response } = res();
     await deliverHandler(
-      { body: { to: "instagram:123", messageId: "m1", conversationId: "c1", content: "hi", attachments: [photo] } } as Request,
+      {
+        body: {
+          to: "instagram:123",
+          messageId: "m1",
+          conversationId: "c1",
+          content: "hi",
+          attachments: [photo],
+        },
+      } as Request,
       response,
       { getGraphClient: () => graph, getAccessToken: () => "token", logger, tracker },
     );
@@ -150,7 +158,12 @@ describe("Human Agent tag after 24 hours (D13-14)", () => {
       }),
     });
     const out = await deliver(graph, { content: "Sorry for the wait", messageType: "HumanAgent" });
-    expect(graph.sendText).toHaveBeenLastCalledWith("123", "Sorry for the wait", "token", "human_agent");
+    expect(graph.sendText).toHaveBeenLastCalledWith(
+      "123",
+      "Sorry for the wait",
+      "token",
+      "human_agent",
+    );
     expect(out.body).toEqual({ success: true, providerMessageId: "mid.tagged" });
   });
 
@@ -174,5 +187,62 @@ describe("Human Agent tag after 24 hours (D13-14)", () => {
     const out = await deliver(graph, { content: "hi", messageType: "HumanAgent" });
     expect(graph.sendText).toHaveBeenCalledTimes(2);
     expect(out.body).toEqual({ success: false, error: "24h_window_expired" });
+  });
+});
+
+describe("expired or revoked token (Graph 190)", () => {
+  async function deliverWithRevoke(graph: GraphClient, revokeConnection: () => Promise<void>) {
+    const { response, out } = res();
+    await deliverHandler(
+      {
+        body: { to: "instagram:123", messageId: "m1", conversationId: "c1", content: "hi" },
+      } as Request,
+      response,
+      { getGraphClient: () => graph, getAccessToken: () => "token", logger, revokeConnection },
+    );
+    return out;
+  }
+
+  it("reports token_revoked and tells core to disconnect", async () => {
+    const graph = client({
+      sendText: vi.fn(async () => {
+        throw new GraphApiError("Error validating access token: Session has expired", 400, 190);
+      }),
+    });
+    const revoke = vi.fn(async () => {});
+
+    const out = await deliverWithRevoke(graph, revoke);
+
+    expect(out).toEqual({ statusCode: 200, body: { success: false, error: "token_revoked" } });
+    expect(revoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("still answers when the revoke call fails", async () => {
+    const graph = client({
+      sendText: vi.fn(async () => {
+        throw new GraphApiError("expired", 400, 190);
+      }),
+    });
+
+    const out = await deliverWithRevoke(
+      graph,
+      vi.fn(async () => Promise.reject(new Error("down"))),
+    );
+
+    expect(out.body).toEqual({ success: false, error: "token_revoked" });
+  });
+
+  it("reports other Graph errors by their code and does not disconnect", async () => {
+    const graph = client({
+      sendText: vi.fn(async () => {
+        throw new GraphApiError("Invalid parameter", 400, 100);
+      }),
+    });
+    const revoke = vi.fn(async () => {});
+
+    const out = await deliverWithRevoke(graph, revoke);
+
+    expect(out.body).toEqual({ success: false, error: "graph_100" });
+    expect(revoke).not.toHaveBeenCalled();
   });
 });

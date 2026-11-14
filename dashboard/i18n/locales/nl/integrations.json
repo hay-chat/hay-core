@@ -1,17 +1,18 @@
 {
   "channels": {
     "title": "Kanalen",
-    "description": "Actieve communicatiekanalen die je klanten met Hay.chat verbinden",
+    "description": "Waar je klanten je kunnen bereiken. Elk kanaal brengt zijn gesprekken naar dezelfde inbox.",
     "headTitle": "Kanalen - Hay.chat",
     "browseMarketplace": "Marketplace bekijken",
-    "loading": "Kanalen laden...",
-    "empty": {
-      "title": "Geen actieve kanalen",
-      "description": "Installeer een kanaalintegratie uit de marketplace om gesprekken te ontvangen.",
-      "action": "Marketplace bekijken"
+    "add": {
+      "title": "Kanaal toevoegen",
+      "description": "WhatsApp, Instagram, e-mail en meer"
     },
-    "actions": {
-      "configure": "Instellen"
+    "webchat": {
+      "description": "De chat voor je website.",
+      "liveOn": "De chat op je website, {host}.",
+      "notInstalled": "De chat voor je website. Voeg één regel code toe om live te gaan.",
+      "off": "De chat voor je website. Hij staat uit."
     }
   },
   "marketplace": {
@@ -188,7 +189,7 @@
     "deletePlugin": "Plugin verwijderen",
     "deleteConfirm": {
       "title": "Deze plugin verwijderen?",
-      "description": "{name} wordt uit je organisatie verwijderd. Dit kan niet ongedaan worden gemaakt.",
+      "description": "{name} wordt uit je organisatie verwijderd. Dit kun je niet ongedaan maken.",
       "confirm": "Verwijderen"
     },
     "error": {
@@ -284,7 +285,7 @@
       "oauthDisconnectedFrom": "Ontkoppeld van {name}",
       "oauthDisconnectFailed": "Ontkoppelen mislukt",
       "deletedSuccess": "Plugin verwijderd",
-      "deleteFailed": "Plugin verwijderen is niet gelukt"
+      "deleteFailed": "De plugin kon niet worden verwijderd"
     },
     "channelHealth": {
       "failingTitle": "Dit kanaal werkt niet goed",
@@ -373,7 +374,7 @@
       "connect": "{name} koppelen",
       "setupGuide": "Lees de installatiegids",
       "note": "Je kunt het altijd weer verwijderen.",
-      "noteOAuth": "Je keurt de toegang goed in {name}. Je kunt het altijd weer verwijderen.",
+      "noteOAuth": "Je geeft toegang in {name}. Je kunt het altijd weer verwijderen.",
       "abilities": {
         "title": "Wat je agent kan doen",
         "handles": {
@@ -390,41 +391,41 @@
             "description": "Annuleert een bestelling of past die aan voordat ze wordt verzonden."
           },
           "billing": {
-            "title": "Vragen over facturatie beantwoorden",
+            "title": "Vragen over facturen beantwoorden",
             "description": "Zoekt de facturen en betalingen van de klant op."
           },
           "subscriptions": {
             "title": "Abonnementen beheren",
-            "description": "Controleert, wijzigt of annuleert het abonnement van een klant."
+            "description": "Bekijkt, wijzigt of annuleert het abonnement van een klant."
           },
           "bookings": {
-            "title": "Boekingen aannemen",
-            "description": "Zoekt vrije momenten en boekt, verplaatst of annuleert voor de klant."
+            "title": "Afspraken inplannen",
+            "description": "Zoekt vrije tijden en boekt, verzet of annuleert voor de klant."
           }
         }
       },
       "how": {
-        "title": "Hoe koppelen werkt",
+        "title": "Zo werkt koppelen",
         "steps": {
           "connect": {
             "title": "Klik op Koppelen",
             "description": "Hay voegt {name} toe aan je workspace en opent de installatie."
           },
           "approve": {
-            "title": "Keur de toegang goed in {name}",
-            "description": "Log in bij {name} en keur goed wat Hay mag gebruiken."
+            "title": "Geef toegang in {name}",
+            "description": "Log in bij {name} en geef toestemming voor wat Hay mag gebruiken."
           },
           "details": {
             "title": "Vul je gegevens van {name} in",
             "description": "De installatie vertelt wat er nodig is en waar je het vindt."
           },
           "setup": {
-            "title": "Rond de installatie af",
-            "description": "Volg de stappen die Hay toont. Je ziet wat er nodig is en waar je het vindt."
+            "title": "Installatie afronden",
+            "description": "Volg de stappen die Hay toont. Hay vertelt wat er nodig is en waar je het vindt."
           },
           "verify": {
-            "title": "Test de verbinding",
-            "description": "Hay controleert of het {name} kan bereiken voordat je agent het gebruikt."
+            "title": "De koppeling testen",
+            "description": "Hay controleert of {name} bereikbaar is voordat je agent het gebruikt."
           }
         }
       },
@@ -444,15 +445,15 @@
       },
       "data": {
         "title": "Gegevens waarmee het werkt",
-        "noteOAuth": "{name} toont de exacte rechten voordat je ze goedkeurt.",
+        "noteOAuth": "{name} toont de precieze rechten voordat je toestemming geeft.",
         "items": {
-          "messages": "Klantberichten",
+          "messages": "Berichten van klanten",
           "customers": "Klantprofielen",
           "orders": "Bestellingen",
           "products": "Producten en voorraad",
           "payments": "Betalingen en terugbetalingen",
           "disputes": "Geschillen",
-          "bookings": "Boekingen",
+          "bookings": "Afspraken",
           "tickets": "Tickets",
           "documents": "Pagina's en documenten"
         }

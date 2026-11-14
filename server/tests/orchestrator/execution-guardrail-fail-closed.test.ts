@@ -80,6 +80,7 @@ describe("ExecutionLayer guardrails fail closed", () => {
     anyLayer.applyLinkGuardrail = jest.fn(async () => null);
     anyLayer.assessCompanyInterest = assessCompanyInterest;
     anyLayer.assessUnflaggedResponseGrounding = jest.fn(async () => null);
+    anyLayer.checkGrounding = jest.fn(async () => ({ context: {}, grounding: 1 }));
     anyLayer.getCompanyInterestConfig = jest.fn(async () => ({ enabled: true, maxRetries: 1 }));
     anyLayer.getConfidenceConfig = jest.fn(async () => ({
       fallbackMessage: "Let me connect you with a team member.",

@@ -87,6 +87,7 @@ describe("ExecutionLayer link check", () => {
       requiresFactCheck: false,
     }));
     anyLayer.assessUnflaggedResponseGrounding = jest.fn(async () => null);
+    anyLayer.checkGrounding = jest.fn(async () => ({ context: {}, grounding: 1 }));
     anyLayer.getConfidenceConfig = jest.fn(async () => ({
       fallbackMessage: "Let me connect you with a team member.",
     }));

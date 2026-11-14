@@ -188,14 +188,75 @@ describe("ExecutionLayer Stage 2 runs on every reply", () => {
     expect(outcome.userMessage).toBe("Hi! How can I help you today?");
   });
 
-  it("keeps the full assessment for replies Stage 1 flags", async () => {
+  it("keeps the full assessment for replies Stage 1 flags, reusing the early grounding", async () => {
     anyLayer.assessCompanyInterest = jest.fn(async () => stageOne(true));
+    assessGrounding.mockResolvedValue(0.4);
 
     const outcome = await invoke("Our return window is 90 days.");
 
-    expect(assessGrounding).not.toHaveBeenCalled();
+    // Grounding starts alongside Stage 1 and is asked once, not again inside
+    // the full assessment.
+    expect(assessGrounding).toHaveBeenCalledTimes(1);
     expect(assessConfidence).toHaveBeenCalledTimes(1);
-    expect(assessConfidence.mock.calls[0][2]).toBeUndefined();
+    expect(assessConfidence.mock.calls[0][2]).toEqual({ grounding: 0.4 });
     expect(outcome.step).toBe("HANDOFF");
+  });
+
+  it("starts Stage 1 and grounding before Stage 0 has finished", async () => {
+    const order: string[] = [];
+    let releaseStageZero!: () => void;
+    anyLayer.getActionClaimConfig = jest.fn(async () => ({ enabled: true }));
+    anyLayer.applyActionClaimGuardrail = jest.fn(async () => {
+      order.push("stage0:start");
+      await new Promise<void>((resolve) => (releaseStageZero = resolve));
+      order.push("stage0:end");
+      return null;
+    });
+    anyLayer.assessCompanyInterest = jest.fn(async () => {
+      order.push("stage1:start");
+      return stageOne(false);
+    });
+    assessGrounding.mockImplementation(async () => {
+      order.push("grounding:start");
+      return 0.95;
+    });
+
+    const pending = invoke("Our return window is 30 days.");
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(order).toEqual(
+      expect.arrayContaining(["stage0:start", "stage1:start", "grounding:start"]),
+    );
+    expect(order).not.toContain("stage0:end");
+
+    releaseStageZero();
+    const outcome = await pending;
+    expect(outcome.step).toBe("RESPOND");
+  });
+
+  it("re-runs Stage 1 and grounding on the reply the link check rewrote", async () => {
+    const companyInterest = jest.fn(async () => stageOne(false));
+    anyLayer.assessCompanyInterest = companyInterest;
+    anyLayer.applyLinkGuardrail = jest.fn(async (result: { userMessage?: string }) => {
+      result.userMessage = "Our return window is 30 days.";
+      return null;
+    });
+    assessGrounding.mockResolvedValue(0.95);
+
+    const outcome = await invoke("Our return window is 30 days, see https://made.up/returns");
+
+    expect(outcome.userMessage).toBe("Our return window is 30 days.");
+    expect(companyInterest).toHaveBeenCalledTimes(2);
+    expect((companyInterest.mock.calls[1] as unknown[])[1]).toBe("Our return window is 30 days.");
+    expect(assessGrounding).toHaveBeenCalledTimes(2);
+  });
+
+  it("drops the early checks when Stage 0 replaces the reply", async () => {
+    const replanned = { step: "HANDOFF", userMessage: "A teammate will help." };
+    anyLayer.applyActionClaimGuardrail = jest.fn(async () => replanned);
+
+    const outcome = await invoke("I've cancelled your order.");
+
+    expect(outcome).toBe(replanned);
+    expect(assessConfidence).not.toHaveBeenCalled();
   });
 });

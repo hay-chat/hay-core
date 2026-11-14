@@ -26,6 +26,8 @@ const UPLOAD_PROCEDURES = [
   "testTranscripts.",
   "auth.uploadAvatar",
   "organizations.uploadLogo",
+  "organizations.assistant.uploadAvatar",
+  "webchat.uploadLogo",
   "conversations.uploadAttachment",
 ];
 

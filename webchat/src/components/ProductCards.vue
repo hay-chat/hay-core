@@ -135,24 +135,20 @@ const formatPrice = (amount?: string | number, currency?: string): string => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 8px;
-  margin: 4px 0;
+  min-width: 248px;
 }
 
 .hay-product-card {
   display: flex;
   flex-direction: column;
   border-radius: 10px;
-  border: 1px solid var(--color-neutral-200, #e5e7eb);
-  background: white;
+  border: 1px solid var(--hay-line);
+  background: var(--hay-surface);
   overflow: hidden;
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
 }
 
 .hay-product-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: var(--hay-accent);
 }
 
 .hay-product-card__link {
@@ -165,7 +161,7 @@ const formatPrice = (amount?: string | number, currency?: string): string => {
 
 .hay-product-card__image {
   aspect-ratio: 1 / 1;
-  background: var(--color-neutral-100, #f3f4f6);
+  background: var(--hay-raised);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -175,6 +171,7 @@ const formatPrice = (amount?: string | number, currency?: string): string => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 0;
 }
 
 .hay-product-card__body {
@@ -197,19 +194,19 @@ const formatPrice = (amount?: string | number, currency?: string): string => {
 .hay-product-card__price {
   font-size: 12px;
   font-weight: 600;
-  color: var(--hay-primary);
+  color: var(--hay-accent);
 }
 
 .hay-product-card__compare {
   margin-left: 4px;
   font-weight: 400;
-  color: var(--color-neutral-500);
+  color: var(--hay-meta);
 }
 
 .hay-product-card__option {
   font-size: 10px;
   line-height: 1.3;
-  color: var(--color-neutral-500);
+  color: var(--hay-meta);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -217,15 +214,15 @@ const formatPrice = (amount?: string | number, currency?: string): string => {
 
 .hay-product-card__oos {
   font-size: 10px;
-  color: var(--color-neutral-500);
+  color: var(--hay-meta);
 }
 
 .hay-product-card__buy {
   margin: 0 8px 8px;
   padding: 6px 8px;
   border-radius: 6px;
-  background: var(--hay-primary);
-  color: white;
+  background: var(--hay-brand);
+  color: var(--hay-on-brand);
   font-size: 12px;
   font-weight: 600;
   text-align: center;
@@ -247,7 +244,7 @@ button.hay-product-card__buy {
   margin: -4px 8px 8px;
   font-size: 10px;
   text-align: center;
-  color: var(--color-neutral-500);
+  color: var(--hay-meta);
 }
 
 .hay-product-card__buy:hover {
@@ -256,7 +253,7 @@ button.hay-product-card__buy {
 
 .hay-product-card__buy:focus-visible,
 .hay-product-card__link:focus-visible {
-  outline: 2px solid var(--hay-primary);
+  outline: 2px solid var(--hay-accent);
   outline-offset: 2px;
 }
 </style>

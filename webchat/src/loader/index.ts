@@ -4,15 +4,32 @@
 import type { HayChatConfig } from "@/types";
 import { boot, type ChatModule } from "./boot";
 
+// No default position: the settings' position applies unless the page sets one.
 const defaultConfig: HayChatConfig = {
   organizationId: "",
   baseUrl: "http://localhost:3001",
-  position: "right",
-  theme: "blue",
   showGreeting: true,
 };
 
-const config: HayChatConfig = { ...defaultConfig, ...window.HayChat?.config };
+/**
+ * The dashboard's live preview hands its config as a JSON data block: its frame
+ * inherits the dashboard's CSP, which runs no inline script.
+ */
+function configBlock(): HayChatConfig | undefined {
+  const text = document.getElementById("hay-chat-config")?.textContent;
+  if (!text) return undefined;
+  try {
+    return JSON.parse(text) as HayChatConfig;
+  } catch {
+    console.error("[Hay Webchat] #hay-chat-config is not valid JSON");
+    return undefined;
+  }
+}
+
+const config: HayChatConfig = {
+  ...defaultConfig,
+  ...(window.HayChat?.config ?? configBlock()),
+};
 
 // The chunk sits next to widget.js. currentScript is only set while this
 // script runs, so resolve the URL now.

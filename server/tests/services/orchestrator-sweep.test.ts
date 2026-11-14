@@ -23,9 +23,6 @@ jest.mock("@server/services/scheduler.service", () => ({ schedulerService: {} })
 jest.mock("@server/services/dpop-cache.service", () => ({ dpopCacheService: {} }));
 jest.mock("@server/services/job-queue.service", () => ({ jobQueueService: {} }));
 jest.mock("@server/services/privacy.service", () => ({ privacyService: {} }));
-jest.mock("@server/services/plugin-instance-manager.service", () => ({
-  pluginInstanceManagerService: {},
-}));
 jest.mock("@server/services/oauth-token-refresh.job", () => ({ refreshOAuthTokens: jest.fn() }));
 jest.mock("@server/services/document-retry.service", () => ({ documentRetryService: {} }));
 

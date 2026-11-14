@@ -26,11 +26,7 @@ export const SETTINGS_NAV: SettingsSection[] = [
   {
     id: "channels",
     labelKey: "nav.channels",
-    tabs: [
-      { labelKey: "nav.channelList", path: "/channels", adminOnly: true },
-      { labelKey: "nav.webchat", path: "/settings/webchat", adminOnly: true },
-      { labelKey: "nav.businessHours", path: "/settings/business-hours", adminOnly: true },
-    ],
+    tabs: [{ labelKey: "nav.channelList", path: "/channels", adminOnly: true }],
   },
   {
     id: "workspace",
@@ -38,6 +34,7 @@ export const SETTINGS_NAV: SettingsSection[] = [
     tabs: [
       { labelKey: "nav.general", path: "/settings/general", adminOnly: true },
       { labelKey: "nav.users", path: "/settings/users", adminOnly: true },
+      { labelKey: "nav.businessHours", path: "/settings/business-hours", adminOnly: true },
       { labelKey: "nav.sso", path: "/settings/sso", adminOnly: true, ownerOnly: true },
     ],
   },

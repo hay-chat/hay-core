@@ -694,6 +694,64 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .getMany();
   }
 
+  /**
+   * Web conversations of the organization, newest activity first: those with
+   * the given ids and/or those of the given customer. Used for a visitor's
+   * own conversation list, so the caller has already proven both.
+   */
+  async findWebConversationsForVisitor(
+    organizationId: string,
+    visitor: { conversationIds: string[]; customerId: string | null },
+    limit: number,
+  ): Promise<Conversation[]> {
+    if (visitor.conversationIds.length === 0 && !visitor.customerId) return [];
+    return await this.getRepository()
+      .createQueryBuilder("conversation")
+      .where("conversation.organization_id = :organizationId", { organizationId })
+      .andWhere("conversation.channel = :channel", { channel: "web" })
+      .andWhere("conversation.deleted_at IS NULL")
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where("conversation.id IN (:...ids)", {
+            // An empty IN () is invalid SQL; the nil uuid matches nothing.
+            ids: visitor.conversationIds.length
+              ? visitor.conversationIds
+              : ["00000000-0000-0000-0000-000000000000"],
+          });
+          if (visitor.customerId) {
+            qb.orWhere("conversation.customer_id = :customerId", {
+              customerId: visitor.customerId,
+            });
+          }
+        }),
+      )
+      .orderBy("conversation.lastMessageAt", "DESC", "NULLS LAST")
+      .addOrderBy("conversation.created_at", "DESC")
+      .limit(limit)
+      .getMany();
+  }
+
+  /**
+   * The latest message the widget shows (customer, AI or team reply, sent) of
+   * each conversation, keyed by conversation id.
+   */
+  async getLastWidgetReplies(conversationIds: string[]): Promise<Map<string, Message>> {
+    if (conversationIds.length === 0) return new Map();
+    const { DeliveryState } = await import("@server/types/message-feedback.types");
+    const messages = await this.getMessageRepository()
+      .createQueryBuilder("message")
+      .distinctOn(["message.conversation_id"])
+      .where("message.conversation_id IN (:...conversationIds)", { conversationIds })
+      .andWhere("message.delivery_state = :sent", { sent: DeliveryState.SENT })
+      .andWhere("message.type IN (:...types)", {
+        types: [MessageType.CUSTOMER, MessageType.BOT_AGENT, MessageType.HUMAN_AGENT],
+      })
+      .orderBy("message.conversation_id")
+      .addOrderBy("message.created_at", "DESC")
+      .getMany();
+    return new Map(messages.map((message) => [message.conversation_id, message]));
+  }
+
   async getMessages(conversationId: string): Promise<Message[]> {
     const messageRepository = this.getMessageRepository();
     return await messageRepository.find({

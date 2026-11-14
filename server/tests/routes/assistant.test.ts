@@ -29,6 +29,13 @@ describe("organizations.assistant.update input", () => {
     );
   });
 
+  it("takes one of the avatar presets", () => {
+    expect(updateAssistantSchema.parse({ avatarPreset: "robot" })).toEqual({
+      avatarPreset: "robot",
+    });
+    expect(updateAssistantSchema.safeParse({ avatarPreset: "unicorn" }).success).toBe(false);
+  });
+
   it("no longer takes agent-only fields", () => {
     const parsed = updateAssistantSchema.parse({ name: "Ana", channels: ["web"], enabled: false });
     expect(parsed).toEqual({ name: "Ana" });

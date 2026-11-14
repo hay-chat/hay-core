@@ -16,7 +16,7 @@ function render(messages: Message[]) {
   const Root = defineComponent({
     setup() {
       provideI18n();
-      return () => h(MessageList, { messages, isTyping: false });
+      return () => h(MessageList, { messages, isTyping: false, assistantName: "Assistant" });
     },
   });
   return mount(Root);

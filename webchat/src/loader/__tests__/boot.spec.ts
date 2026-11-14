@@ -290,6 +290,52 @@ describe("widget loader", () => {
     });
   });
 
+  describe("brand colour and theme", () => {
+    const root = () => document.getElementById("hay-webchat-root")!;
+    const token = (name: string) => root().style.getPropertyValue(name);
+
+    it("waits for the settings' colour before showing the button, then applies it", async () => {
+      mockPublicConfig({ enabled: true, brandColor: "#3b82f6", themeMode: "dark" });
+      boot(config, fakeChunk().loadChat);
+
+      expect(root().hasAttribute("data-pending")).toBe(true);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(root().hasAttribute("data-pending")).toBe(false);
+      // The button keeps the exact colour; the header gets the readable one.
+      expect(token("--hay-launcher")).toBe("#3b82f6");
+      expect(token("--hay-brand")).not.toBe("#3b82f6");
+      expect(root().getAttribute("data-theme-mode")).toBe("dark");
+    });
+
+    it("shows the button anyway when the settings are slow", async () => {
+      globalThis.fetch = vi.fn(() => new Promise(() => {})) as unknown as typeof fetch;
+      boot(config, fakeChunk().loadChat);
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(root().hasAttribute("data-pending")).toBe(false);
+      expect(token("--hay-launcher")).toBe("#001df5");
+    });
+
+    it("the page's colour and theme win and paint at once", async () => {
+      mockPublicConfig({ enabled: true, brandColor: "#3b82f6", themeMode: "dark" });
+      boot({ ...config, brandColor: "#f59e0b", themeMode: "system" }, fakeChunk().loadChat);
+
+      expect(root().hasAttribute("data-pending")).toBe(false);
+      expect(token("--hay-launcher")).toBe("#f59e0b");
+      await vi.advanceTimersByTimeAsync(0);
+      expect(token("--hay-launcher")).toBe("#f59e0b");
+      expect(token("--hay-on-brand")).toBe("#111827");
+      expect(root().getAttribute("data-theme-mode")).toBe("system");
+    });
+
+    it("interaction: paints at once in the default colour, light", () => {
+      mockPublicConfig({ enabled: true });
+      boot({ ...config, loading: "interaction" }, fakeChunk().loadChat);
+      expect(root().hasAttribute("data-pending")).toBe(false);
+      expect(token("--hay-launcher")).toBe("#001df5");
+      expect(root().getAttribute("data-theme-mode")).toBe("light");
+    });
+  });
+
   it("labels the button in the visitor's language", () => {
     mockPublicConfig({ enabled: true });
     boot({ ...config, locale: "pt-BR", loading: "interaction" }, fakeChunk().loadChat);
@@ -329,5 +375,99 @@ describe("widget loader", () => {
     await loader.chatReady();
     expect(sessionStorage.length).toBe(0);
     expect(localStorage.length).toBe(0);
+  });
+
+  it("puts the button in the settings' corner when the page sets none", async () => {
+    mockPublicConfig({ enabled: true, position: "left" });
+    boot({ ...config, loading: "eager" }, fakeChunk().loadChat);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(button()?.classList.contains("hay-chat-button--left")).toBe(true);
+  });
+
+  it("keeps the page's own corner over the settings'", async () => {
+    mockPublicConfig({ enabled: true, position: "left" });
+    boot({ ...config, position: "right", loading: "eager" }, fakeChunk().loadChat);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(button()?.classList.contains("hay-chat-button--left")).toBe(false);
+  });
+
+  it("preview (C4): opens at once on the given config, fetching and storing nothing", async () => {
+    const fetchMock = mockPublicConfig({ enabled: true });
+    const chunk = fakeChunk();
+    const preview = { state: "home", device: "mobile" } as const;
+    const loader = boot({ ...config, brandColor: "#14532d", preview }, chunk.loadChat);
+
+    expect(chunk.loadChat).toHaveBeenCalledTimes(1);
+    await loader.chatReady();
+    expect(chunk.mountChat).toHaveBeenCalledWith(
+      expect.objectContaining({ open: true, publicConfig: null, hostCalls: [] }),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(window.HayChat?.grantConsent).toBeUndefined();
+    expect(document.getElementById("hay-webchat-root")?.hasAttribute("data-preview")).toBe(true);
+    expect(sessionStorage.length).toBe(0);
+    expect(localStorage.length).toBe(0);
+  });
+
+  it("preview, closed: shows the button and the teaser, chat not open", async () => {
+    const chunk = fakeChunk();
+    const preview = { state: "closed", device: "desktop" } as const;
+    const loader = boot({ ...config, teaserMessage: "Need a hand?", preview }, chunk.loadChat);
+    await loader.chatReady();
+    expect(chunk.mountChat).toHaveBeenCalledWith(expect.objectContaining({ open: false }));
+    expect(document.querySelector(".hay-chat-teaser")?.textContent).toContain("Need a hand?");
+  });
+
+  describe("button icon", () => {
+    const openIcon = () => button()!.querySelector(".hay-chat-button__icon-open");
+
+    it("is the outlined chat bubble by default", () => {
+      boot({ ...config, loading: "interaction" }, fakeChunk().loadChat);
+      expect(openIcon()?.getAttribute("fill")).toBe("none");
+    });
+
+    it("takes the preset and style from the settings", async () => {
+      mockPublicConfig({ enabled: true, launcherIcon: "sparkle", launcherIconStyle: "filled" });
+      boot({ ...config, loading: "eager" }, fakeChunk().loadChat);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(openIcon()?.getAttribute("fill")).toBe("currentColor");
+      expect(openIcon()?.innerHTML).toContain("M12 2.5");
+    });
+
+    it("shows the merchant's image as an img, relative to the API", async () => {
+      mockPublicConfig({
+        enabled: true,
+        launcherIcon: "custom",
+        launcherIconUrl: "/uploads/i.png",
+      });
+      boot({ ...config, loading: "eager" }, fakeChunk().loadChat);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(openIcon()?.tagName).toBe("IMG");
+      expect(openIcon()?.getAttribute("src")).toBe("https://api.example.test/uploads/i.png");
+    });
+
+    it("ignores an icon URL that isn't http(s), showing the chat bubble", async () => {
+      mockPublicConfig({
+        enabled: true,
+        launcherIcon: "custom",
+        launcherIconUrl: "javascript:alert(1)",
+      });
+      boot({ ...config, loading: "eager" }, fakeChunk().loadChat);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(openIcon()?.tagName.toLowerCase()).toBe("svg");
+    });
+
+    it("the page's own icon wins over the settings'", async () => {
+      mockPublicConfig({ enabled: true, launcherIcon: "sparkle" });
+      boot({ ...config, launcherIcon: "robot", loading: "eager" }, fakeChunk().loadChat);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(openIcon()?.innerHTML).toContain("rect");
+    });
+
+    it("marks a light brand colour so a custom image is drawn dark", () => {
+      boot({ ...config, brandColor: "#fde047", loading: "interaction" }, fakeChunk().loadChat);
+      const root = document.getElementById("hay-webchat-root")!;
+      expect(root.hasAttribute("data-launcher-dark-icon")).toBe(true);
+    });
   });
 });

@@ -1,10 +1,18 @@
 // The chat button, in plain DOM so it paints without Vue. Once the chat chunk
 // mounts, it drives the button through the LauncherBridge.
-import type { HayChatConfig, LauncherBridge } from "@/types";
+import type {
+  HayChatConfig,
+  LauncherBridge,
+  LauncherIcon,
+  LauncherIconStyle,
+  PublicConfig,
+  ThemeMode,
+} from "@/types";
+import { brandTokens } from "@/utils/brandColor";
+import { launcherIconSvg } from "@/utils/icons";
 import type { LauncherLabels } from "./labels";
 import css from "./launcher.css?inline";
 
-const ICON_OPEN = '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>';
 const ICON_CLOSE =
   '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>';
 
@@ -18,6 +26,14 @@ export interface Launcher extends LauncherBridge {
   /** Where the chat chunk mounts. */
   chatContainer: HTMLElement;
   setBusy(busy: boolean): void;
+  /** Colour tokens and light/dark theme for the button and the chat. */
+  setAppearance(brandColor: string | null | undefined, themeMode: ThemeMode | undefined): void;
+  /** The button's icon from the settings: a preset, or the merchant's image. */
+  setIcon(icon: LauncherButtonIcon): void;
+  /** Hide the button until the merchant's colour is known (see boot.ts). */
+  setPending(pending: boolean): void;
+  /** The corner from the settings, when the page set none. */
+  setPosition(position: NonNullable<PublicConfig["position"]>): void;
   /**
    * Show a message next to the button, until the visitor opens the chat or
    * dismisses it. Does nothing once either has happened, unless `force` (the
@@ -29,6 +45,33 @@ export interface Launcher extends LauncherBridge {
   remove(): void;
 }
 
+export interface LauncherButtonIcon {
+  icon?: LauncherIcon;
+  style?: LauncherIconStyle;
+  /** For "custom": the image, absolute or relative to the API. */
+  url?: string | null;
+}
+
+/** The button's icon, as config or the settings give it. */
+export function buttonIcon(source: HayChatConfig | PublicConfig | null | undefined) {
+  return {
+    icon: source?.launcherIcon,
+    style: source?.launcherIconStyle,
+    url: source?.launcherIconUrl,
+  };
+}
+
+/** An http(s) URL for `url`, relative ones resolved against the API; anything else null. */
+export function httpUrl(url: string | null | undefined, baseUrl: string): string | null {
+  if (!url) return null;
+  try {
+    const resolved = new URL(url, `${baseUrl}/`);
+    return resolved.protocol === "https:" || resolved.protocol === "http:" ? resolved.href : null;
+  } catch {
+    return null;
+  }
+}
+
 export function createLauncher(config: HayChatConfig, labels: LauncherLabels): Launcher {
   const style = document.createElement("style");
   style.textContent = css;
@@ -36,7 +79,21 @@ export function createLauncher(config: HayChatConfig, labels: LauncherLabels): L
 
   const root = document.createElement("div");
   root.id = "hay-webchat-root";
-  root.setAttribute("data-theme", config.theme || "blue");
+  // The dashboard's live preview (C4).
+  if (config.preview) root.setAttribute("data-preview", "");
+  let position = config.position ?? "right";
+  const setAppearance: Launcher["setAppearance"] = (brandColor, themeMode) => {
+    for (const [name, value] of Object.entries(brandTokens(brandColor))) {
+      root.style.setProperty(name, value);
+    }
+    root.setAttribute("data-theme-mode", themeMode ?? "light");
+    // A custom icon image is recoloured to the icon colour (white or near-black).
+    root.toggleAttribute(
+      "data-launcher-dark-icon",
+      brandTokens(brandColor)["--hay-launcher-icon"] !== "#ffffff",
+    );
+  };
+  setAppearance(config.brandColor, config.themeMode);
 
   // .hay-webchat-widget wraps everything, so a host page can remove the
   // whole widget with one selector (the dashboard demo does).
@@ -46,15 +103,42 @@ export function createLauncher(config: HayChatConfig, labels: LauncherLabels): L
 
   const button = document.createElement("button");
   button.type = "button";
-  button.className =
-    config.position === "left" ? "hay-chat-button hay-chat-button--left" : "hay-chat-button";
+  const placeButton = () => {
+    button.className =
+      position === "left" ? "hay-chat-button hay-chat-button--left" : "hay-chat-button";
+  };
+  placeButton();
   button.setAttribute("aria-label", labels.open);
   button.setAttribute("aria-expanded", "false");
   button.innerHTML =
-    icon("hay-chat-button__icon-open", ICON_OPEN) +
+    launcherIconSvg("chat", "outline", "hay-chat-button__icon-open") +
     icon("hay-chat-button__icon-close", ICON_CLOSE) +
     '<span class="hay-chat-button__badge" hidden></span>';
   const badge = button.lastElementChild as HTMLElement;
+
+  // The default (no setting yet) is the outlined chat bubble.
+  const setIcon: Launcher["setIcon"] = ({ icon: name, style, url }) => {
+    let next: Element;
+    const imageUrl = name === "custom" ? httpUrl(url, config.baseUrl) : null;
+    if (imageUrl) {
+      const image = document.createElement("img");
+      image.className = "hay-chat-button__icon-open hay-chat-button__icon-image";
+      image.alt = "";
+      image.src = imageUrl;
+      next = image;
+    } else {
+      const preset = name && name !== "custom" ? name : "chat";
+      const template = document.createElement("template");
+      template.innerHTML = launcherIconSvg(
+        preset,
+        style ?? "outline",
+        "hay-chat-button__icon-open",
+      );
+      next = template.content.firstElementChild!;
+    }
+    button.querySelector(".hay-chat-button__icon-open")?.replaceWith(next);
+  };
+  if (config.launcherIcon) setIcon(buttonIcon(config));
 
   widget.append(chatContainer, button);
   root.appendChild(widget);
@@ -81,6 +165,22 @@ export function createLauncher(config: HayChatConfig, labels: LauncherLabels): L
       badge.textContent = count > 0 ? String(count) : "";
       badge.hidden = count <= 0;
     },
+    focus() {
+      button.focus();
+    },
+    setAppearance,
+    setIcon,
+    setPending(pending) {
+      root.toggleAttribute("data-pending", pending);
+    },
+    setPosition(next) {
+      position = next;
+      placeButton();
+      teaser?.classList.toggle("hay-chat-teaser--left", position === "left");
+    },
+    setSheet(sheet) {
+      root.toggleAttribute("data-sheet", sheet);
+    },
     setBusy(busy) {
       if (busy) button.setAttribute("aria-busy", "true");
       else button.removeAttribute("aria-busy");
@@ -95,7 +195,7 @@ export function createLauncher(config: HayChatConfig, labels: LauncherLabels): L
 
       teaser = document.createElement("div");
       teaser.className =
-        config.position === "left" ? "hay-chat-teaser hay-chat-teaser--left" : "hay-chat-teaser";
+        position === "left" ? "hay-chat-teaser hay-chat-teaser--left" : "hay-chat-teaser";
 
       // The message opens the chat, exactly like the button.
       const open = document.createElement("button");

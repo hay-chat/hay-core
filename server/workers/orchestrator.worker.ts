@@ -2,6 +2,7 @@ import { Orchestrator } from "../orchestrator";
 import { AppDataSource } from "../database/data-source";
 import { createLogger, withLogContext } from "@server/lib/logger";
 import { metrics } from "@server/lib/metrics";
+import { config } from "@server/config/env";
 import { rabbitmqService } from "@server/services/rabbitmq.service";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { simulationHarnessService } from "@server/services/simulation/simulation-harness.service";
@@ -183,7 +184,7 @@ export class OrchestratorWorker {
           }
         }
       },
-      { prefetch: 2 },
+      { prefetch: config.orchestrator.concurrency },
     );
 
     await rabbitmqService.consume(

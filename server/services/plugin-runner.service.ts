@@ -69,6 +69,7 @@ type RegistryManifest = Omit<HayPluginManifest, "capabilities"> & {
 export class PluginRunnerService {
   private workers = new Map<string, WorkerInfo>(); // Key: "orgId:pluginId"
   private pendingStarts = new Set<string>(); // workerKeys spawned but not yet ready
+  private startsInFlight = new Map<string, Promise<WorkerInfo>>(); // one start per workerKey
   private portAllocator = getPortAllocator();
   private pluginsDir: string;
   private runnerPath: string;
@@ -112,6 +113,25 @@ export class PluginRunnerService {
       throw new Error(`Worker already running for ${workerKey}`);
     }
 
+    // Callers that find no worker while one is still starting (several turns
+    // reaching a cold plugin at once) share that start. Without this each one
+    // spawned its own worker, and every worker re-ran the plugin's startup sync
+    // (e.g. a Shopify catalog push), which exhausted the database pool.
+    const inFlight = this.startsInFlight.get(workerKey);
+    if (inFlight) return inFlight;
+
+    const start = this.startNewWorker(orgId, pluginId, workerKey).finally(() =>
+      this.startsInFlight.delete(workerKey),
+    );
+    this.startsInFlight.set(workerKey, start);
+    return start;
+  }
+
+  private async startNewWorker(
+    orgId: string,
+    pluginId: string,
+    workerKey: string,
+  ): Promise<WorkerInfo> {
     // Get plugin registry
     const pluginRepo = AppDataSource.getRepository(PluginRegistry);
     const plugin = await pluginRepo.findOne({ where: { pluginId } });

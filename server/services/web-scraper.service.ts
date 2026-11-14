@@ -69,6 +69,14 @@ export function isSamePageRedirect(from: URL, to: URL): boolean {
   );
 }
 
+/**
+ * The document's own <title>. `$("title")` alone also matches the <title>
+ * elements inside inline SVG icons and concatenates them all ("Sketchicon-close").
+ */
+export function pageTitle($: cheerio.CheerioAPI): string {
+  return $("head > title").first().text().trim() || $("h1").first().text().trim() || "Untitled";
+}
+
 export class WebScraperService extends EventEmitter {
   private visitedUrls = new Set<string>();
   private urlQueue: string[] = [];
@@ -359,7 +367,7 @@ export class WebScraperService extends EventEmitter {
       const $ = cheerio.load(fullHtml);
 
       // Extract title from the page
-      const title = $("title").text() || $("h1").first().text() || "Untitled";
+      const title = pageTitle($);
 
       // Only text a visitor can see goes into the knowledge base.
       removeHiddenElements($);
@@ -674,7 +682,7 @@ export class WebScraperService extends EventEmitter {
           const $ = cheerio.load(html);
 
           // Extract page metadata
-          const title = $("title").text() || $("h1").first().text() || "Untitled";
+          const title = pageTitle($);
           const description =
             $('meta[name="description"]').attr("content") ||
             $('meta[property="og:description"]').attr("content") ||

@@ -3,7 +3,6 @@ const findByPlugin = jest.fn();
 const startPluginWorker = jest.fn();
 const getPlugin = jest.fn();
 const findByKey = jest.fn();
-const updateActivityTimestamp = jest.fn();
 
 jest.mock("@server/repositories/plugin-registry.repository", () => ({
   pluginRegistryRepository: { findByPluginId },
@@ -16,9 +15,6 @@ jest.mock("@server/repositories/plugin-webhook-route.repository", () => ({
 }));
 jest.mock("@server/services/plugin-manager.service", () => ({
   pluginManagerService: { startPluginWorker, getPlugin },
-}));
-jest.mock("@server/services/plugin-instance-manager.service", () => ({
-  pluginInstanceManagerService: { updateActivityTimestamp },
 }));
 jest.mock("@server/lib/hmac-signature", () => ({
   ...jest.requireActual<typeof import("@server/lib/hmac-signature")>("@server/lib/hmac-signature"),
@@ -182,7 +178,6 @@ describe("webhookRouterService.dispatch", () => {
   beforeEach(() => {
     jest.resetAllMocks();
     startPluginWorker.mockResolvedValue({ port: 1234, instanceId: "inst" });
-    updateActivityTimestamp.mockResolvedValue(undefined);
     global.fetch = jest.fn().mockResolvedValue({ ok: true });
   });
 
@@ -300,7 +295,6 @@ describe("webhookRouterService.dispatch (single-object body)", () => {
   beforeEach(() => {
     jest.resetAllMocks();
     startPluginWorker.mockResolvedValue({ port: 1234, instanceId: "inst" });
-    updateActivityTimestamp.mockResolvedValue(undefined);
     global.fetch = jest.fn().mockResolvedValue({ ok: true });
   });
 
@@ -327,7 +321,6 @@ describe("webhookRouterService.dispatch (email-address keys)", () => {
   beforeEach(() => {
     jest.resetAllMocks();
     startPluginWorker.mockResolvedValue({ port: 1234, instanceId: "inst" });
-    updateActivityTimestamp.mockResolvedValue(undefined);
     global.fetch = jest.fn().mockResolvedValue({ ok: true });
   });
 
@@ -528,7 +521,6 @@ describe("webhookRouterService.handle plugin-declared dedupe", () => {
     verifyHmac.mockReturnValue(true);
     setOwners({ PAGE_A: "org-a", PAGE_B: "org-b", STORE_1: "org-a" });
     startPluginWorker.mockResolvedValue({ port: 1234, instanceId: "inst" });
-    updateActivityTimestamp.mockResolvedValue(undefined);
     releaseWebhookDelivery.mockResolvedValue(undefined);
     global.fetch = jest.fn().mockResolvedValue({ ok: true });
   });

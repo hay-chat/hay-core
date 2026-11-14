@@ -22,7 +22,8 @@ import { createListProcedure } from "@server/trpc/procedures/list";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { messageApprovalService } from "../../../services/message-approval.service";
 import { createLogger } from "@server/lib/logger";
-import { agentFirstName } from "../../../services/webchat/public-message";
+import { agentAvatarUrl, agentFirstName } from "../../../services/webchat/public-message";
+import { announceAgentRead } from "../../../services/widget-events.service";
 import { decodeBase64 } from "../../../services/webchat/widget-attachments";
 import {
   STAFF_ATTACHMENT_MAX_COUNT,
@@ -634,6 +635,14 @@ export const conversationsRouter = t.router({
         });
       }
 
+      // A person opening the conversation in the inbox (the dashboard reloads
+      // it as messages arrive) has read the visitor's latest message: the
+      // widget shows "Seen". API tokens read conversations too; they are not
+      // a person reading.
+      if (ctx.user?.authMethod === "jwt") {
+        void announceAgentRead(conversation, conversation.messages ?? []);
+      }
+
       return conversation;
     }),
 
@@ -930,12 +939,15 @@ export const conversationsRouter = t.router({
       }
 
       // The widget shows a person's reply as "10:42 · Marina" (first name only)
+      // and their photo beside it.
       let senderFirstName: string | undefined;
+      let senderAvatarUrl: string | null = null;
       let senderLanguage: LanguageCode | null = null;
       if (messageType === MessageType.HUMAN_AGENT) {
         const { userRepository } = await import("../../../repositories/user.repository");
         const sender = await userRepository.findById(ctx.user!.id);
         senderFirstName = agentFirstName(sender);
+        senderAvatarUrl = agentAvatarUrl(sender);
         if (isLanguageCode(sender?.translationLanguage)) {
           senderLanguage = sender.translationLanguage;
         }
@@ -984,6 +996,7 @@ export const conversationsRouter = t.router({
           sender: input.role || "user",
           sentByUserId: ctx.user?.id,
           agentFirstName: senderFirstName,
+          ...(messageType === MessageType.HUMAN_AGENT ? { agentAvatarUrl: senderAvatarUrl } : {}),
         },
         ...(translations ? { translations } : {}),
         ...(detectedLanguage ? { detectedLanguage } : {}),
@@ -1125,13 +1138,15 @@ export const conversationsRouter = t.router({
       }
 
       const { userRepository } = await import("../../../repositories/user.repository");
+      const sender = await userRepository.findById(ctx.user!.id);
       const message = await conversation.addMessage({
         content: prepared.content,
         type: MessageType.HUMAN_AGENT,
         metadata: {
           sender: "assistant",
           sentByUserId: ctx.user?.id,
-          agentFirstName: agentFirstName(await userRepository.findById(ctx.user!.id)),
+          agentFirstName: agentFirstName(sender),
+          agentAvatarUrl: agentAvatarUrl(sender),
           channelTemplate: prepared.channelTemplate,
         },
       });
@@ -1221,6 +1236,7 @@ export const conversationsRouter = t.router({
           // Shown to the shopper as "Marina joined the chat" (first name only)
           systemEvent: "agent_joined",
           agentFirstName: agentFirstName(user),
+          agentAvatarUrl: agentAvatarUrl(user),
         },
       });
 
@@ -1301,6 +1317,7 @@ export const conversationsRouter = t.router({
           // Shown to the shopper as "Marina left the chat" (+ "AI again" when returned to AI)
           systemEvent: input.returnToMode === "ai" ? "agent_returned_to_ai" : "agent_left",
           agentFirstName: agentFirstName(user),
+          agentAvatarUrl: agentAvatarUrl(user),
         },
       });
 

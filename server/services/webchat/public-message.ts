@@ -26,6 +26,10 @@ export interface PublicMessageMetadata {
   systemEvent?: AgentSystemEvent;
   /** First name of the team member behind a HumanAgent message or a systemEvent. */
   agentFirstName?: string;
+  /** Their profile photo (public avatar URL), or null when they have none. */
+  agentAvatarUrl?: string | null;
+  /** Public documents an AI answer was based on (only those with a public URL). */
+  sources?: AnswerSource[];
   /** The content is only a "[Customer sent …]" line: the widget shows the files instead. */
   mediaPlaceholder?: true;
   /** Image URLs the server checked in this reply; any other image renders as a link. */
@@ -47,6 +51,18 @@ const isAgentSystemEvent = (value: unknown): value is AgentSystemEvent =>
   typeof value === "string" && (AGENT_SYSTEM_EVENTS as readonly string[]).includes(value);
 
 const MAX_FIRST_NAME_LENGTH = 50;
+const MAX_SOURCES = 5;
+const MAX_SOURCE_TITLE_LENGTH = 200;
+const MAX_URL_LENGTH = 2048;
+
+/** A public document an AI answer used, as the widget links it. */
+export interface AnswerSource {
+  title: string;
+  url: string;
+}
+
+const isHttpUrl = (value: unknown): value is string =>
+  typeof value === "string" && value.length <= MAX_URL_LENGTH && /^https?:\/\//i.test(value);
 
 /**
  * The only part of a team member's name a shopper may see: their first name,
@@ -55,6 +71,32 @@ const MAX_FIRST_NAME_LENGTH = 50;
 export function agentFirstName(user: { firstName?: string | null } | null | undefined) {
   const firstName = user?.firstName?.trim();
   return firstName ? firstName.slice(0, MAX_FIRST_NAME_LENGTH) : undefined;
+}
+
+/**
+ * A team member's photo as a shopper may see it: their avatar, which lives in
+ * a public upload folder, or null when they have none (the widget then shows
+ * their initial).
+ */
+export function agentAvatarUrl(
+  user: { avatarUrl?: string | null } | null | undefined,
+): string | null {
+  const url = user?.avatarUrl;
+  return isHttpUrl(url) ? url : null;
+}
+
+/** Stored answer sources reduced to well-formed public links. */
+function publicSources(value: unknown): AnswerSource[] {
+  if (!Array.isArray(value)) return [];
+  const sources: AnswerSource[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") continue;
+    const { title, url } = entry as Record<string, unknown>;
+    if (typeof title !== "string" || !title.trim() || !isHttpUrl(url)) continue;
+    sources.push({ title: title.trim().slice(0, MAX_SOURCE_TITLE_LENGTH), url });
+    if (sources.length === MAX_SOURCES) break;
+  }
+  return sources;
 }
 
 /** Customer-facing message types the widget always receives. */
@@ -125,6 +167,17 @@ export function toPublicMessageMetadata(metadata: unknown): PublicMessageMetadat
   });
   if (firstName) {
     result.agentFirstName = firstName;
+  }
+
+  if ("agentAvatarUrl" in source) {
+    result.agentAvatarUrl = agentAvatarUrl({
+      avatarUrl: typeof source.agentAvatarUrl === "string" ? source.agentAvatarUrl : null,
+    });
+  }
+
+  const sources = publicSources(source.sources);
+  if (sources.length > 0) {
+    result.sources = sources;
   }
 
   return result;

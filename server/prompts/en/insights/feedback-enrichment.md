@@ -5,7 +5,7 @@ description: Turns a staff rating of one AI reply into an Insights QA event (wha
 version: 1.0.0
 ---
 
-Someone from the store's team rated one reply of the store's AI agent. Explain the rating for the store owner.
+{{#if byVisitor}}The customer in this conversation rated one reply of the store's AI agent (thumbs up or down in the chat).{{else}}Someone from the store's team rated one reply of the store's AI agent.{{/if}} Explain the rating for the store owner.
 
 RATING: {{rating}}
 {{#if comment}}

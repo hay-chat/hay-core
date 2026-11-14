@@ -29,7 +29,7 @@ import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
 import { isTestConversation } from "@server/services/close-classification/outcome-rules";
 import { insightRunsService } from "./insight-runs.service";
-import { FeedbackRating } from "@server/types/message-feedback.types";
+import { FeedbackRating, FeedbackSource } from "@server/types/message-feedback.types";
 import {
   INSIGHT_ACTION_TYPES,
   INSIGHT_SEVERITIES,
@@ -144,6 +144,8 @@ export class FeedbackInsightService {
         enriched_at: null,
         signals: {
           rating: feedback.rating,
+          // "operator" (a team member's review) or "visitor" (webchat thumbs)
+          feedbackSource: feedback.source,
           hasComment: Boolean(feedback.comment?.trim()),
           messageType: message.type,
           channel: conversation.channel,
@@ -220,6 +222,7 @@ export class FeedbackInsightService {
         {
           rating,
           comment,
+          byVisitor: feedback?.source === FeedbackSource.VISITOR,
           context: buildTranscript(before) || "(no earlier messages)",
           ratedReply: message.content?.trim() || "(empty)",
         },

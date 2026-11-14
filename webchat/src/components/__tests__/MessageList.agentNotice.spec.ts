@@ -7,9 +7,9 @@ import ptBr from "@/i18n/locales/pt-br";
 import type { Message } from "@/types";
 
 /**
- * Shoppers must know when they are talking to a person: a centred line when a
- * team member joins or leaves, and the person's first name after the time on
- * their replies. Worded in the shopper's language from structured metadata.
+ * Shoppers must know when they are talking to a person: a centred pill when a
+ * team member joins or leaves, and the person's first name above their
+ * replies. Worded in the shopper's language from structured metadata.
  */
 
 const at = (minute: number) => new Date(2026, 9, 27, 10, minute).getTime();
@@ -51,23 +51,29 @@ function render(messages: Message[], translations?: Translations) {
   const Root = defineComponent({
     setup() {
       provideI18n(translations);
-      return () => h(MessageList, { messages, isTyping: false });
+      return () => h(MessageList, { messages, isTyping: false, assistantName: "Acme assistant" });
     },
   });
   return mount(Root);
 }
 
 const lines = (wrapper: ReturnType<typeof render>) =>
-  wrapper.findAll(".hay-message__system").map((line) => line.text());
+  wrapper.findAll(".hay-notice__text").map((line) => line.text());
 
 describe("MessageList agent notices", () => {
-  it("shows centred join/leave lines in English", () => {
+  it("shows centred join/leave pills in English, the name in bold", () => {
     const wrapper = render([joined, reply, backToAi]);
     expect(lines(wrapper)).toEqual([
       "Marina joined the chat",
       "Marina left the chat. You're chatting with the AI assistant again.",
     ]);
-    expect(wrapper.findAll(".hay-message--system")).toHaveLength(2);
+    expect(wrapper.find(".hay-notice b").text()).toBe("Marina");
+  });
+
+  it("shows the person's photo on the pill when the server sends one", () => {
+    const withPhoto = { ...joined, metadata: { ...joined.metadata, agentAvatarUrl: "/m.png" } };
+    expect(render([withPhoto]).find(".hay-notice img").attributes("src")).toBe("/m.png");
+    expect(render([joined]).find(".hay-notice .hay-avatar").text()).toBe("M");
   });
 
   it("words them in the shopper's language", () => {
@@ -89,10 +95,12 @@ describe("MessageList agent notices", () => {
     ]);
   });
 
-  it("puts the person's first name after the time on their replies, not on the AI's", () => {
+  it("names the person above their replies, and the AI with its label", () => {
     const wrapper = render([reply, botReply]);
-    const times = wrapper.findAll(".hay-message__time").map((time) => time.text());
-    expect(times).toEqual(["10:42 · Marina", "10:51"]);
+    const names = wrapper.findAll(".hay-group__name").map((name) => name.text());
+    expect(names).toEqual(["Marina", "Acme assistant"]);
+    const times = wrapper.findAll(".hay-bubble__time").map((time) => time.text());
+    expect(times).toEqual(["10:42", "10:51"]);
   });
 
   it("ignores System messages without a known event", () => {

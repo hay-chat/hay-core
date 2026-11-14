@@ -483,6 +483,10 @@ export function resolveQuickCheckSettings(
  * Organization Settings JSONB structure
  * This type defines the complete structure of the settings field in the Organization entity
  */
+/** Icons the assistant's avatar can use when no picture is uploaded. */
+export const ASSISTANT_AVATAR_PRESETS = ["sparkle", "sparkles", "robot"] as const;
+export type AssistantAvatarPreset = (typeof ASSISTANT_AVATAR_PRESETS)[number];
+
 export interface OrganizationSettings {
   testModeDefault?: boolean;
   companyDomain?: string; // Company's business domain/industry for context
@@ -501,6 +505,7 @@ export interface OrganizationSettings {
   setup?: SetupSettings; // In-app setup answers and readiness checks
   mfaRequired?: boolean; // Every member must use two-factor authentication
   ssoEnforced?: boolean; // Members must sign in through the organization's identity provider
+  assistantAvatarPreset?: AssistantAvatarPreset; // The assistant's icon when no avatar is uploaded; missing = "sparkle"
   [key: string]: unknown;
 }
 

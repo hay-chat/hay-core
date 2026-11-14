@@ -105,7 +105,21 @@ export class ProductSyncService {
       canonical.currency,
     );
 
-    return AppDataSource.transaction(async (manager) => {
+    // Embed before the transaction opens: the embedding call goes to the
+    // provider (and looks up the org's provider settings on another pooled
+    // connection), which inside the transaction would hold its connection idle
+    // and could deadlock the pool when many upserts run at once.
+    const previous = await AppDataSource.getRepository(Product).findOne({
+      select: { id: true, searchText: true },
+      where: { organizationId, source, externalId: canonical.externalId },
+    });
+    const searchTextChanged = !previous || previous.searchText !== searchText;
+    const vector =
+      searchTextChanged && searchText.length > 0
+        ? (await productVectorStoreService.embedTexts(organizationId, [searchText]))[0]
+        : undefined;
+
+    const result = await AppDataSource.transaction(async (manager) => {
       const productRepo = manager.getRepository(Product);
 
       const existing = await productRepo.findOne({
@@ -143,11 +157,10 @@ export class ProductSyncService {
 
       await this.syncVariants(manager, organizationId, saved.id, canonical, source);
 
-      const searchTextChanged = !existing || existing.searchText !== searchText;
       let embeddingRefreshed = false;
 
-      if (searchTextChanged && searchText.length > 0) {
-        await productVectorStoreService.upsertProductEmbeddings(
+      if (vector) {
+        await productVectorStoreService.writeProductEmbeddings(
           organizationId,
           [
             {
@@ -162,6 +175,7 @@ export class ProductSyncService {
               },
             },
           ],
+          [vector],
           manager,
         );
         embeddingRefreshed = true;
@@ -178,26 +192,25 @@ export class ProductSyncService {
         "Product upserted",
       );
 
-      // Best-effort audit — swallow failures so a slow audit table never
-      // blocks ingestion.
-      try {
-        await auditLogService.logProductUpsert(
-          undefined,
-          organizationId,
-          saved.id,
-          {
-            source,
-            externalId: canonical.externalId,
-            title: saved.title,
-          },
-          { created, embeddingRefreshed },
-        );
-      } catch (err) {
-        logger.error({ err, productId: saved.id }, "Failed to write product audit log");
-      }
-
       return { productId: saved.id, created, embeddingRefreshed };
     });
+
+    // Best-effort audit, after the commit: the audit write uses its own pooled
+    // connection, and taking a second connection inside the transaction can
+    // deadlock the pool. Failures are swallowed so the audit never blocks ingestion.
+    try {
+      await auditLogService.logProductUpsert(
+        undefined,
+        organizationId,
+        result.productId,
+        { source, externalId: canonical.externalId, title: sanitizeContent(canonical.title) },
+        { created: result.created, embeddingRefreshed: result.embeddingRefreshed },
+      );
+    } catch (err) {
+      logger.error({ err, productId: result.productId }, "Failed to write product audit log");
+    }
+
+    return result;
   }
 
   /**

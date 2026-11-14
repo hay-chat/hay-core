@@ -4,7 +4,7 @@ jest.mock("@server/repositories/plugin-instance.repository", () => ({
   pluginInstanceRepository: {},
 }));
 
-import { getCachedToolDescriptors } from "../../services/plugin-tools.service";
+import { getCachedToolDescriptors, toolActivityLabels } from "../../services/plugin-tools.service";
 import { decideGate } from "../../services/core/action-policy";
 // The same helper the plugin worker uses to merge a plugin's `toolRisk`
 // declaration into tools/list before core caches it.
@@ -127,5 +127,38 @@ describe("getCachedToolDescriptors", () => {
   it("returns empty for missing config", () => {
     expect(getCachedToolDescriptors(null)).toEqual([]);
     expect(getCachedToolDescriptors({})).toEqual([]);
+  });
+});
+
+describe("tool progress labels", () => {
+  const configWith = (tool: Record<string, unknown>) => ({
+    mcpServers: {
+      local: [{ serverId: "shop", tools: [{ description: "d", inputSchema: {}, ...tool }] }],
+    },
+  });
+
+  it("reads label / doneLabel from the listed tool", () => {
+    const [descriptor] = getCachedToolDescriptors(
+      configWith({ name: "get_order", label: "Looking up your order", doneLabel: "Checked it" }),
+    );
+    expect(descriptor).toMatchObject({ label: "Looking up your order", doneLabel: "Checked it" });
+  });
+
+  it("reads them from _meta for MCP SDK servers", () => {
+    const [descriptor] = getCachedToolDescriptors(
+      configWith({
+        name: "get_order",
+        _meta: { "chat.hay/label": "  Looking up\nyour order ", "chat.hay/doneLabel": 42 },
+      }),
+    );
+    expect(descriptor.label).toBe("Looking up your order");
+    expect(descriptor.doneLabel).toBeUndefined();
+  });
+
+  it("caps long labels and ignores empty ones", () => {
+    expect(toolActivityLabels({ label: "x".repeat(200), doneLabel: "   " })).toEqual({
+      label: "x".repeat(80),
+    });
+    expect(toolActivityLabels({})).toEqual({});
   });
 });
