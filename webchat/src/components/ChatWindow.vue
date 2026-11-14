@@ -170,6 +170,9 @@
         @submit-form="
           (messageId, response) => $emit('submitInConversationForm', messageId, response)
         "
+        @product-click="
+          (messageId, productId, type) => $emit('productClick', messageId, productId, type)
+        "
       />
 
       <WaitingBanner
@@ -239,7 +242,7 @@ import PoweredBy from "./PoweredBy.vue";
 import { useI18n } from "@/i18n";
 import { currentHuman } from "@/utils/thread";
 import type { HeaderStatus } from "@/utils/availability";
-import type { AgentActivity, Message, SendFailure, TeamMember } from "@/types";
+import type { AgentActivity, Message, ProductClickType, SendFailure, TeamMember } from "@/types";
 import type { FormResponse, FormSchema } from "@hay/form-schema";
 
 // Loaded on demand: most organizations never ask for a pre-chat form.
@@ -321,6 +324,7 @@ defineEmits<{
   toggleExpand: [];
   submitPreChatForm: [response: FormResponse];
   submitInConversationForm: [messageId: string, response: FormResponse];
+  productClick: [messageId: string, productId: string, type: ProductClickType];
 }>();
 
 const windowRef = ref<HTMLElement | null>(null);

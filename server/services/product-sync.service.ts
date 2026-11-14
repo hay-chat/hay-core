@@ -21,6 +21,7 @@ import { sanitizeContent } from "../utils/sanitize";
 import { productVectorStoreService } from "./product-vector-store.service";
 import { auditLogService } from "./audit-log.service";
 import { createLogger } from "@server/lib/logger";
+import { withPurchaseFields } from "@server/lib/shopping-links";
 import type { CanonicalProduct, CanonicalVariant } from "../types/canonical-product";
 
 const logger = createLogger("product-sync");
@@ -334,7 +335,7 @@ export class ProductSyncService {
       row.weightValue = v.weightValue !== undefined ? v.weightValue.toFixed(3) : undefined;
       row.weightUnit = v.weightUnit;
       row.imageSrc = v.imageSrc;
-      row.attributes = v.attributes;
+      row.attributes = withPurchaseFields(v.attributes, v);
       await variantRepo.save(row);
     }
 

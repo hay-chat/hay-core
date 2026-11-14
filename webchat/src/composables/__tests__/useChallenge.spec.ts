@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useChallenge } from "../useChallenge";
-import type { WidgetContribution } from "@/types";
+import type { ChallengeContribution } from "@/types";
 
 const config = { organizationId: "org-1", baseUrl: "https://api.hay.test", locale: "pt-BR" };
-const invisible: WidgetContribution = {
+const invisible: ChallengeContribution = {
   id: "turnstile.challenge",
   type: "challenge@1",
   props: { provider: "turnstile", mode: "invisible" },

@@ -85,6 +85,90 @@ describe("resolveContributionProps", () => {
 describe("webchat contributions", () => {
   beforeEach(() => findEnabledByOrganization.mockReset());
 
+  describe("cart@1", () => {
+    const cart = (props: Record<string, unknown>, configProps: Record<string, string> = {}) => ({
+      contributions: [{ id: "cart", type: "cart@1", props, configProps }],
+      gates: [],
+    });
+    const valid = {
+      addPath: "/cart/add.js",
+      addBody: '{"items":[{"id":{{cartItemId}},"quantity":{{quantity}}}]}',
+      checkoutPath: "/checkout",
+    };
+    const served = () =>
+      webchatExtensionsService.getPublicContributions("org-1", ["cart@1"], { underAttack: false });
+
+    it("serves the plugin's cart requests, tagged with its catalog source", async () => {
+      findEnabledByOrganization.mockResolvedValue([instance("store", {}, cart(valid))]);
+      expect(await served()).toEqual([
+        { id: "store.cart", type: "cart@1", source: "store", props: valid },
+      ]);
+    });
+
+    it("is withdrawn when the org switched it off", async () => {
+      findEnabledByOrganization.mockResolvedValue([
+        instance("store", { mode: false }, cart(valid, { enabled: "mode" })),
+      ]);
+      expect(await served()).toEqual([]);
+    });
+
+    it("refuses a path on another host", async () => {
+      for (const addPath of ["//evil.test/cart", "https://evil.test/cart", "cart/add.js"]) {
+        findEnabledByOrganization.mockResolvedValue([
+          instance("store", {}, cart({ ...valid, addPath })),
+        ]);
+        expect(await served()).toEqual([]);
+      }
+    });
+
+    it("refuses a body that is not a JSON template", async () => {
+      findEnabledByOrganization.mockResolvedValue([
+        instance("store", {}, cart({ ...valid, addBody: "id={{cartItemId}}" })),
+      ]);
+      expect(await served()).toEqual([]);
+    });
+
+    it("refuses half a token setup", async () => {
+      findEnabledByOrganization.mockResolvedValue([
+        instance("store", {}, cart({ ...valid, tokenPath: "/api/cart" })),
+      ]);
+      expect(await served()).toEqual([]);
+    });
+
+    it("accepts theme events and a storefront root, and refuses malformed ones", async () => {
+      const afterAddEvents = JSON.stringify([
+        { name: "cart:refresh" },
+        { name: "store:sync", target: "window", detail: { type: "from_data" } },
+      ]);
+      const extras = { afterAddEvents, rootPathGlobal: "Store.routes.root" };
+      findEnabledByOrganization.mockResolvedValue([
+        instance("store", {}, cart({ ...valid, ...extras })),
+      ]);
+      expect((await served())[0].props).toMatchObject(extras);
+
+      for (const bad of [
+        { afterAddEvents: "cart:refresh,other" },
+        { afterAddEvents: JSON.stringify([{ name: "x", target: "document.cookie" }]) },
+        { afterAddEvents: JSON.stringify([{ name: "x", detail: { nested: { a: 1 } } }]) },
+        { rootPathGlobal: "document.cookie;alert(1)" },
+      ]) {
+        findEnabledByOrganization.mockResolvedValue([
+          instance("store", {}, cart({ ...valid, ...bad })),
+        ]);
+        expect(await served()).toEqual([]);
+      }
+    });
+
+    it("is not sent to a widget that cannot use it", async () => {
+      findEnabledByOrganization.mockResolvedValue([instance("store", {}, cart(valid))]);
+      expect(
+        await webchatExtensionsService.getPublicContributions("org-1", ["challenge@1"], {
+          underAttack: false,
+        }),
+      ).toEqual([]);
+    });
+  });
+
   it("serves challenge@1 only to widgets that support it", async () => {
     findEnabledByOrganization.mockResolvedValue([instance("captcha", { siteKey: "k" }, challenge)]);
 

@@ -23,6 +23,8 @@ import { conversationRepository } from "../../../repositories/conversation.repos
 import { CustomerRepository } from "../../../repositories/customer.repository";
 import { OrganizationRepository } from "../../../repositories/organization.repository";
 import { createLogger } from "@server/lib/logger";
+import { SHOPPING_EVENT_TYPES } from "@server/database/entities/shopping-event.entity";
+import { recordProductClick } from "@server/services/shopping-events.service";
 import { webchatSettingsService } from "../../../services/webchat/webchat-settings.service";
 import { recordWebchatConsent } from "../../../services/webchat/consent-record.service";
 import { verifiedCustomerExternalId } from "../../../services/webchat/webchat-identity.service";
@@ -124,6 +126,8 @@ const sendMessageSchema = z.object({
   content: z.string().min(1).max(PUBLIC_WIDGET_LIMITS.maxMessageLength),
   proof: z.string(), // DPoP proof
   context: z.record(z.string(), z.any()).optional(),
+  // The page the shopper is on now: the conversation follows them across pages.
+  pageUrl: z.string().max(2048).optional(),
   clientMessageId: clientMessageIdSchema,
 });
 
@@ -175,6 +179,13 @@ const recordConsentSchema = z.object({
 });
 
 // Schema for getting messages
+const trackProductClickSchema = z.object({
+  conversationId: z.string().uuid(),
+  messageId: z.string().uuid(),
+  productId: z.string().uuid(),
+  type: z.enum(SHOPPING_EVENT_TYPES),
+});
+
 const getMessagesSchema = z.object({
   conversationId: z.string().uuid(),
   proof: z.string(), // DPoP proof
@@ -570,6 +581,11 @@ export const publicConversationsRouter = t.router({
       );
       if (gate.decision === "deny") throw verificationFailed();
 
+      // Before the message: adding it starts the AI's turn, which reads the page.
+      if (input.pageUrl && input.pageUrl !== conversation.metadata?.url) {
+        await conversationRepository.mergeMetadata(conversation.id, { url: input.pageUrl });
+      }
+
       // Add the message using the entity method which handles cooldown
       const message = await conversation.addMessage({
         content: input.content,
@@ -817,6 +833,17 @@ export const publicConversationsRouter = t.router({
 
     return { saved: true, nonce: verified.newNonce, error: null };
   }),
+
+  // A shopper opened a recommended product or followed its buy link. No DPoP
+  // proof: see shopping-events.service for what makes a click count.
+  trackProductClick: publicProcedure
+    .input(trackProductClickSchema)
+    .mutation(async ({ input, ctx }) => {
+      if (await isPublicWidgetRateLimited([{ rule: "clickPerIp", id: clientIp(ctx.ipAddress) }])) {
+        throw tooManyRequests();
+      }
+      return { recorded: await recordProductClick(input) };
+    }),
 
   // The visitor's thumbs up/down on an AI answer (requires DPoP proof). Only
   // AI answers of this conversation; rating again replaces the rating.

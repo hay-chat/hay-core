@@ -26,7 +26,68 @@ import type { HayLogger } from "./logger";
  * change to a type's props ships as a new version (`challenge@2`) and the
  * widget advertises the versions it supports.
  */
-export type WebchatContributionType = "challenge@1";
+export type WebchatContributionType = "challenge@1" | "cart@1";
+
+/**
+ * Props of a `cart@1` contribution: how to put a product in the cart of the
+ * store the widget is on. The widget sends these requests from the shopper's
+ * browser, to the page's own origin only, when the shopper clicks the button
+ * on a product card. A product gets the button when its variant carries a
+ * `cartItemId` (see `CanonicalVariant`) and the page is on the product's site.
+ *
+ * @example
+ * ```typescript
+ * register.webchat.contribution({
+ *   id: 'cart',
+ *   type: 'cart@1',
+ *   props: {
+ *     enabled: config.field('cartActions'),
+ *     addPath: '/cart/add.js',
+ *     addBody: '{"items":[{"id":{{cartItemId}},"quantity":{{quantity}}}]}',
+ *     checkoutPath: '/checkout',
+ *   },
+ * });
+ * ```
+ */
+export interface WebchatCartV1Props {
+  /** The org's switch (usually a boolean config field defaulting to true). Default true. */
+  enabled?: boolean;
+  /** Path the widget POSTs to, on the page's origin. One leading slash. */
+  addPath: string;
+  /**
+   * The JSON request body as text, with `{{cartItemId}}`, `{{quantity}}` and
+   * `{{conversationId}}` filled in by the widget. Quote a placeholder where the
+   * store expects a string. Must be valid JSON once filled.
+   */
+  addBody: string;
+  /** Path of the store's checkout, where the card's "Checkout" link goes. */
+  checkoutPath: string;
+  /**
+   * For stores that require a token on cart writes: the widget GETs
+   * `tokenPath`, reads `tokenResponseHeader` from the answer and sends it as
+   * `tokenRequestHeader` with the add request. Set all three or none.
+   */
+  tokenPath?: string;
+  tokenResponseHeader?: string;
+  tokenRequestHeader?: string;
+  /**
+   * DOM events the widget fires after a successful add, so the store's theme
+   * refreshes its cart count or drawer. A JSON array as text, at most 8 events:
+   * `[{ "name": "cart:refresh" }, { "name": "x", "target": "window", "detail": { "type": "y" } }]`.
+   * `target` is `"body"` (default, bubbling) or `"window"`; `detail` is a flat
+   * object of strings, numbers and booleans. The widget always fires
+   * `hay:cart-updated` on the body as well.
+   */
+  afterAddEvents?: string;
+  /**
+   * Dotted name of a global on the store's page that holds the path the
+   * storefront lives under, for stores served from a locale folder (e.g.
+   * `"Shopify.routes.root"` holding `"/en-ca/"`). The widget puts it in front
+   * of `addPath`, `checkoutPath` and `tokenPath`. Ignored when the global is
+   * missing or is not a path.
+   */
+  rootPathGlobal?: string;
+}
 
 /** A contribution prop is either a literal or a reference to a config field. */
 export type WebchatContributionPropValue = string | number | boolean | ConfigFieldReference;

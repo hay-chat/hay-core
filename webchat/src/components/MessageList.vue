@@ -112,29 +112,12 @@
               v-else-if="part.kind === 'products'"
               class="hay-bubble hay-bubble--rich hay-bubble--follow"
             >
-              <div class="hay-product-recs">
-                <a
-                  v-for="p in part.products"
-                  :key="p.id || p.externalId"
-                  :href="safeHttpUrl(p.sourceUrl) ?? '#'"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="hay-product-card"
-                >
-                  <div class="hay-product-card__image">
-                    <img v-if="p.imageUrl" :src="p.imageUrl" :alt="p.title" loading="lazy" />
-                  </div>
-                  <div class="hay-product-card__body">
-                    <div class="hay-product-card__title">{{ p.title }}</div>
-                    <div v-if="p.topVariant?.price" class="hay-product-card__price">
-                      {{ formatPrice(p.topVariant.price, p.topVariant.currency) }}
-                    </div>
-                    <div v-if="p.available === false" class="hay-product-card__oos">
-                      Out of stock
-                    </div>
-                  </div>
-                </a>
-              </div>
+              <ProductCards
+                :products="part.products"
+                @product-click="
+                  (productId, type) => $emit('productClick', part.message.id, productId, type)
+                "
+              />
             </div>
 
             <!-- FORM messages: the form itself, or the answers once submitted -->
@@ -250,7 +233,14 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref, watch, nextTick, type Directive } from "vue";
-import type { AgentActivity, AnswerSource, Message, TeamMember } from "@/types";
+import type {
+  AgentActivity,
+  AnswerSource,
+  Message,
+  ProductClickType,
+  RecommendedProduct,
+  TeamMember,
+} from "@/types";
 import {
   parseMarkdown,
   safeHttpUrl,
@@ -266,6 +256,8 @@ import type { FormResponse, FormSchema } from "@hay/form-schema";
 
 // Forms are rare on a first open, so their code loads only when one shows.
 const FormMessage = defineAsyncComponent(() => import("./FormMessage.vue"));
+// Same for product cards: only shopping conversations show them.
+const ProductCards = defineAsyncComponent(() => import("./ProductCards.vue"));
 // Sources and thumbs: their own chunk too, loaded with the first AI answer.
 const AnswerExtras = defineAsyncComponent(() => import("./AnswerExtras.vue"));
 
@@ -302,6 +294,7 @@ const props = defineProps<{
 
 defineEmits<{
   submitForm: [messageId: string, response: FormResponse];
+  productClick: [messageId: string, productId: string, type: ProductClickType];
 }>();
 
 interface FormUi {
@@ -309,16 +302,6 @@ interface FormUi {
   schema?: FormSchema;
   status?: string;
   response?: FormResponse;
-}
-
-interface ProductCard {
-  id?: string;
-  externalId?: string;
-  title?: string;
-  imageUrl?: string;
-  sourceUrl?: string;
-  available?: boolean;
-  topVariant?: { price?: string | number; currency?: string };
 }
 
 type Part =
@@ -332,7 +315,7 @@ type Part =
       /** The group's last bubble: it carries the time. */
       last?: boolean;
     }
-  | { kind: "products"; key: string; message: Message; products: ProductCard[] }
+  | { kind: "products"; key: string; message: Message; products: RecommendedProduct[] }
   | { kind: "form"; key: string; message: Message; form: FormUi }
   | { kind: "files"; key: string; message: Message };
 
@@ -342,12 +325,12 @@ function formUi(message: Message): FormUi | null {
   return ui?.kind === "form" && ui.schema ? ui : null;
 }
 
-function productsOf(message: Message): ProductCard[] | null {
+function productsOf(message: Message): RecommendedProduct[] | null {
   if (message.agentType !== "ProductRecommendation") return null;
   const recommendation = message.metadata?.productRecommendation as
     { products?: unknown } | undefined;
   return Array.isArray(recommendation?.products)
-    ? (recommendation.products as ProductCard[])
+    ? (recommendation.products as RecommendedProduct[])
     : null;
 }
 
@@ -585,21 +568,6 @@ const formatTime = (timestamp: number) => {
   const hours = date.getHours().toString().padStart(2, "0");
   const minutes = date.getMinutes().toString().padStart(2, "0");
   return `${hours}:${minutes}`;
-};
-
-const formatPrice = (amount?: string | number, currency?: string): string => {
-  if (amount === undefined || amount === null || amount === "") return "";
-  const value = typeof amount === "string" ? parseFloat(amount) : amount;
-  if (Number.isNaN(value)) return "";
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: currency || "USD",
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `${value.toFixed(2)} ${currency ?? ""}`.trim();
-  }
 };
 
 // Images (and the answer extras, which load on demand) arrive after the list first scrolls,
@@ -1026,68 +994,5 @@ a.hay-message__attachment-file:hover {
     opacity: 1;
     transform: translateY(-3px);
   }
-}
-
-/* Product recommendation cards */
-.hay-product-recs {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 8px;
-  min-width: 248px;
-}
-
-.hay-product-card {
-  display: flex;
-  flex-direction: column;
-  border-radius: 10px;
-  border: 1px solid var(--hay-line);
-  background: var(--hay-surface);
-  text-decoration: none;
-  color: inherit;
-  overflow: hidden;
-}
-
-.hay-product-card:hover {
-  border-color: var(--hay-accent);
-}
-
-.hay-product-card__image {
-  aspect-ratio: 1 / 1;
-  background: var(--hay-raised);
-}
-
-.hay-product-card__image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 0;
-}
-
-.hay-product-card__body {
-  padding: 6px 8px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.hay-product-card__title {
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.25;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.hay-product-card__price {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--hay-accent);
-}
-
-.hay-product-card__oos {
-  font-size: 10px;
-  color: var(--hay-meta);
 }
 </style>

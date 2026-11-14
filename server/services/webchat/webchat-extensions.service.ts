@@ -37,7 +37,7 @@ import { workerFetch } from "@server/lib/worker-client";
 const logger = createLogger("webchat-extensions");
 
 /** Contribution types this server can validate and serve. */
-export const CONTRIBUTION_TYPES = ["challenge@1"] as const;
+export const CONTRIBUTION_TYPES = ["challenge@1", "cart@1"] as const;
 export type ContributionType = (typeof CONTRIBUTION_TYPES)[number];
 
 /**
@@ -56,6 +56,103 @@ export const challengeV1Schema = z.object({
 });
 export type ChallengeV1Props = z.infer<typeof challengeV1Schema>;
 
+/** A path on the page's own origin: one leading slash, so it can never name another host. */
+const sameOriginPath = z
+  .string()
+  .regex(/^\/(?!\/)[^\s\\]{0,500}$/, "must be a path on the store's own origin");
+const headerName = z.string().regex(/^[A-Za-z0-9-]{1,64}$/);
+
+/** What the widget fills into a cart request body. */
+export const CART_BODY_VARIABLES = ["cartItemId", "quantity", "conversationId"] as const;
+
+/**
+ * Fill a `cart@1` body template. Every value is plain by construction (an id of
+ * letters and digits, an integer, a uuid), so text substitution cannot change
+ * the shape of the JSON around it.
+ */
+export function fillCartBody(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (match, name: string) =>
+    name in values ? String(values[name]) : match,
+  );
+}
+
+function isValidCartBody(template: string): boolean {
+  try {
+    JSON.parse(fillCartBody(template, { cartItemId: "1", quantity: 1, conversationId: "c" }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** One DOM event of `afterAddEvents`: where it is fired and the flat `detail` it carries. */
+const cartEventSchema = z
+  .object({
+    name: z.string().regex(/^[A-Za-z0-9_:.-]{1,64}$/),
+    target: z.enum(["body", "window"]).optional(),
+    detail: z
+      .record(z.string().max(40), z.union([z.string().max(200), z.number(), z.boolean()]))
+      .optional(),
+  })
+  .strict();
+
+function isValidCartEvents(text: string): boolean {
+  try {
+    return z.array(cartEventSchema).max(8).safeParse(JSON.parse(text)).success;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * `cart@1`: how to put a product in the cart of the store the widget is on.
+ * The plugin describes the store platform's cart requests; the widget sends
+ * them from the shopper's browser, to the page's own origin only, when the
+ * shopper clicks a product card's button. Nothing here is a plugin id or
+ * platform name: Core and the widget only see paths and a body template.
+ */
+export const cartV1Schema = z
+  .object({
+    /** The org's switch: false withdraws the contribution. */
+    enabled: z.boolean().default(true),
+    /** POST target that adds an item, e.g. "/cart/add.js". */
+    addPath: sameOriginPath,
+    /** JSON body with {{cartItemId}}, {{quantity}} and {{conversationId}} placeholders. */
+    addBody: z.string().min(2).max(2000).refine(isValidCartBody, "must be a JSON template"),
+    /** Where "Checkout" takes the shopper. */
+    checkoutPath: sameOriginPath,
+    /**
+     * Stores that want a token on cart writes (a nonce): GET `tokenPath`, read
+     * `tokenResponseHeader` from the answer, send it back as `tokenRequestHeader`.
+     */
+    tokenPath: sameOriginPath.optional(),
+    tokenResponseHeader: headerName.optional(),
+    tokenRequestHeader: headerName.optional(),
+    /**
+     * DOM events the widget fires after a successful add, so the store's theme
+     * refreshes its cart: a JSON array of `{ name, target?, detail? }` as text.
+     */
+    afterAddEvents: z.string().max(2000).refine(isValidCartEvents, "invalid events").optional(),
+    /**
+     * A global of the store's page holding the path its storefront lives under
+     * (a locale folder such as "/en-ca/"): dotted name, read by the widget and
+     * put in front of every cart path.
+     */
+    rootPathGlobal: z
+      .string()
+      .regex(/^[A-Za-z_$][\w$]{0,40}(\.[A-Za-z_$][\w$]{0,40}){0,4}$/)
+      .optional(),
+  })
+  .refine(
+    (props) =>
+      [props.tokenPath, props.tokenResponseHeader, props.tokenRequestHeader].filter(Boolean)
+        .length %
+        3 ===
+      0,
+    "tokenPath, tokenResponseHeader and tokenRequestHeader go together",
+  );
+export type CartV1Props = z.infer<typeof cartV1Schema>;
+
 /** A resolved, validated contribution (server-side view; includes the site key). */
 export interface ResolvedChallengeContribution {
   /** Stable public id: `<pluginId>.<contributionId>`. */
@@ -65,11 +162,19 @@ export interface ResolvedChallengeContribution {
 }
 
 /** What the widget receives: only what it needs to render. */
-export interface PublicContribution {
-  id: string;
-  type: ContributionType;
-  props: { provider: string; mode: "invisible" | "challenge_all" };
-}
+export type PublicContribution =
+  | {
+      id: string;
+      type: "challenge@1";
+      props: { provider: string; mode: "invisible" | "challenge_all" };
+    }
+  | {
+      id: string;
+      type: "cart@1";
+      /** The catalog source these cart requests are for (matches a product's `source`). */
+      source: string;
+      props: Omit<CartV1Props, "enabled">;
+    };
 
 export interface GateInput {
   token?: string;
@@ -209,19 +314,63 @@ export class WebchatExtensionsService {
     return resolved;
   }
 
+  /** Every valid, switched-on `cart@1` contribution for an org. */
+  async resolveCarts(organizationId: string): Promise<PublicContribution[]> {
+    const resolved: PublicContribution[] = [];
+    for (const instance of await this.webchatInstances(organizationId)) {
+      this.refreshMetadataIfNeeded(instance);
+      for (const descriptor of webchatMetadata(instance)?.contributions ?? []) {
+        if (descriptor.type !== "cart@1") continue;
+        const pluginId = instance.plugin.pluginId;
+        const id = `${pluginId}.${descriptor.id}`;
+        const parsed = cartV1Schema.safeParse(
+          resolveContributionProps(
+            descriptor,
+            instance.config,
+            configSchemaOf(instance),
+            configEnvAllowList(instance.plugin),
+          ),
+        );
+        if (!parsed.success) {
+          logger.warn(
+            { organizationId, contribution: id, issues: parsed.error.issues.map((i) => i.message) },
+            "Webchat cart contribution ignored: invalid props",
+          );
+          continue;
+        }
+        const { enabled, ...props } = parsed.data;
+        if (!enabled) continue;
+        // Products are stamped with the plugin id as their source at ingestion.
+        resolved.push({ id, type: "cart@1", source: pluginId, props });
+      }
+    }
+    return resolved;
+  }
+
   /** Public contributions for a widget, filtered to the types it can render. */
   async getPublicContributions(
     organizationId: string,
     supports: readonly string[],
     options: { underAttack: boolean },
   ): Promise<PublicContribution[]> {
-    if (!supports.includes("challenge@1")) return [];
-    const challenges = await this.resolveChallenges(organizationId, options);
-    return challenges.map((c) => ({
-      id: c.id,
-      type: c.type,
-      props: { provider: c.props.provider, mode: c.props.mode as "invisible" | "challenge_all" },
-    }));
+    const contributions: PublicContribution[] = [];
+    if (supports.includes("challenge@1")) {
+      const challenges = await this.resolveChallenges(organizationId, options);
+      contributions.push(
+        ...challenges.map((c) => ({
+          id: c.id,
+          type: c.type,
+          props: {
+            provider: c.props.provider,
+            mode: c.props.mode as "invisible" | "challenge_all",
+          },
+        })),
+      );
+    }
+    if (supports.includes("cart@1")) {
+      contributions.push(...(await this.resolveCarts(organizationId)));
+    }
+    return contributions;
   }
 
   /**

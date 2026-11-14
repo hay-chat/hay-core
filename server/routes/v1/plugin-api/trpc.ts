@@ -1353,6 +1353,8 @@ export const pluginApiTrpcRouter = router({
                     weightValue: z.number().optional(),
                     weightUnit: z.string().optional(),
                     imageSrc: z.string().optional(),
+                    buyUrl: z.string().max(2048).optional(),
+                    cartItemId: z.string().max(64).optional(),
                     attributes: z.record(z.string(), z.any()).optional(),
                   }),
                 )

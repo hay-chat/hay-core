@@ -181,5 +181,6 @@ export function createPreviewChat(options: PreviewOptions): WidgetChat {
       return true;
     },
     openConversation: done,
+    trackProductClick: nothing,
   };
 }

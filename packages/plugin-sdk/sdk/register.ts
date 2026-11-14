@@ -36,7 +36,7 @@ export const WEBCHAT_GATE_DEFAULT_TIMEOUT_MS = 3000;
 /** Maximum gate timeout (ms): a gate blocks a shopper's first message. */
 export const WEBCHAT_GATE_MAX_TIMEOUT_MS = 5000;
 
-const WEBCHAT_CONTRIBUTION_TYPES = ["challenge@1"] as const;
+const WEBCHAT_CONTRIBUTION_TYPES = ["challenge@1", "cart@1"] as const;
 const WEBCHAT_GATE_EVENTS: WebchatGateEvent[] = ["conversation.create", "message.send"];
 
 /**

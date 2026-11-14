@@ -55,6 +55,7 @@
         @toggle-expand="toggleExpand"
         @submit-pre-chat-form="onPreChatForm"
         @submit-in-conversation-form="submitInConversationForm"
+        @product-click="trackProductClick"
       >
         <template #home>
           <HomeView
@@ -91,6 +92,7 @@ import { safeStorage } from "./composables/useConsent";
 import { provideI18n, type Translations } from "./i18n";
 import { resolveLocale } from "./i18n/resolve";
 import { resumeConversationId } from "./utils/resume";
+import { cartContextKey } from "./utils/cartContext";
 import {
   fetchAvailability,
   headerStatus,
@@ -99,7 +101,12 @@ import {
   type WidgetAvailability,
 } from "./utils/availability";
 import type { FormResponse } from "@hay/form-schema";
-import type { HayChatConfig, LauncherBridge, PublicConfig } from "./types";
+import type {
+  ChallengeContribution,
+  HayChatConfig,
+  LauncherBridge,
+  PublicConfig,
+} from "./types";
 import { ASSISTANT_AVATAR_PRESET } from "./components/Avatar.vue";
 
 // The home view loads with the chat's first open (most visitors start there),
@@ -193,7 +200,9 @@ const assistantName = computed(() => resolvedAgentName.value || t("chat.assistan
 
 // The org's bot check, when one is on (declarative challenge@1 contribution).
 const challengeContribution =
-  props.publicConfig?.contributions?.find((c) => c.type === "challenge@1") ?? null;
+  props.publicConfig?.contributions?.find(
+    (c): c is ChallengeContribution => c.type === "challenge@1",
+  ) ?? null;
 
 // CSAT: host config wins, then server config; enabled by default.
 const resolvedCsatEnabled = computed(
@@ -216,7 +225,11 @@ const chat: WidgetChat =
       // Named on the "working" overlay while a page tool runs.
       agentName: resolvedAgentName.value,
     },
-    { challenge: challengeContribution, preChatForm: props.publicConfig?.preChatForm ?? null },
+    {
+      challenge: challengeContribution,
+      preChatForm: props.publicConfig?.preChatForm ?? null,
+      contributions: props.publicConfig?.contributions ?? [],
+    },
   );
 
 const {
@@ -256,7 +269,14 @@ const {
   submitInConversationForm,
   rateMessage,
   openConversation,
+  trackProductClick,
 } = chat;
+
+// Product cards add to the store's cart through the plugins' cart@1 contributions.
+provide(cartContextKey, {
+  contributions: props.publicConfig?.contributions ?? [],
+  conversationId,
+});
 
 function setChallengeHost(el: HTMLElement | null) {
   challengeHost.value = el;

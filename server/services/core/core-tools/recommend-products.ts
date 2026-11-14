@@ -14,6 +14,11 @@ import { Product, ProductStatus } from "@server/entities/product.entity";
 import { ProductVariant, VariantAvailability } from "@server/entities/product-variant.entity";
 import { productVectorStoreService } from "@server/services/product-vector-store.service";
 import { createLogger } from "@server/lib/logger";
+import {
+  variantBuyUrl,
+  variantCartItemId,
+  withShoppingAttribution,
+} from "@server/lib/shopping-links";
 import type { CoreToolDefinition } from "./index";
 import { READ_RISK } from "../tool-risk";
 
@@ -46,6 +51,10 @@ interface ProductRecommendation {
   imageUrl?: string;
   available: boolean;
   similarity: number;
+  /** How many variants the product has: more than one means the shopper must choose. */
+  variantCount: number;
+  /** What the shopper can choose (size, colour, ...), capped for display. */
+  options?: Array<{ name: string; values: string[] }>;
   topVariant?: {
     id: string;
     externalId: string;
@@ -55,8 +64,19 @@ interface ProductRecommendation {
     currency?: string;
     sku?: string;
     availability: VariantAvailability;
+    /**
+     * Adds this variant to the cart or opens checkout. Only set when the
+     * product has a single, in-stock variant: we never pick a size or colour
+     * for the shopper.
+     */
+    buyUrl?: string;
+    /** The store cart's id for this variant, under the same rule as `buyUrl`. */
+    cartItemId?: string;
   };
 }
+
+/** Option values shown per option on a card ("S, M, L, XL +2"). */
+const MAX_OPTION_VALUES = 8;
 
 export const recommendProductsTool: CoreToolDefinition = {
   name: "recommend_products",
@@ -83,7 +103,12 @@ export const recommendProductsTool: CoreToolDefinition = {
         properties: {
           minPrice: { type: "number", minimum: 0 },
           maxPrice: { type: "number", minimum: 0 },
-          inStockOnly: { type: "boolean" },
+          inStockOnly: {
+            type: "boolean",
+            default: true,
+            description:
+              "Defaults to true. Pass false only when the shopper asks about a specific product that may be sold out.",
+          },
           categorySlug: { type: "string" },
           productType: { type: "string" },
           tags: { type: "array", items: { type: "string" } },
@@ -113,6 +138,8 @@ export const recommendProductsTool: CoreToolDefinition = {
       return { products: [], query: "", filtersApplied: parsed.filters };
     }
     const limit = Math.min(Math.max(parsed.limit ?? 4, 1), 10);
+    // In-stock only unless the model asks otherwise: a sold-out card is a dead end.
+    const filters = { ...parsed.filters, inStockOnly: parsed.filters?.inStockOnly !== false };
 
     if (!productVectorStoreService.initialized) {
       await productVectorStoreService.initialize();
@@ -124,7 +151,7 @@ export const recommendProductsTool: CoreToolDefinition = {
     const hits = await productVectorStoreService.search(organizationId, query, candidatePool);
 
     if (!hits.length) {
-      return { products: [], query, filtersApplied: parsed.filters };
+      return { products: [], query, filtersApplied: filters };
     }
 
     const productIds = hits.map((h) => h.productId);
@@ -142,7 +169,7 @@ export const recommendProductsTool: CoreToolDefinition = {
       .map((h) => ({ hit: h, product: byId.get(h.productId) }))
       .filter((row): row is { hit: (typeof hits)[number]; product: Product } => !!row.product)
       .filter(({ product }) => {
-        const f = parsed.filters || {};
+        const f = filters;
         if (f.inStockOnly && !product.available) return false;
         if (f.productType && product.productType !== f.productType) return false;
         if (f.minPrice !== undefined && product.priceMax !== undefined) {
@@ -165,7 +192,7 @@ export const recommendProductsTool: CoreToolDefinition = {
 
     if (!filtered.length) {
       logger.debug({ organizationId, query }, "No products matched after filters");
-      return { products: [], query, filtersApplied: parsed.filters };
+      return { products: [], query, filtersApplied: filters };
     }
 
     // Pull the cheapest in-stock variant (fall back to first by position) for each finalist.
@@ -184,6 +211,8 @@ export const recommendProductsTool: CoreToolDefinition = {
     const recs: ProductRecommendation[] = filtered.map(({ product, hit }) => {
       const candidateVariants = variantsByProduct.get(product.id) ?? [];
       const topVariant = pickTopVariant(candidateVariants);
+      const canBuyDirectly =
+        candidateVariants.length === 1 && topVariant?.availability === VariantAvailability.IN_STOCK;
       return {
         id: product.id,
         externalId: product.externalId,
@@ -191,13 +220,15 @@ export const recommendProductsTool: CoreToolDefinition = {
         title: product.title,
         handle: product.handle,
         description: product.descriptionShort ?? product.description,
-        sourceUrl: product.sourceUrl,
+        sourceUrl: withShoppingAttribution(product.sourceUrl, conversation.id),
         vendor: product.vendor,
         productType: product.productType,
         tags: product.tags,
         imageUrl: product.images?.[0]?.src,
         available: product.available,
         similarity: hit.similarity,
+        variantCount: candidateVariants.length,
+        options: displayOptions(product),
         topVariant: topVariant
           ? {
               id: topVariant.id,
@@ -208,14 +239,26 @@ export const recommendProductsTool: CoreToolDefinition = {
               currency: topVariant.currency ?? product.currency,
               sku: topVariant.sku,
               availability: topVariant.availability,
+              buyUrl: canBuyDirectly
+                ? withShoppingAttribution(variantBuyUrl(topVariant.attributes), conversation.id)
+                : undefined,
+              cartItemId: canBuyDirectly ? variantCartItemId(topVariant.attributes) : undefined,
             }
           : undefined,
       };
     });
 
-    return { products: recs, query, filtersApplied: parsed.filters };
+    return { products: recs, query, filtersApplied: filters };
   },
 };
+
+/** The product's real choices: options with a single value ("Title: Default") are noise. */
+function displayOptions(product: Product): ProductRecommendation["options"] {
+  const options = (product.options ?? [])
+    .filter((option) => Array.isArray(option.values) && option.values.length > 1)
+    .map((option) => ({ name: option.name, values: option.values.slice(0, MAX_OPTION_VALUES) }));
+  return options.length ? options : undefined;
+}
 
 function pickTopVariant(variants: ProductVariant[]): ProductVariant | undefined {
   if (!variants.length) return undefined;

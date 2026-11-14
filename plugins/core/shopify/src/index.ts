@@ -46,6 +46,7 @@ import {
   webhookUrl,
   type ShopifyClient,
 } from "./disputes.js";
+import { cartPermalink } from "./buy-link.js";
 import { complianceTopic, handleComplianceWebhook, pluginApiMutation } from "./compliance.js";
 import type {
   CanonicalProduct,
@@ -264,8 +265,9 @@ async function shopifyGraphql<T>(
   return json.data;
 }
 
-function mapVariant(node: ShopifyVariantNode): CanonicalVariant {
+function mapVariant(node: ShopifyVariantNode, onlineStoreUrl?: string | null): CanonicalVariant {
   return {
+    buyUrl: node.availableForSale === false ? undefined : cartPermalink(onlineStoreUrl, node.id),
     externalId: node.id,
     sku: node.sku ?? undefined,
     barcode: node.barcode ?? undefined,
@@ -294,7 +296,7 @@ function mapVariant(node: ShopifyVariantNode): CanonicalVariant {
 }
 
 function mapProduct(node: ShopifyProductNode): CanonicalProduct {
-  const variants = (node.variants?.edges ?? []).map((e) => mapVariant(e.node));
+  const variants = (node.variants?.edges ?? []).map((e) => mapVariant(e.node, node.onlineStoreUrl));
   if (!variants.length) {
     // Defensive fallback — Shopify products always have at least one variant in
     // practice, but guard so the core's "variants required" contract holds.

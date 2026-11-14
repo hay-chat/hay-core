@@ -1,5 +1,5 @@
 import { ref, shallowRef } from "vue";
-import type { HayChatConfig, WidgetContribution } from "@/types";
+import type { HayChatConfig, ChallengeContribution } from "@/types";
 import { resolveLocale } from "@/i18n/resolve";
 
 /** Must match the server's CHALLENGE_MESSAGE_SOURCE. */
@@ -38,7 +38,7 @@ export function useChallenge(config: HayChatConfig) {
     }
   })();
 
-  const challengeUrl = (contribution: WidgetContribution): string => {
+  const challengeUrl = (contribution: ChallengeContribution): string => {
     const params = new URLSearchParams({
       org: config.organizationId,
       c: contribution.id,
@@ -48,7 +48,7 @@ export function useChallenge(config: HayChatConfig) {
     return `${config.baseUrl}/v1/webchat/challenge?${params.toString()}`;
   };
 
-  const run = (contribution: WidgetContribution): Promise<ChallengeResult> =>
+  const run = (contribution: ChallengeContribution): Promise<ChallengeResult> =>
     new Promise((resolve) => {
       if (!apiOrigin || !host.value) {
         resolve({ error: "unavailable" });

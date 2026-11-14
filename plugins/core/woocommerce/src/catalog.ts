@@ -132,6 +132,23 @@ function mapVariation(
   };
 }
 
+/**
+ * WooCommerce adds a product to the cart from any store URL carrying
+ * `?add-to-cart=<id>`. Only simple products: a variation needs its attributes
+ * chosen, and external/grouped products have no cart button.
+ */
+export function addToCartUrl(product: WooProduct): string | undefined {
+  if (product.type !== "simple" || !product.permalink) return undefined;
+  if (availability(product) === "out_of_stock") return undefined;
+  try {
+    const url = new URL(product.permalink);
+    url.searchParams.set("add-to-cart", String(product.id));
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
 export function mapProduct(
   product: WooProduct,
   variations: WooVariation[],
@@ -147,6 +164,7 @@ export function mapProduct(
       title: "Default",
       position: 1,
       imageSrc: product.images?.[0]?.src,
+      buyUrl: addToCartUrl(product),
       ...stockFields(product, currency),
     });
   }

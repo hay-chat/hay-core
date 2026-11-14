@@ -11,8 +11,10 @@ import { debugLog } from "@/utils/debug";
 import { resumeConversationId } from "@/utils/resume";
 import type {
   AgentActivity,
+  ChallengeContribution,
   HayChatConfig,
   Message,
+  ProductClickType,
   SendFailure,
   VisitorConversation,
   WidgetContribution,
@@ -31,9 +33,11 @@ import { findMissingRequiredFields } from "@hay/form-schema";
 
 export interface UseChatOptions {
   /** The org's challenge@1 contribution, when a bot check is on. */
-  challenge?: WidgetContribution | null;
+  challenge?: ChallengeContribution | null;
   /** The org's pre-chat form, asked before the first message when set. */
   preChatForm?: FormSchema | null;
+  /** The org's plugin contributions: the store's cart requests (cart@1) are run from here. */
+  contributions?: WidgetContribution[];
 }
 
 interface Keypair {
@@ -169,6 +173,8 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
   // Page tools (WebMCP): the host page's tools go up with identify and again
   // whenever the page changes them; a tool_call runs here, under the orange
   // "working" overlay, and its answer goes back on the same socket.
+  const storeContributions = options.contributions ?? [];
+  const canUseStoreCart = storeContributions.some((c) => c.type === "cart@1");
   watch(pageToolsVersion, () => {
     if (isConnected.value && conversationId.value) sendTools(listPageTools());
   });
@@ -176,7 +182,12 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     debugLog("[Webchat] Page tool call", call);
     startActivity(config.agentName || "Hay", describeToolCall(call.name));
     try {
-      const result = await executePageTool(call.name, call.args);
+      const result = call.builtin
+        ? // Loaded on demand: few conversations add to a cart.
+          await (
+            await import("@/utils/cart")
+          ).runStoreAction(storeContributions, call.name, call.args, conversationId.value)
+        : await executePageTool(call.name, call.args);
       sendToolResult(call.callId, { result: result === undefined ? null : result });
     } catch (error) {
       console.warn(`[Hay Webchat] Page tool "${call.name}" failed:`, error);
@@ -530,6 +541,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
         conversationId.value,
         (url) => createDPoPProof("GET", url, key.privateKey, key.publicJwk),
         listPageTools(),
+        canUseStoreCart,
       );
     }
   };
@@ -1360,6 +1372,12 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     });
   };
 
+  // A click on a recommended product card or its buy link.
+  const trackProductClick = (messageId: string, productId: string, type: ProductClickType) => {
+    if (!conversationId.value) return;
+    conversation.trackProductClick(conversationId.value, messageId, productId, type);
+  };
+
   // Rate the support once the conversation has ended (CSAT).
   const submitCsat = async (rating: number, retried = false): Promise<boolean> => {
     if (!conversationId.value || !keypair.value) return false;
@@ -1474,6 +1492,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     saveContactEmail,
     submitPreChatForm,
     submitInConversationForm,
+    trackProductClick,
     rateMessage,
     openConversation,
   };
@@ -1518,6 +1537,7 @@ export type WidgetChat = Pick<
   | "submitInConversationForm"
   | "rateMessage"
   | "openConversation"
+  | "trackProductClick"
 >;
 
 /** Sample content for the dashboard's live preview (src/preview.ts). */

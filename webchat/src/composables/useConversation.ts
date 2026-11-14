@@ -1,4 +1,4 @@
-import type { Attachment, HayChatConfig } from "@/types";
+import type { Attachment, HayChatConfig, ProductClickType } from "@/types";
 import type { FormResponse } from "@hay/form-schema";
 
 interface ConversationMetadata {
@@ -206,6 +206,9 @@ export function useConversation(config: HayChatConfig) {
         conversationId,
         content,
         proof,
+        // The server caps pageUrl at 2048 characters and would refuse the whole
+        // message, so a longer URL (tracking parameters) is left out.
+        ...(window.location.href.length <= 2048 ? { pageUrl: window.location.href } : {}),
         ...(clientMessageId ? { clientMessageId } : {}),
         ...(context && Object.keys(context).length > 0 ? { context } : {}),
       }),
@@ -306,6 +309,24 @@ export function useConversation(config: HayChatConfig) {
   };
 
   /**
+   * Report a click on a recommended product. Best effort: the link opens
+   * whether or not this reaches the server.
+   */
+  const trackProductClick = (
+    conversationId: string,
+    messageId: string,
+    productId: string,
+    type: ProductClickType,
+  ): void => {
+    void fetch(`${baseUrl}/v1/publicConversations.trackProductClick`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversationId, messageId, productId, type }),
+      keepalive: true,
+    }).catch(() => undefined);
+  };
+
+  /**
    * Thumbs up/down on an AI answer. Resolves to the server answer, which may
    * carry NONCE_EXPIRED with a fresh nonce.
    */
@@ -334,6 +355,7 @@ export function useConversation(config: HayChatConfig) {
     sendAttachment,
     setContactEmail,
     submitCsat,
+    trackProductClick,
     rateMessage,
   };
 }

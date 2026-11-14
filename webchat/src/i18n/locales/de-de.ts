@@ -8,6 +8,11 @@ export default {
   "chat.expand": "Chat vergrößern",
   "chat.collapse": "Chat verkleinern",
   "chat.poweredBy": "Bereitgestellt von",
+  "product.buy": "Kaufen",
+  "product.addToCart": "In den Warenkorb",
+  "product.addedToCart": "Im Warenkorb",
+  "product.checkout": "Zur Kasse",
+  "product.outOfStock": "Nicht vorrätig",
   "input.send": "Nachricht senden",
   "error.sendFailed":
     "Ihre Nachricht konnte nicht gesendet werden. Bitte versuchen Sie es gleich noch einmal.",
