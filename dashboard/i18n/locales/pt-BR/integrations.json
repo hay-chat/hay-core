@@ -307,10 +307,12 @@
     },
     "channelHealth": {
       "failingTitle": "Este canal está com falhas",
+      "expiringTitle": "A conexão deste canal está prestes a expirar",
       "since": "Desde {time}",
       "reasons": {
         "delivery_failures": "{detail} respostas não puderam ser entregues na última hora. Clientes neste canal podem estar sem resposta.",
         "token_revoked": "A conexão foi revogada ou expirou. Reconecte para voltar a receber e enviar mensagens.",
+        "token_expiring": "A conexão expira em {detail} e não pôde ser renovada automaticamente. Reconecte antes dessa data para continuar recebendo e enviando mensagens.",
         "quality_drop": "O provedor reduziu a classificação de qualidade deste canal ({detail}). Os limites de mensagens podem cair se ela continuar baixando."
       },
       "alerted": "Proprietários e administradores foram avisados por e-mail e push."

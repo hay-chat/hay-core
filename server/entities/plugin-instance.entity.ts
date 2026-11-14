@@ -6,12 +6,16 @@ import type { AuthState, PluginInstanceRuntimeState } from "../types/plugin-sdk.
 import { AuthStateEncryptedTransformer } from "../lib/auth/utils/encryption";
 
 /** Why a channel is failing (D13-11). */
-export type ChannelHealthReason = "delivery_failures" | "token_revoked" | "quality_drop";
+export type ChannelHealthReason =
+  "delivery_failures" | "token_revoked" | "token_expiring" | "quality_drop";
 
 export interface ChannelHealth {
   status: "ok" | "failing";
   reason?: ChannelHealthReason;
-  /** Short provider/plugin detail, e.g. "RED" or "4 replies failed in the last hour". */
+  /**
+   * Short provider/plugin detail, e.g. "RED", "4" (failed replies) or, for
+   * `token_expiring`, the expiry as an ISO timestamp.
+   */
   detail?: string;
   /** When the current status started (ISO). */
   since: string;
