@@ -4,13 +4,11 @@
     <span class="hay-powered-by__brand">
       <svg class="hay-powered-by__icon" viewBox="0 0 24 24" aria-hidden="true">
         <rect width="24" height="24" rx="6" fill="#001df5" />
-        <!-- The Hay mark, as in the dashboard (layout/OrgSwitcher.vue). -->
-        <svg x="6" y="6.5" width="12" height="11" viewBox="0 0 177 161">
-          <path
-            fill="#fff"
-            d="M169.457 154.602C169.457 154.602 46.8109 160.184 0 160.184C38.3848 20.6498 63.663 -65.8613 72.0895 98.7885C105.793 -19.35 127.327 -44.4661 127.327 95.0677C193.799 -54.6986 175.074 82.0447 169.457 154.602Z"
-          />
-        </svg>
+        <!-- The Hay mark (dashboard layout/OrgSwitcher.vue), rounded to fit the chunk budget. -->
+        <path
+          fill="#fff"
+          d="M17.5 17.1S9.2 17.4 6 17.4C8.6 7.9 10.3 2 10.9 13.2 13.2 5.2 14.6 3.5 14.6 13 19.1 2.8 17.9 12.1 17.5 17.1Z"
+        />
       </svg>
       <b>Hay.chat</b>
     </span>
