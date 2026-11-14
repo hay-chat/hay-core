@@ -1,7 +1,7 @@
 <template>
   <div
     :class="
-      cn('group/sidebar-wrapper flex min-h-screen w-full', sidebarOpen && 'sidebar-open', className)
+      cn('group/sidebar-wrapper flex min-h-dvh w-full', sidebarOpen && 'sidebar-open', className)
     "
   >
     <slot />
