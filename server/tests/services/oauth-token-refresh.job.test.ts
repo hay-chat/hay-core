@@ -1,3 +1,10 @@
+// shouldRefresh is pure; stub the job's DB-backed imports so loading the
+// module doesn't pull in the data source and entity graph.
+jest.mock("@server/repositories/plugin-instance.repository", () => ({
+  pluginInstanceRepository: {},
+}));
+jest.mock("@server/services/oauth.service", () => ({ oauthService: {} }));
+
 import { shouldRefresh } from "@server/services/oauth-token-refresh.job";
 
 const DAY = 24 * 60 * 60;
@@ -11,9 +18,10 @@ describe("shouldRefresh", () => {
     expect(shouldRefresh(now + 11 * DAY, now - 49 * DAY, now)).toBe(true);
   });
 
-  it("refreshes a 1-hour token after 48 minutes", () => {
-    expect(shouldRefresh(now + 13 * 60, now - 47 * 60, now)).toBe(false);
-    expect(shouldRefresh(now + 11 * 60, now - 49 * 60, now)).toBe(true);
+  it("refreshes a 1-hour token in its last 15 minutes, before the 80% mark", () => {
+    // 80% would be minute 48, but the 15-minute floor kicks in at minute 45
+    expect(shouldRefresh(now + 16 * 60, now - 44 * 60, now)).toBe(false);
+    expect(shouldRefresh(now + 14 * 60, now - 46 * 60, now)).toBe(true);
   });
 
   it("falls back to the last 15 minutes when the issue time is unknown", () => {
