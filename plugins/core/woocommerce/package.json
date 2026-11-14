@@ -13,7 +13,8 @@
     "marketplaceCategory": "commerce",
     "capabilities": [
       "mcp",
-      "products"
+      "products",
+      "webchat"
     ],
     "setup": {
       "businessTypes": [

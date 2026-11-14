@@ -4,6 +4,8 @@ import {
   addToCartUrl,
   bulkSync,
   mapProduct,
+  productCartItemId,
+  variationCartItemId,
   type WooGet,
   type WooProduct,
   type WooVariation,
@@ -215,5 +217,51 @@ describe("addToCartUrl", () => {
   it("has no link for a product that needs options chosen, or is sold out", () => {
     expect(addToCartUrl(VARIABLE)).toBeUndefined();
     expect(addToCartUrl({ ...SIMPLE, stock_status: "outofstock" })).toBeUndefined();
+  });
+});
+
+describe("cartItemId", () => {
+  it("is the product id for a simple product that can be bought", () => {
+    expect(productCartItemId(SIMPLE)).toBe("10");
+    expect(mapProduct(SIMPLE, [], "USD").variants[0].cartItemId).toBe("10");
+    expect(productCartItemId({ ...SIMPLE, stock_status: "onbackorder" })).toBe("10");
+  });
+
+  it("is left out for products the cart does not take by their own id", () => {
+    expect(productCartItemId({ ...SIMPLE, stock_status: "outofstock" })).toBeUndefined();
+    expect(productCartItemId({ ...SIMPLE, type: "external" })).toBeUndefined();
+    expect(productCartItemId({ ...SIMPLE, type: "grouped" })).toBeUndefined();
+    expect(productCartItemId(VARIABLE)).toBeUndefined();
+    // A variable product whose variations are all unpublished falls back to a default variant.
+    expect(mapProduct(VARIABLE, [], "USD").variants[0].cartItemId).toBeUndefined();
+  });
+
+  it("is the variation id when every varying attribute is fixed and it is not sold out", () => {
+    const variants = mapProduct(VARIABLE, VARIATIONS, "USD").variants;
+    expect(variants.map((v) => v.cartItemId)).toEqual([undefined, "22"]); // 21 is out of stock
+  });
+
+  it("is left out for a variation that leaves an attribute on Any", () => {
+    const product: WooProduct = {
+      ...VARIABLE,
+      attributes: [
+        { name: "Size", variation: true, options: ["S", "M"] },
+        { name: "Colour", variation: true, options: ["Red", "Blue"] },
+        { name: "Material", variation: false, options: ["Cotton"] },
+      ],
+    };
+    const anyColour: WooVariation = {
+      ...VARIATIONS[1],
+      attributes: [{ name: "Size", option: "M" }],
+    };
+    const fixed: WooVariation = {
+      ...VARIATIONS[1],
+      attributes: [
+        { name: "Size", option: "M" },
+        { name: "Colour", option: "Red" },
+      ],
+    };
+    expect(variationCartItemId(product, anyColour)).toBeUndefined();
+    expect(variationCartItemId(product, fixed)).toBe("22");
   });
 });

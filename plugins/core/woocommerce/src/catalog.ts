@@ -114,7 +114,25 @@ function stockFields(fields: WooStockFields, currency: string | undefined) {
   };
 }
 
+/**
+ * The id the Store API's `cart/add-item` takes for a variation, when the id is
+ * enough on its own: every attribute the parent varies by has a fixed value on
+ * this variation. A variation left on "Any size" needs the shopper's choice
+ * sent with it (wc/v3 omits such attributes from the variation), so it gets no id.
+ */
+export function variationCartItemId(
+  product: WooProduct,
+  variation: WooVariation,
+): string | undefined {
+  if (availability(variation) === "out_of_stock") return undefined;
+  const fixed = new Set((variation.attributes ?? []).filter((a) => a.option).map((a) => a.name));
+  const varying = (product.attributes ?? []).filter((a) => a.variation);
+  if (!varying.length || !varying.every((a) => fixed.has(a.name))) return undefined;
+  return String(variation.id);
+}
+
 function mapVariation(
+  product: WooProduct,
   variation: WooVariation,
   index: number,
   currency: string | undefined,
@@ -128,8 +146,23 @@ function mapVariation(
     selectedOptions: selected.length ? selected : undefined,
     position: variation.menu_order ?? index + 1,
     imageSrc: variation.image?.src || undefined,
+    cartItemId: variationCartItemId(product, variation),
     ...stockFields(variation, currency),
   };
+}
+
+/**
+ * Whether the store's cart takes this product by its own id: a simple product
+ * that is not sold out. External and grouped products have no cart button, and
+ * a variable product is added through one of its variations.
+ */
+function isDirectlyAddable(product: WooProduct): boolean {
+  return product.type === "simple" && availability(product) !== "out_of_stock";
+}
+
+/** The id the Store API's `cart/add-item` takes for a simple product: its own. */
+export function productCartItemId(product: WooProduct): string | undefined {
+  return isDirectlyAddable(product) ? String(product.id) : undefined;
 }
 
 /**
@@ -138,8 +171,7 @@ function mapVariation(
  * chosen, and external/grouped products have no cart button.
  */
 export function addToCartUrl(product: WooProduct): string | undefined {
-  if (product.type !== "simple" || !product.permalink) return undefined;
-  if (availability(product) === "out_of_stock") return undefined;
+  if (!isDirectlyAddable(product) || !product.permalink) return undefined;
   try {
     const url = new URL(product.permalink);
     url.searchParams.set("add-to-cart", String(product.id));
@@ -156,7 +188,7 @@ export function mapProduct(
 ): CanonicalProduct {
   const variants = variations
     .filter((v) => v.status === undefined || v.status === "publish")
-    .map((v, i) => mapVariation(v, i, currency));
+    .map((v, i) => mapVariation(product, v, i, currency));
   if (!variants.length) {
     // Simple (and grouped/external) products: the product is its own variant.
     variants.push({
@@ -165,6 +197,7 @@ export function mapProduct(
       position: 1,
       imageSrc: product.images?.[0]?.src,
       buyUrl: addToCartUrl(product),
+      cartItemId: productCartItemId(product),
       ...stockFields(product, currency),
     });
   }

@@ -45,6 +45,27 @@ agent not to re-run and to hand off: a person refunds in the gateway. `refund_pa
 (record only) is accepted only for offline methods (bacs, cod, cheque), where the store pays the
 money back by hand; the result then says `moneyMoved: false, recordedOnly: true`.
 
+## Add to cart from chat
+
+With the `webchat` capability the plugin contributes a `cart@1` (`src/cart.ts`): on the storefront,
+a recommended product's card gets an **Add to cart** button and the widget calls the WooCommerce
+Store API from the shopper's browser (`GET /wp-json/wc/store/v1/cart` for the `Nonce` header, then
+`POST /wp-json/wc/store/v1/cart/add-item` with `{ id, quantity }`). The catalog sync sets
+`cartItemId` on what the cart takes by id alone: simple products and variations with every
+attribute fixed, when not sold out. After an add the widget fires three events so the page redraws
+its cart: `wc_fragment_refresh` (classic themes' cart fragments) and `wc-blocks_added_to_cart` (the
+blocks' cart store) on `document.body`, and `wc-blocks_store_sync_required` on `window` for the
+Mini-Cart block. The last one relies on a store WooCommerce keeps private, so it may stop working
+in a future release; the count then updates on the next page load.
+
+Settings: **Add to cart from chat** (on by default), **Checkout page path** (default `/checkout/`)
+and the two **Cart API paths**, which only need changing when WordPress lives in a folder
+(`/shop/wp-json/...`) or uses plain permalinks (`/?rest_route=/wc/store/v1/...`).
+
+Limits: the Store API cannot attach the conversation to the cart or order without PHP on the
+store, so orders are not attributed to the chat. A store that disabled the Store API, or a
+security plugin that blocks it, makes the button fall back to the product's buy link.
+
 ## Build & test
 
 ```bash

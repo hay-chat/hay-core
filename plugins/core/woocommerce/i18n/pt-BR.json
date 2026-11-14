@@ -124,6 +124,22 @@
     "returnInstructions": {
       "label": "Como devolver",
       "description": "Seu processo de devolução, com suas palavras: para onde enviar, link ou formulário e prazos. O Hay.chat repassa o texto como está quando um cliente pergunta como devolver. Se ficar vazio, o Hay.chat encaminha essas perguntas para sua equipe."
+    },
+    "cartActions": {
+      "label": "Adicionar ao carrinho pelo chat",
+      "description": "Mostra um botão Adicionar ao carrinho nos produtos que o Hay.chat recomenda, quando o chat está aberto na sua loja. O produto vai para o carrinho do próprio cliente. Desative para mostrar só o link do produto."
+    },
+    "checkoutPath": {
+      "label": "Caminho da página de checkout",
+      "description": "Para onde o link Finalizar compra leva depois que um produto é adicionado. Altere se a sua página de checkout não fica em /checkout/ (por exemplo /finalizar-compra/ ou /loja/checkout/)."
+    },
+    "cartAddPath": {
+      "label": "Caminho da API do carrinho: adicionar item",
+      "description": "Só altere se o WordPress está instalado em uma pasta ou usa links permanentes simples. Exemplo com pasta: /loja/wp-json/wc/store/v1/cart/add-item. Links permanentes simples: /?rest_route=/wc/store/v1/cart/add-item."
+    },
+    "cartTokenPath": {
+      "label": "Caminho da API do carrinho: carrinho",
+      "description": "Só altere junto com o caminho acima. Exemplo com pasta: /loja/wp-json/wc/store/v1/cart. Links permanentes simples: /?rest_route=/wc/store/v1/cart."
     }
   },
   "ui": {
