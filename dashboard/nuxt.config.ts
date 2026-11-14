@@ -34,6 +34,9 @@ export default defineNuxtConfig({
       // Organization (on this deployment) whose assistant answers questions about Hay in the
       // dashboard. Unset means no support widget.
       supportWidgetOrgId: process.env["SUPPORT_WIDGET_ORG_ID"] || "",
+      // Domain the server publishes help centers under (`<subdomain>.<this>`). The dashboard
+      // frames those sites to preview them, so the CSP has to allow it.
+      helpCenterDomain: process.env["HELP_CENTER_DOMAIN"] || "",
       baseDomain:
         process.env["BASE_DOMAIN"] ||
         (process.env["NODE_ENV"] === "development" ? "localhost:3000" : ""),
@@ -124,6 +127,7 @@ export default defineNuxtConfig({
           "en/evidence.json",
           "en/tests.json",
           "en/setup.json",
+          "en/help-center.json",
         ],
       },
       {
@@ -151,6 +155,7 @@ export default defineNuxtConfig({
           "pt-BR/evidence.json",
           "pt-BR/tests.json",
           "pt-BR/setup.json",
+          "pt-BR/help-center.json",
         ],
       },
       {

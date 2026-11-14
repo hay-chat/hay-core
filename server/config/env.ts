@@ -77,6 +77,16 @@ export const config = {
     useSSL: process.env.USE_SSL === "true" || process.env.NODE_ENV === "production",
   },
 
+  // Public help center sites live on `<subdomain>.<HELP_CENTER_DOMAIN>`, a
+  // domain separate from the dashboard and API. host[:port]; empty turns the
+  // feature off. The reverse proxy must send that domain (and its subdomains)
+  // to this server.
+  helpCenter: {
+    domain: stripScheme(process.env.HELP_CENTER_DOMAIN || "")
+      .toLowerCase()
+      .replace(/\/+$/, ""),
+  },
+
   // Prometheus endpoint, on its own port so no reverse proxy can reach it. A
   // host other than loopback also requires METRICS_TOKEN. Port 0 turns it off.
   metrics: {

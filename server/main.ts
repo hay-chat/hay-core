@@ -133,6 +133,13 @@ async function startServer() {
 
   server.use(requestContext);
 
+  // Public help center websites, told apart by Host. Mounted first: a request
+  // on a help center host is answered there and never reaches the API below;
+  // every other request passes through untouched.
+  const { helpCenterSite, helpCenterTlsAskHandler } =
+    await import("@server/routes/help-center-site");
+  server.use(helpCenterSite());
+
   // Baseline security headers. The default CSP suits JSON and plain-text
   // responses (nothing loads, nothing may frame them); routes that serve HTML
   // or files set their own CSP (webchat challenge, media, plugin assets,
@@ -256,6 +263,13 @@ async function startServer() {
       checks,
       pluginIsolation: getPluginIsolationHealth(),
     });
+  });
+
+  // Asked by the reverse proxy before it obtains a TLS certificate for a help
+  // center hostname (Caddy on-demand TLS). Internal like /ready: proxies must
+  // not expose /internal/* publicly.
+  server.get("/internal/help-center/tls-ask", (req, res, next) => {
+    helpCenterTlsAskHandler(req, res).catch(next);
   });
 
   // Serve uploaded files from local storage

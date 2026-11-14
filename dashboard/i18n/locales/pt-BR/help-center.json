@@ -1,0 +1,235 @@
+{
+  "helpCenter": {
+    "title": "Central de ajuda",
+    "description": "Publique seus documentos como um site público que seus clientes podem pesquisar e ler.",
+    "loading": "Carregando sua central de ajuda...",
+    "loadFailed": "Não foi possível carregar sua central de ajuda.",
+    "tryAgain": "Tentar novamente",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "copyFailed": "Não foi possível copiar. Selecione o texto e copie manualmente.",
+    "untitled": "Sem título",
+    "live": "No ar",
+    "offline": "Fora do ar",
+    "reset": "Redefinir",
+    "saveChanges": "Salvar alterações",
+    "saved": "Alterações salvas",
+    "saveFailed": "Não foi possível salvar suas alterações",
+    "cancel": "Cancelar",
+    "opensInNewTab": "(abre em uma nova aba)",
+    "disabled": {
+      "title": "As centrais de ajuda não estão configuradas neste servidor",
+      "description": "Este servidor não tem um domínio de central de ajuda, então não há onde publicar um site. Se você hospeda o Hay por conta própria, defina HELP_CENTER_DOMAIN no ambiente do servidor e reinicie-o."
+    },
+    "notLive": {
+      "title": "Sua central de ajuda ainda não está no ar",
+      "description": "Ninguém de fora da sua equipe consegue vê-la. Adicione seu conteúdo, confira a pré-visualização e depois coloque no ar pela aba Visão geral."
+    },
+    "tabs": {
+      "overview": "Visão geral",
+      "content": "Conteúdo",
+      "appearance": "Aparência",
+      "domain": "Domínio"
+    },
+    "unsaved": {
+      "marker": "tem alterações não salvas",
+      "title": "Sair sem salvar?",
+      "description": "Suas alterações de aparência não foram salvas. Se você sair agora, elas serão perdidas.",
+      "leave": "Sair da página"
+    },
+    "basics": {
+      "name": "Nome",
+      "namePlaceholder": "Central de Ajuda Acme",
+      "nameHint": "Aparece no topo do site e nas abas do navegador.",
+      "address": "Endereço",
+      "addressCurrent": "{address} é o seu endereço atual.",
+      "addressAvailable": "{address} está disponível.",
+      "addressChecking": "Verificando este endereço...",
+      "addressCheckFailed": "Não foi possível verificar este endereço agora. Você pode continuar: ele é verificado de novo ao salvar.",
+      "addressTooShort": "Use pelo menos 3 caracteres.",
+      "addressTooLong": "Use no máximo 63 caracteres.",
+      "addressInvalid": "Use apenas letras minúsculas, números e hifens, começando e terminando com uma letra ou um número.",
+      "addressReserved": "Esse endereço é reservado. Escolha outro.",
+      "addressTaken": "Esse endereço já está em uso. Escolha outro.",
+      "language": "Idioma",
+      "languageHint": "O idioma dos textos do próprio site, como a caixa de busca. Seus artigos aparecem como foram escritos."
+    },
+    "theme": {
+      "accentColor": "Cor de destaque",
+      "accentColorPicker": "Escolher uma cor de destaque",
+      "accentColorInvalid": "Digite uma cor hexadecimal de 6 dígitos, como #2747d6.",
+      "contrastWarning": "Em uma página branca, esta cor tem contraste de {ratio}:1, abaixo dos 4.5:1 de que um texto precisa. Os links aparecerão na cor normal do texto em vez desta; os botões continuam legíveis.",
+      "font": "Fonte",
+      "fonts": {
+        "sans": "Sem serifa",
+        "serif": "Com serifa",
+        "rounded": "Arredondada",
+        "mono": "Monoespaçada"
+      },
+      "layout": "Layout da página inicial",
+      "layouts": {
+        "cards": "Cartões",
+        "cardsHint": "Um cartão por coleção.",
+        "list": "Lista",
+        "listHint": "Todos os artigos listados em suas coleções."
+      },
+      "heroTitle": "Título de destaque",
+      "heroTitlePlaceholder": "Como podemos ajudar?",
+      "heroSubtitle": "Subtítulo de destaque",
+      "heroSubtitlePlaceholder": "Pesquise nossos guias ou navegue por tema.",
+      "showPoweredBy": "Mostrar \"Powered by Hay\""
+    },
+    "collection": {
+      "title": "Título",
+      "titlePlaceholder": "Primeiros passos",
+      "description": "Descrição",
+      "descriptionPlaceholder": "O que os visitantes encontram aqui",
+      "icon": "Ícone",
+      "iconSuggestions": "Ícones sugeridos",
+      "iconPlaceholder": "Qualquer emoji",
+      "iconHint": "Escolha um acima ou digite qualquer emoji. Deixe vazio para não usar ícone."
+    },
+    "picker": {
+      "search": "Pesquisar documentos",
+      "searchPlaceholder": "Pesquisar por título",
+      "loadFailed": "Não foi possível carregar seus documentos.",
+      "noMatches": "Nenhum documento corresponde à sua pesquisa.",
+      "noDocuments": "Você ainda não tem documentos. Crie ou importe alguns em Documentos primeiro.",
+      "alreadyHere": "Já está nesta coleção",
+      "inCollection": "Em {collection} (será movido)",
+      "notPublished": "Não publicado",
+      "previous": "Anterior",
+      "next": "Próxima",
+      "pageOf": "Página {page} de {total}"
+    },
+    "setup": {
+      "steps": {
+        "label": "Etapas da configuração",
+        "basics": "Básico",
+        "brand": "Marca",
+        "content": "Conteúdo"
+      },
+      "basics": {
+        "title": "Dê um nome à sua central de ajuda",
+        "description": "Escolha como ela se chama e onde as pessoas vão encontrá-la. Você pode mudar tudo isso depois."
+      },
+      "brand": {
+        "title": "Deixe com a sua cara",
+        "description": "Escolha uma cor, uma fonte e um layout. Depois você pode ajustar tudo com uma pré-visualização ao vivo."
+      },
+      "content": {
+        "title": "Adicione sua primeira coleção",
+        "description": "Coleções agrupam artigos relacionados, como Primeiros passos ou Cobrança. Você pode pular esta etapa e adicionar conteúdo depois.",
+        "documents": "Documentos para colocar nesta coleção"
+      },
+      "back": "Voltar",
+      "continue": "Continuar",
+      "skipContent": "Pular e criar",
+      "create": "Criar central de ajuda",
+      "createFailed": "Não foi possível criar sua central de ajuda",
+      "created": "Central de ajuda criada",
+      "createdNotLive": "Ela ainda não está no ar. Revise e coloque no ar quando estiver tudo pronto.",
+      "createdPartly": "Sua central de ajuda foi criada, mas parte da configuração não foi concluída. Confira as abas Conteúdo e Aparência."
+    },
+    "articles": {
+      "publicNotice": "Ao adicionar, estes documentos são marcados como públicos. Quando seu site estiver no ar, qualquer pessoa na internet poderá ler os que estiverem publicados.",
+      "addTitle": "Adicionar artigos a {collection}",
+      "addDescription": "Escolha os documentos que aparecem nesta coleção. Um documento só pode estar em uma coleção por vez.",
+      "addConfirm": "Adicionar artigos | Adicionar 1 artigo | Adicionar {count} artigos",
+      "added": "Artigos adicionados"
+    },
+    "overview": {
+      "statusTitle": "Seu site",
+      "liveDescription": "Sua central de ajuda está no ar: qualquer pessoa na internet pode abri-la.",
+      "offlineDescription": "Sua central de ajuda está fora do ar: os visitantes veem uma página de \"não encontrado\".",
+      "copyAddress": "Copiar endereço do site",
+      "liveArticles": "Nenhum artigo está pronto para aparecer ainda. | 1 artigo está pronto para aparecer. | {count} artigos estão prontos para aparecer.",
+      "goLive": "Colocar no ar",
+      "goOffline": "Tirar do ar",
+      "preview": "Pré-visualizar",
+      "detailsTitle": "Detalhes",
+      "detailsDescription": "O nome, o endereço e o idioma da sua central de ajuda.",
+      "addressChangeWarning": "Mudar o endereço quebra os links para o endereço antigo, inclusive os que as pessoas salvaram ou compartilharam.",
+      "searchIndexing": "Mecanismos de busca podem indexar este site",
+      "searchIndexingHint": "Desative para pedir a mecanismos de busca, como o Google, que não listem sua central de ajuda.",
+      "goLiveTitle": "Colocar no ar?",
+      "goLiveDescription": "Sua central de ajuda ficará pública em {url}. Ela ainda não tem artigos prontos para aparecer, então os visitantes verão um site vazio. | Sua central de ajuda ficará pública em {url}. 1 artigo passa a ser visível para qualquer pessoa na internet. | Sua central de ajuda ficará pública em {url}. {count} artigos passam a ser visíveis para qualquer pessoa na internet.",
+      "goOfflineTitle": "Tirar sua central de ajuda do ar?",
+      "goOfflineDescription": "Os visitantes verão uma página de \"não encontrado\" e os links para seus artigos deixarão de funcionar até você colocar no ar de novo. Nada é excluído.",
+      "nowLive": "Sua central de ajuda está no ar",
+      "nowOffline": "Sua central de ajuda está fora do ar"
+    },
+    "content": {
+      "intro": "Um artigo aparece no seu site quando o documento está publicado, é público e foi colocado em uma coleção.",
+      "newCollection": "Nova coleção",
+      "loadFailed": "Não foi possível carregar suas coleções.",
+      "emptyTitle": "Nenhuma coleção ainda",
+      "emptyDescription": "Coleções agrupam artigos relacionados no seu site. Crie uma e depois adicione documentos a ela.",
+      "articleCount": "Nenhum artigo | 1 artigo | {count} artigos",
+      "moveCollectionUp": "Mover {title} para cima",
+      "moveCollectionDown": "Mover {title} para baixo",
+      "editCollection": "Editar {title}",
+      "deleteCollection": "Excluir {title}",
+      "noArticles": "Esta coleção ainda não tem artigos.",
+      "notLive": {
+        "draft": "Fora do ar: rascunho",
+        "unpublished": "Fora do ar: não publicado",
+        "notPublic": "Fora do ar: não é público"
+      },
+      "moveArticleUp": "Mover {title} para cima",
+      "moveArticleDown": "Mover {title} para baixo",
+      "removeArticle": "Remover {title} desta coleção",
+      "addArticles": "Adicionar artigos",
+      "editCollectionTitle": "Editar coleção",
+      "collectionDialogHint": "Os visitantes veem o título, a descrição e o ícone na página inicial do seu site.",
+      "create": "Criar coleção",
+      "deleteTitle": "Excluir {title}?",
+      "deleteDescription": "A coleção e o lugar dela no seu site são removidos, e os artigos dela saem da central de ajuda. Os documentos em si não são excluídos.",
+      "deleteConfirm": "Excluir coleção",
+      "deleted": "Coleção excluída",
+      "articleRemoved": "Artigo removido da central de ajuda",
+      "stillPublicHint": "Os documentos continuam marcados como públicos. Você pode mudar isso na página de cada documento."
+    },
+    "appearance": {
+      "title": "Aparência",
+      "description": "As alterações aparecem na pré-visualização na hora. Os visitantes só as veem depois que você salvar.",
+      "previewTitle": "Pré-visualização",
+      "previewWidth": "Largura da pré-visualização",
+      "desktop": "Computador",
+      "mobile": "Celular",
+      "previewUnsaved": "Mostrando suas alterações não salvas.",
+      "previewSaved": "Mostrando seu site como está salvo.",
+      "previewFrameTitle": "Pré-visualização da sua central de ajuda",
+      "previewUnavailable": "A pré-visualização não está disponível agora. Você ainda pode alterar e salvar suas configurações."
+    },
+    "domain": {
+      "title": "Domínio personalizado",
+      "connected": "Conectado",
+      "pending": "Pendente",
+      "description": "Publique sua central de ajuda no seu próprio domínio. Seu endereço padrão, {address}, continua funcionando de qualquer forma.",
+      "inputLabel": "Domínio",
+      "add": "Adicionar domínio",
+      "addHint": "Use um subdomínio que você controla, como help.yourcompany.com. Você vai adicionar um registro DNS para provar que ele é seu.",
+      "addFailed": "Não foi possível adicionar esse domínio.",
+      "pendingIntro": "Para conectar {domain}, adicione um destes registros onde você gerencia o DNS dele e depois verifique.",
+      "recordType": "Tipo",
+      "recordName": "Nome",
+      "recordValue": "Valor",
+      "recommended": "Recomendado",
+      "alternative": "Alternativa",
+      "copyName": "Copiar nome do {type}",
+      "copyValue": "Copiar valor do {type}",
+      "recordsHint": "Use o registro CNAME se puder: ele também leva os visitantes até a sua central de ajuda. Se o seu provedor de DNS oculta registros CNAME, por exemplo quando o domínio passa pelo proxy da Cloudflare, adicione o registro TXT para provar que o domínio é seu.",
+      "checkNow": "Verificar agora",
+      "checkedAt": "Última verificação: {date}.",
+      "verifyFailed": "Não foi possível verificar o domínio agora. Tente de novo em instantes.",
+      "verified": "Domínio conectado",
+      "verifiedAt": "Verificado em {date}.",
+      "httpsNote": "Depois que um novo domínio é verificado, o HTTPS pode levar alguns minutos para começar a funcionar.",
+      "remove": "Remover domínio",
+      "removeTitle": "Remover {domain}?",
+      "removeDescription": "Sua central de ajuda deixará de responder neste domínio, e os links que o usam vão quebrar. Ela continua disponível em {address}.",
+      "removed": "Domínio removido"
+    }
+  }
+}

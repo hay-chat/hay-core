@@ -1,0 +1,235 @@
+{
+  "helpCenter": {
+    "title": "Help center",
+    "description": "Publish your documents as a public website your customers can search and read.",
+    "loading": "Loading your help center...",
+    "loadFailed": "We could not load your help center.",
+    "tryAgain": "Try again",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Could not copy. Select the text and copy it yourself.",
+    "untitled": "Untitled",
+    "live": "Live",
+    "offline": "Offline",
+    "reset": "Reset",
+    "saveChanges": "Save changes",
+    "saved": "Changes saved",
+    "saveFailed": "Could not save your changes",
+    "cancel": "Cancel",
+    "opensInNewTab": "(opens in a new tab)",
+    "disabled": {
+      "title": "Help centers are not set up on this server",
+      "description": "This server has no help center domain, so there is nowhere to publish a site. If you host Hay yourself, set HELP_CENTER_DOMAIN in the server's environment and restart it."
+    },
+    "notLive": {
+      "title": "Your help center is not live yet",
+      "description": "Nobody outside your team can see it. Add your content, check the preview, then go live from the Overview tab."
+    },
+    "tabs": {
+      "overview": "Overview",
+      "content": "Content",
+      "appearance": "Appearance",
+      "domain": "Domain"
+    },
+    "unsaved": {
+      "marker": "has unsaved changes",
+      "title": "Leave without saving?",
+      "description": "Your appearance changes have not been saved. If you leave now, they are lost.",
+      "leave": "Leave page"
+    },
+    "basics": {
+      "name": "Name",
+      "namePlaceholder": "Acme Help Center",
+      "nameHint": "Shown at the top of the site and in browser tabs.",
+      "address": "Address",
+      "addressCurrent": "{address} is your current address.",
+      "addressAvailable": "{address} is available.",
+      "addressChecking": "Checking this address...",
+      "addressCheckFailed": "We could not check this address right now. You can continue: it is checked again when you save.",
+      "addressTooShort": "Use at least 3 characters.",
+      "addressTooLong": "Use 63 characters or fewer.",
+      "addressInvalid": "Use only lowercase letters, numbers and hyphens, and start and end with a letter or number.",
+      "addressReserved": "That address is reserved. Choose another one.",
+      "addressTaken": "That address is already taken. Choose another one.",
+      "language": "Language",
+      "languageHint": "The language of the site's own labels, such as the search box. Your articles are shown as written."
+    },
+    "theme": {
+      "accentColor": "Accent colour",
+      "accentColorPicker": "Pick an accent colour",
+      "accentColorInvalid": "Enter a 6-digit hex colour, such as #2747d6.",
+      "contrastWarning": "On a white page this colour has a contrast of {ratio}:1, below the 4.5:1 that text needs. Links will be shown in the normal text colour instead of this one; buttons stay readable.",
+      "font": "Font",
+      "fonts": {
+        "sans": "Sans",
+        "serif": "Serif",
+        "rounded": "Rounded",
+        "mono": "Mono"
+      },
+      "layout": "Home page layout",
+      "layouts": {
+        "cards": "Cards",
+        "cardsHint": "One card per collection.",
+        "list": "List",
+        "listHint": "Every article listed under its collection."
+      },
+      "heroTitle": "Hero title",
+      "heroTitlePlaceholder": "How can we help?",
+      "heroSubtitle": "Hero subtitle",
+      "heroSubtitlePlaceholder": "Search our guides or browse by topic.",
+      "showPoweredBy": "Show \"Powered by Hay\""
+    },
+    "collection": {
+      "title": "Title",
+      "titlePlaceholder": "Getting started",
+      "description": "Description",
+      "descriptionPlaceholder": "What visitors will find here",
+      "icon": "Icon",
+      "iconSuggestions": "Suggested icons",
+      "iconPlaceholder": "Any emoji",
+      "iconHint": "Pick one above or type any emoji. Leave it empty for no icon."
+    },
+    "picker": {
+      "search": "Search documents",
+      "searchPlaceholder": "Search by title",
+      "loadFailed": "We could not load your documents.",
+      "noMatches": "No documents match your search.",
+      "noDocuments": "You have no documents yet. Create or import some under Documents first.",
+      "alreadyHere": "Already in this collection",
+      "inCollection": "In {collection} (will move)",
+      "notPublished": "Not published",
+      "previous": "Previous",
+      "next": "Next",
+      "pageOf": "Page {page} of {total}"
+    },
+    "setup": {
+      "steps": {
+        "label": "Setup steps",
+        "basics": "Basics",
+        "brand": "Brand",
+        "content": "Content"
+      },
+      "basics": {
+        "title": "Name your help center",
+        "description": "Choose what it is called and where people will find it. You can change all of this later."
+      },
+      "brand": {
+        "title": "Make it yours",
+        "description": "Pick a colour, a font and a layout. You can fine-tune these with a live preview afterwards."
+      },
+      "content": {
+        "title": "Add your first collection",
+        "description": "Collections group related articles, such as Getting started or Billing. You can skip this and add content later.",
+        "documents": "Documents to put in this collection"
+      },
+      "back": "Back",
+      "continue": "Continue",
+      "skipContent": "Skip and create",
+      "create": "Create help center",
+      "createFailed": "Could not create your help center",
+      "created": "Help center created",
+      "createdNotLive": "It is not live yet. Review it, then go live when you are ready.",
+      "createdPartly": "Your help center was created, but part of the setup did not finish. Check the Content and Appearance tabs."
+    },
+    "articles": {
+      "publicNotice": "Adding marks these documents as public. Once your site is live, anyone on the internet can read the published ones.",
+      "addTitle": "Add articles to {collection}",
+      "addDescription": "Pick the documents to show in this collection. A document can be in one collection at a time.",
+      "addConfirm": "Add articles | Add 1 article | Add {count} articles",
+      "added": "Articles added"
+    },
+    "overview": {
+      "statusTitle": "Your site",
+      "liveDescription": "Your help center is live: anyone on the internet can open it.",
+      "offlineDescription": "Your help center is offline: visitors see a \"not found\" page.",
+      "copyAddress": "Copy site address",
+      "liveArticles": "No articles are ready to show yet. | 1 article is ready to show. | {count} articles are ready to show.",
+      "goLive": "Go live",
+      "goOffline": "Go offline",
+      "preview": "Preview",
+      "detailsTitle": "Details",
+      "detailsDescription": "The name, address and language of your help center.",
+      "addressChangeWarning": "Changing the address breaks links to the old one, including links people have saved or shared.",
+      "searchIndexing": "Search engines can index this site",
+      "searchIndexingHint": "Turn this off to ask search engines such as Google not to list your help center.",
+      "goLiveTitle": "Go live?",
+      "goLiveDescription": "Your help center will be public at {url}. It has no articles ready to show yet, so visitors will see an empty site. | Your help center will be public at {url}. 1 article becomes visible to anyone on the internet. | Your help center will be public at {url}. {count} articles become visible to anyone on the internet.",
+      "goOfflineTitle": "Take your help center offline?",
+      "goOfflineDescription": "Visitors will see a \"not found\" page and links to your articles will stop working until you go live again. Nothing is deleted.",
+      "nowLive": "Your help center is live",
+      "nowOffline": "Your help center is offline"
+    },
+    "content": {
+      "intro": "An article shows on your site when its document is published, public and placed in a collection.",
+      "newCollection": "New collection",
+      "loadFailed": "We could not load your collections.",
+      "emptyTitle": "No collections yet",
+      "emptyDescription": "Collections group related articles on your site. Create one, then add documents to it.",
+      "articleCount": "No articles | 1 article | {count} articles",
+      "moveCollectionUp": "Move {title} up",
+      "moveCollectionDown": "Move {title} down",
+      "editCollection": "Edit {title}",
+      "deleteCollection": "Delete {title}",
+      "noArticles": "This collection has no articles yet.",
+      "notLive": {
+        "draft": "Not live: draft",
+        "unpublished": "Not live: not published",
+        "notPublic": "Not live: not public"
+      },
+      "moveArticleUp": "Move {title} up",
+      "moveArticleDown": "Move {title} down",
+      "removeArticle": "Remove {title} from this collection",
+      "addArticles": "Add articles",
+      "editCollectionTitle": "Edit collection",
+      "collectionDialogHint": "Visitors see the title, description and icon on your site's home page.",
+      "create": "Create collection",
+      "deleteTitle": "Delete {title}?",
+      "deleteDescription": "The collection and its place on your site are removed, and its articles leave the help center. The documents themselves are not deleted.",
+      "deleteConfirm": "Delete collection",
+      "deleted": "Collection deleted",
+      "articleRemoved": "Article removed from the help center",
+      "stillPublicHint": "The documents are still marked public. You can change that on each document's page."
+    },
+    "appearance": {
+      "title": "Appearance",
+      "description": "Changes show in the preview straight away. Visitors see them once you save.",
+      "previewTitle": "Preview",
+      "previewWidth": "Preview width",
+      "desktop": "Desktop",
+      "mobile": "Mobile",
+      "previewUnsaved": "Showing your unsaved changes.",
+      "previewSaved": "Showing your site as saved.",
+      "previewFrameTitle": "Preview of your help center",
+      "previewUnavailable": "The preview is not available right now. You can still change and save your settings."
+    },
+    "domain": {
+      "title": "Custom domain",
+      "connected": "Connected",
+      "pending": "Pending",
+      "description": "Serve your help center from your own domain. Your built-in address, {address}, keeps working either way.",
+      "inputLabel": "Domain",
+      "add": "Add domain",
+      "addHint": "Use a subdomain you control, such as help.yourcompany.com. You will add one DNS record to prove it is yours.",
+      "addFailed": "Could not add that domain.",
+      "pendingIntro": "To connect {domain}, add one of these records where you manage its DNS, then check.",
+      "recordType": "Type",
+      "recordName": "Name",
+      "recordValue": "Value",
+      "recommended": "Recommended",
+      "alternative": "Alternative",
+      "copyName": "Copy {type} name",
+      "copyValue": "Copy {type} value",
+      "recordsHint": "Use the CNAME record if you can: it also sends visitors to your help center. If your DNS provider hides CNAME records, for example when the domain is proxied through Cloudflare, add the TXT record to prove the domain is yours.",
+      "checkNow": "Check now",
+      "checkedAt": "Last checked {date}.",
+      "verifyFailed": "We could not check the domain right now. Try again in a moment.",
+      "verified": "Domain connected",
+      "verifiedAt": "Verified {date}.",
+      "httpsNote": "After a new domain is verified, HTTPS can take a few minutes to start working.",
+      "remove": "Remove domain",
+      "removeTitle": "Remove {domain}?",
+      "removeDescription": "Your help center will stop answering on this domain, and links that use it will break. It stays available at {address}.",
+      "removed": "Domain removed"
+    }
+  }
+}

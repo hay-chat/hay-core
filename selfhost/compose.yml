@@ -31,6 +31,8 @@ x-hay-env: &hay-env
   API_DOMAIN: ${HAY_DOMAIN:?set HAY_DOMAIN in .env}
   DASHBOARD_DOMAIN: ${HAY_DOMAIN}
   BASE_DOMAIN: ${HAY_DOMAIN}
+  # Empty turns help centers off.
+  HELP_CENTER_DOMAIN: ${HELP_CENTER_DOMAIN:-}
 
 x-hay: &hay
   image: hay:local

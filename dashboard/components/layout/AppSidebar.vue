@@ -170,6 +170,14 @@ const navMain = computed(() => {
     { title: t("nav.documents"), url: "/documents", isActive: isPathActive("/documents") },
     { title: t("nav.playbooks"), url: "/playbooks", isActive: isPathActive("/playbooks") },
   ];
+  // Publishing a public website is an admin decision (see roleProtectedRoutes).
+  if (isAdminOrOwner) {
+    knowledgeItems.push({
+      title: t("nav.helpCenter"),
+      url: "/help-center",
+      isActive: isPathActive("/help-center"),
+    });
+  }
   if (appStore.enabledPlugins.some((p) => p.type?.includes("products"))) {
     knowledgeItems.push({
       title: t("nav.products"),

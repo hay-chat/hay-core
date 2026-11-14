@@ -126,14 +126,29 @@
         >
           {{ $t(`documents.filters.${document.status}`) }}
         </Badge>
-        <Badge v-if="document.visibility" variant="outline">
+        <Badge v-if="document.visibility && !canEdit" variant="outline">
           {{ $t(`documents.import.metadata.${document.visibility}`) }}
         </Badge>
         <Badge v-if="document.sourceUrl" variant="outline" class="gap-1">
           <Globe class="h-3 w-3" />
           {{ $t("documents.detail.webImport") }}
         </Badge>
-        <div class="flex items-center gap-2 ml-auto">
+        <div class="flex flex-wrap items-center gap-2 ml-auto">
+          <template v-if="canEdit">
+            <span id="document-visibility-label" class="text-xs text-neutral-muted">
+              {{ $t("documents.detail.visibilityLabel") }}
+            </span>
+            <Input
+              v-model="selectedVisibility"
+              type="select"
+              :options="visibilityOptions"
+              class="w-32"
+              aria-labelledby="document-visibility-label"
+              data-testid="document-visibility"
+              :disabled="updatingVisibility"
+              @update:model-value="onVisibilityChange"
+            />
+          </template>
           <span class="text-xs text-neutral-muted">{{ $t("documents.detail.statusLabel") }}</span>
           <Input
             v-model="selectedStatus"
@@ -200,6 +215,16 @@
     />
 
     <ConfirmDialog
+      :open="pendingPublic !== null"
+      :title="$t('documents.detail.makePublicTitle')"
+      :description="$t('documents.detail.makePublicDescription')"
+      :confirm-text="$t('documents.detail.makePublicConfirm')"
+      :loading="updatingVisibility"
+      @update:open="!$event && cancelMakePublic()"
+      @confirm="pendingPublic && saveVisibility(pendingPublic)"
+    />
+
+    <ConfirmDialog
       v-model:open="showDeleteDialog"
       :title="$t('documents.deleteDialog.title')"
       :description="$t('documents.deleteDialog.confirmSingle', { name: document?.title || '' })"
@@ -217,6 +242,8 @@ import { HayApi } from "@/utils/api";
 import { markdownToHtml } from "@/utils/markdownToHtml";
 import { sanitizeHtml } from "@/utils/sanitize";
 import { useToast } from "@/composables/useToast";
+import { useUserStore } from "@/stores/user";
+import type { RouterInputs } from "@/types/trpc";
 import type { JSONContent } from "@tiptap/vue-3";
 import {
   ArrowLeft,
@@ -455,6 +482,55 @@ const onStatusChange = async (status: string | number | boolean) => {
   }
 };
 
+// Visibility: public documents can appear on the help center, so going public asks first.
+type DocumentVisibility = NonNullable<RouterInputs["documents"]["update"]["visibility"]>;
+
+const userStore = useUserStore();
+const canEdit = computed(() => userStore.hasScope("documents", "update"));
+const selectedVisibility = ref("private");
+const updatingVisibility = ref(false);
+/** Set while the "make public" confirmation is open. */
+const pendingPublic = ref<DocumentVisibility | null>(null);
+const visibilityOptions = computed(() => [
+  { label: t("documents.import.metadata.public"), value: "public" },
+  { label: t("documents.import.metadata.private"), value: "private" },
+  { label: t("documents.import.metadata.internal"), value: "internal" },
+]);
+
+const isVisibility = (value: unknown): value is DocumentVisibility =>
+  visibilityOptions.value.some((option) => option.value === value);
+
+const onVisibilityChange = (value: string | number | boolean) => {
+  if (!document.value || !isVisibility(value) || value === document.value.visibility) return;
+  if (value === "public") {
+    pendingPublic.value = value;
+  } else {
+    void saveVisibility(value);
+  }
+};
+
+const cancelMakePublic = () => {
+  pendingPublic.value = null;
+  selectedVisibility.value = document.value?.visibility ?? "private";
+};
+
+const saveVisibility = async (visibility: DocumentVisibility) => {
+  if (!document.value || updatingVisibility.value) return;
+  updatingVisibility.value = true;
+  try {
+    await HayApi.documents.update.mutate({ id: document.value.id, visibility });
+    document.value.visibility = visibility;
+    toast.success(t("documents.toast.visibilityUpdated"));
+  } catch (err) {
+    console.error("Failed to update visibility:", err);
+    toast.error(t("documents.toast.visibilityUpdateFailed"));
+  } finally {
+    selectedVisibility.value = document.value.visibility ?? "private";
+    updatingVisibility.value = false;
+    pendingPublic.value = null;
+  }
+};
+
 const fetchDocument = async () => {
   if (!documentId.value) return;
 
@@ -467,6 +543,7 @@ const fetchDocument = async () => {
     });
     document.value = result as DocumentDetail;
     selectedStatus.value = (result.status as DocumentationStatus) || DocumentationStatus.DRAFT;
+    selectedVisibility.value = result.visibility ?? "private";
   } catch (err) {
     console.error("Failed to fetch document:", err);
     error.value = err instanceof Error ? err.message : t("documents.detail.failedToLoad");

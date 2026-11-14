@@ -126,6 +126,7 @@ The dev server (`npm run dev:server`) skips type-checking on restart for speed. 
 | `LLM_BASE_URL`, `LLM_VENDOR`, `LLM_API_KEY`, `LLM_TIER_*`                    | No         | Other OpenAI-compatible chat host |
 | `SMTP_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_AUTH_USER`, `SMTP_AUTH_PASS` | No         | Email sending                     |
 | `BASE_DOMAIN`, `API_DOMAIN`, `DASHBOARD_DOMAIN`                              | Production | Domain configuration              |
+| `HELP_CENTER_DOMAIN`                                                         | No         | Domain for public help centers    |
 
 ## Development
 

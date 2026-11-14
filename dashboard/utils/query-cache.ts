@@ -50,6 +50,8 @@ const MUTATION_GROUPS: Record<string, string[]> = {
   playbooks: ["playbooks"],
   customers: ["customers"],
   insights: ["documents", "playbooks"],
+  // Placing a document in a help center collection makes it public.
+  helpCenter: ["documents"],
 };
 
 /** Mutations under those routers that do not change what any cached list shows. */

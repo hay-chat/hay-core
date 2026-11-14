@@ -15,6 +15,9 @@ export const roleProtectedRoutes: Record<string, string[]> = {
   "/settings/usage": ["owner", "admin"],
   "/settings/assistant": ["owner", "admin"],
 
+  // Help center - publishing a public website is an admin decision
+  "/help-center": ["owner", "admin"],
+
   // In-app setup
   "/setup": ["owner", "admin"],
 

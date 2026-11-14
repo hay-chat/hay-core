@@ -367,6 +367,7 @@ export const documentsRouter = t.router({
         contentJson: z.record(z.string(), z.unknown()).optional(),
         contentHtml: z.string().optional(),
         status: z.nativeEnum(DocumentationStatus).optional(),
+        visibility: z.nativeEnum(DocumentVisibility).optional(),
         regenerateEmbeddings: z.boolean().optional().default(false),
       }),
     )
@@ -393,6 +394,7 @@ export const documentsRouter = t.router({
         ...(nextContent !== undefined && { content: nextContent }),
         ...(input.contentJson && { contentJson: stripMediaSignaturesInJson(input.contentJson) }),
         ...(input.status && { status: input.status }),
+        ...(input.visibility && { visibility: input.visibility }),
         // Archiving a synced doc is sticky: the sync engine must not bring it back.
         ...(input.status && {
           excludedFromSync: input.status === DocumentationStatus.ARCHIVED,

@@ -10,7 +10,7 @@ import { vi } from "vitest";
 export const translate = (key: string, params?: unknown) =>
   params !== undefined && typeof params === "object" ? `${key} ${JSON.stringify(params)}` : key;
 
-export const toast = { success: vi.fn(), error: vi.fn(), show: vi.fn() };
+export const toast = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), show: vi.fn() };
 export const router = { push: vi.fn(), replace: vi.fn() };
 /** The current route; tests set `route.query` before mounting. */
 export const route: { path: string; query: Record<string, unknown> } = { path: "/", query: {} };

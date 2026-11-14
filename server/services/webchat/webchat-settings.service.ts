@@ -8,13 +8,15 @@ import {
   type WebchatPageToolsSettings,
   type WebchatThemeMode,
 } from "@server/database/entities/webchat-settings.entity";
+import { AppDataSource } from "@server/database/data-source";
+import { HelpCenter } from "@server/database/entities/help-center.entity";
 import { organizationRepository } from "@server/repositories/organization.repository";
+import { isHelpCenterEnabled, servedHostnames } from "@server/services/help-center/urls";
 import { storageService } from "@server/services/storage.service";
 import { Upload } from "@server/entities/upload.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import type { Organization } from "@server/entities/organization.entity";
 import type { AssistantAvatarPreset } from "@server/types/organization-settings.types";
-import { AppDataSource } from "@server/database/data-source";
 import { ACTIONS, RESOURCES } from "@server/types/scopes";
 import { createLogger } from "@server/lib/logger";
 import type { FormSchema } from "@hay/form-schema";
@@ -360,12 +362,35 @@ export class WebchatSettingsService {
    */
   async isDomainAllowed(organizationId: string, hostname: string | null): Promise<boolean> {
     const settings = await this.getSettings(organizationId);
-    const allowed = settings.allowedDomains.filter((entry) => entry.trim());
-    if (allowed.length > 0) return matchesAllowedDomains(allowed, hostname);
+    let allowed = settings.allowedDomains.filter((entry) => entry.trim());
+    if (allowed.length === 0) {
+      const { siteIndexService } = await import("@server/services/site-index.service");
+      allowed = domainsForWebsite(await siteIndexService.resolveWebsite(organizationId));
+    }
+    return (
+      matchesAllowedDomains(allowed, hostname) || isOwnHelpCenterHost(organizationId, hostname)
+    );
+  }
+}
 
-    const { siteIndexService } = await import("@server/services/site-index.service");
-    const website = await siteIndexService.resolveWebsite(organizationId);
-    return matchesAllowedDomains(domainsForWebsite(website), hostname);
+/**
+ * The organization's help center always carries its own chat widget, without
+ * anyone having to list the help center's address as an allowed domain.
+ */
+async function isOwnHelpCenterHost(
+  organizationId: string,
+  hostname: string | null,
+): Promise<boolean> {
+  if (!hostname || !isHelpCenterEnabled()) return false;
+  try {
+    const helpCenter = await AppDataSource.getRepository(HelpCenter).findOne({
+      where: { organizationId },
+    });
+    const host = hostname.toLowerCase().replace(/\.$/, "");
+    return helpCenter !== null && servedHostnames(helpCenter).includes(host);
+  } catch {
+    // The help center tables may not exist yet: code deploys before its migration runs.
+    return false;
   }
 }
 
