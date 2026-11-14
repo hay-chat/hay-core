@@ -1,5 +1,4 @@
-import type { SupportedLanguage } from "@server/types/language.types";
-import type { RouterInputs, RouterOutputs } from "@/types/trpc";
+import type { RouterOutputs } from "@/types/trpc";
 
 export type HelpCenterState = RouterOutputs["helpCenter"]["get"];
 export type HelpCenterView = NonNullable<HelpCenterState["helpCenter"]>;
@@ -7,7 +6,6 @@ export type HelpCenterTheme = HelpCenterView["theme"];
 export type HelpCenterCollection = RouterOutputs["helpCenter"]["listCollections"][number];
 export type HelpCenterArticle = HelpCenterCollection["articles"][number];
 export type HelpCenterPreviewLink = NonNullable<RouterOutputs["helpCenter"]["getPreviewLink"]>;
-export type HelpCenterLanguage = RouterInputs["helpCenter"]["create"]["defaultLanguage"];
 export type SubdomainProblem = Extract<
   RouterOutputs["helpCenter"]["checkSubdomain"],
   { available: false }
@@ -52,51 +50,6 @@ export const HELP_CENTER_FONT_STACKS: Record<HelpCenterTheme["font"], string> = 
 export const HELP_CENTER_FONTS: HelpCenterTheme["font"][] = ["sans", "serif", "rounded", "mono"];
 
 export const HELP_CENTER_LAYOUTS: HelpCenterTheme["layout"][] = ["cards", "list"];
-
-/** Every content language the server accepts, under its own name. */
-const LANGUAGE_NAMES: Record<`${SupportedLanguage}`, string> = {
-  en: "English",
-  es: "Español",
-  fr: "Français",
-  de: "Deutsch",
-  pt: "Português",
-  it: "Italiano",
-  nl: "Nederlands",
-  ru: "Русский",
-  zh: "中文",
-  ja: "日本語",
-  ko: "한국어",
-  ar: "العربية",
-  hi: "हिन्दी",
-  tr: "Türkçe",
-  pl: "Polski",
-  sv: "Svenska",
-  da: "Dansk",
-  no: "Norsk",
-  fi: "Suomi",
-  el: "Ελληνικά",
-  he: "עברית",
-  th: "ไทย",
-  vi: "Tiếng Việt",
-  id: "Bahasa Indonesia",
-  ms: "Bahasa Melayu",
-  cs: "Čeština",
-  sk: "Slovenčina",
-  hu: "Magyar",
-  ro: "Română",
-  bg: "Български",
-  uk: "Українська",
-  ca: "Català",
-  hr: "Hrvatski",
-};
-
-export const HELP_CENTER_LANGUAGE_OPTIONS = Object.entries(LANGUAGE_NAMES).map(
-  ([value, label]) => ({ value, label }),
-);
-
-export function isHelpCenterLanguage(value: string): value is HelpCenterLanguage {
-  return value in LANGUAGE_NAMES;
-}
 
 /** A short starting set for collection icons; any emoji can be typed instead. */
 export const COLLECTION_EMOJI = [

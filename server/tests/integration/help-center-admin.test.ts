@@ -49,7 +49,6 @@ import {
   resolveHelpCenterHost,
 } from "../../services/help-center/host-resolver";
 import type { Context } from "../../trpc/context";
-import type { LanguageCode } from "../../types/language.types";
 import { purgeAuditLogs } from "../helpers/audit-logs";
 
 const ORG_A = "4c000000-0000-4000-8000-0000000000a1";
@@ -65,7 +64,7 @@ let adminB: User;
 async function ctxFor(user: User, organizationId: string): Promise<Context> {
   const userOrganization = await AppDataSource.getRepository(UserOrganization).findOneOrFail({
     where: { userId: user.id, organizationId },
-    relations: ["organization"],
+    relations: { organization: true },
   });
   return {
     user: new AuthUser(user, "jwt", { sessionId: "s", organizationId, userOrganization }),
@@ -267,7 +266,7 @@ describe("help center administration", () => {
       ).create({
         name: "Acme Help",
         subdomain: "  Acme-Support ",
-        defaultLanguage: "en" as LanguageCode,
+        defaultLanguage: "en" as const,
       });
 
       expect(view.subdomain).toBe("acme-support");
@@ -305,7 +304,7 @@ describe("help center administration", () => {
           caller.create({
             name: "Again",
             subdomain: "acme-two",
-            defaultLanguage: "en" as LanguageCode,
+            defaultLanguage: "en" as const,
           }),
         ),
       ).toBe("CONFLICT");
@@ -324,7 +323,7 @@ describe("help center administration", () => {
             caller.create({
               name: "Copycat",
               subdomain,
-              defaultLanguage: "en" as LanguageCode,
+              defaultLanguage: "en" as const,
             }),
           ),
         ).toBe("CONFLICT");
@@ -346,9 +345,7 @@ describe("help center administration", () => {
     ])("refuses the subdomain %s", async (subdomain) => {
       const caller = await asAdminA();
       expect(
-        await codeOf(
-          caller.create({ name: "Acme", subdomain, defaultLanguage: "en" as LanguageCode }),
-        ),
+        await codeOf(caller.create({ name: "Acme", subdomain, defaultLanguage: "en" as const })),
       ).toBe("BAD_REQUEST");
       expect(await helpCenterService.findByOrganization(ORG_A)).toBeNull();
     });
@@ -365,7 +362,7 @@ describe("help center administration", () => {
           caller.create({
             name: "   ",
             subdomain: "acme",
-            defaultLanguage: "en" as LanguageCode,
+            defaultLanguage: "en" as const,
           }),
         ),
       ).toBe("BAD_REQUEST");
@@ -470,7 +467,7 @@ describe("help center administration", () => {
           member.create({
             name: "Acme",
             subdomain: "acme",
-            defaultLanguage: "en" as LanguageCode,
+            defaultLanguage: "en" as const,
           }),
         ),
       ).toBe("FORBIDDEN");
@@ -1331,7 +1328,7 @@ describe("help center administration", () => {
       const created = await caller.create({
         name: "Acme",
         subdomain: "acme",
-        defaultLanguage: "en" as LanguageCode,
+        defaultLanguage: "en" as const,
       });
       await caller.setPublished({ published: true });
       await caller.setPublished({ published: false });
@@ -1375,7 +1372,7 @@ describe("help center administration", () => {
           caller.create({
             name: "Acme",
             subdomain: "www",
-            defaultLanguage: "en" as LanguageCode,
+            defaultLanguage: "en" as const,
           }),
         ),
       ).toBe("BAD_REQUEST");

@@ -43,8 +43,8 @@ import { clearHelpCenterHostCache } from "../../services/help-center/host-resolv
 import { SITE_CSS_PATH } from "../../services/help-center/render/styles";
 import { webchatSettingsService } from "../../services/webchat/webchat-settings.service";
 
-const ORG_ID = "4c000000-0000-4000-8000-0000000000a1";
-const OTHER_ORG_ID = "4c000000-0000-4000-8000-0000000000b2";
+const ORG_ID = "4c000000-0000-4000-8000-0000000000a3";
+const OTHER_ORG_ID = "4c000000-0000-4000-8000-0000000000b4";
 const HELP_CENTER_ID = "4c000000-0000-4000-8000-0000000000c1";
 const OTHER_HELP_CENTER_ID = "4c000000-0000-4000-8000-0000000000c2";
 const COLLECTION_ID = "c0110001-0000-4000-8000-000000000001";

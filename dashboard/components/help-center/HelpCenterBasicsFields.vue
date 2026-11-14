@@ -38,13 +38,11 @@
       </p>
     </div>
 
-    <Input
+    <LanguageSelect
       :model-value="modelValue.language"
-      type="select"
       :label="$t('helpCenter.basics.language')"
-      :options="HELP_CENTER_LANGUAGE_OPTIONS"
-      :hint="$t('helpCenter.basics.languageHint')"
-      @update:model-value="update({ language: String($event) })"
+      :helper-text="$t('helpCenter.basics.languageHint')"
+      @update:model-value="update({ language: $event ?? modelValue.language })"
     />
   </div>
 </template>
@@ -53,11 +51,7 @@
 import { computed, ref, watch } from "vue";
 import { useDebounceFn } from "@vueuse/core";
 import { Hay } from "@/utils/api";
-import {
-  HELP_CENTER_LANGUAGE_OPTIONS,
-  type HelpCenterBasics,
-  type SubdomainProblem,
-} from "@/utils/help-center";
+import type { HelpCenterBasics, SubdomainProblem } from "@/utils/help-center";
 
 const props = defineProps<{
   modelValue: HelpCenterBasics;

@@ -93,10 +93,10 @@ import { computed, ref } from "vue";
 import { useStepper } from "@vueuse/core";
 import { Check } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
+import { isLanguageCode } from "@/utils/languages";
 import {
   DEFAULT_HELP_CENTER_THEME,
   errorMessage,
-  isHelpCenterLanguage,
   normalizeTheme,
   type HelpCenterBasics,
   type HelpCenterCollectionDraft,
@@ -135,7 +135,7 @@ const canProceed = computed(
 
 async function finish(withContent: boolean) {
   const language = basics.value.language;
-  if (creating.value || !isHelpCenterLanguage(language)) return;
+  if (creating.value || !isLanguageCode(language)) return;
   creating.value = true;
   try {
     await Hay.helpCenter.create.mutate({

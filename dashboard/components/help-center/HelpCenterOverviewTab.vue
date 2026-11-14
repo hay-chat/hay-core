@@ -127,9 +127,9 @@
 import { computed, ref, watch } from "vue";
 import { ExternalLink } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
+import { isLanguageCode } from "@/utils/languages";
 import {
   errorMessage,
-  isHelpCenterLanguage,
   previewUrl,
   type HelpCenterBasics,
   type HelpCenterCollection,
@@ -208,7 +208,7 @@ watch(() => props.helpCenter, reset);
 
 async function save() {
   const { name, subdomain, language } = form.value.basics;
-  if (!isHelpCenterLanguage(language)) return;
+  if (!isLanguageCode(language)) return;
   saving.value = true;
   try {
     const updated = await Hay.helpCenter.update.mutate({
