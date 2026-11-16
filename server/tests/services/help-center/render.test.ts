@@ -9,6 +9,7 @@ import { sanitizedArticleHtml } from "../../../services/help-center/render/artic
 import { html, raw, scriptJson } from "../../../services/help-center/render/html";
 import {
   renderArticlePage,
+  renderCollectionPage,
   renderHomePage,
   renderNotFoundPage,
   renderSearchPage,
@@ -292,6 +293,7 @@ describe("pages", () => {
     canonicalBase: "https://acme.haychat.co",
     theme: { ...DEFAULT_HELP_CENTER_THEME },
     logoUrl: null,
+    socialImageUrl: null,
     noindex: false,
     nonce: "Tm9uY2U=",
     preview: null,
@@ -429,6 +431,87 @@ describe("pages", () => {
     expect(page).toContain("Page not found");
     expect(page).not.toContain("hc-brand");
     expect(page).not.toContain("Back to home");
+  });
+
+  describe("head metadata", () => {
+    const meta = (page: string, key: string) =>
+      new RegExp(`<meta (?:property|name)="${key}" content="([^"]*)" />`).exec(page)?.[1];
+
+    it("describes a page for link previews with escaped values", () => {
+      const page = renderArticlePage(
+        view({ socialImageUrl: "https://cdn.test/logo.png?a=1&b=2" }),
+        article,
+        raw("<p>Body</p>"),
+      );
+      expect(meta(page, "og:type")).toBe("article");
+      expect(meta(page, "og:site_name")).toBe("Acme &lt;Help&gt;");
+      expect(meta(page, "og:title")).toBe(
+        "Refunds &lt;/title&gt;&lt;script&gt;alert(1)&lt;/script&gt;",
+      );
+      expect(meta(page, "og:description")).toBe("How &quot;refunds&quot; work");
+      expect(meta(page, "og:url")).toBe(
+        "https://acme.haychat.co/articles/refunds-title-script-alert-1-script-0a1b2c3d",
+      );
+      expect(meta(page, "og:locale")).toBe("pt");
+      expect(meta(page, "og:image")).toBe("https://cdn.test/logo.png?a=1&amp;b=2");
+      expect(meta(page, "twitter:card")).toBe("summary");
+      expect(meta(renderHomePage(view({ language: "pt-BR" }), []), "og:locale")).toBe("pt_BR");
+      expect(meta(renderHomePage(view(), []), "og:type")).toBe("website");
+    });
+
+    it("leaves out an image that is not an absolute http address", () => {
+      for (const socialImageUrl of [null, "/uploads/logo.png", "javascript:alert(1)"]) {
+        expect(renderHomePage(view({ socialImageUrl }), [])).not.toContain("og:image");
+      }
+    });
+
+    it("has no link preview tags on pages without a canonical address", () => {
+      expect(renderSearchPage(view(), "x", [])).not.toContain("og:");
+      expect(renderNotFoundPage(view())).not.toContain("og:");
+      expect(renderNotFoundPage(view())).not.toContain("twitter:");
+    });
+
+    it("falls back to the listed titles or the article text for a description", () => {
+      expect(meta(renderHomePage(view(), collections), "description")).toBe("Billing");
+      const untitled = { ...collections[0], description: null };
+      expect(meta(renderCollectionPage(view(), untitled), "description")).toBe(
+        "Refunds &lt;fast&gt;",
+      );
+      const body = raw(
+        `<h2>Steps</h2><p>Go to <b>Billing</b> &amp; pick &quot;Refund&quot;. ${"Then wait. ".repeat(30)}</p>`,
+      );
+      const description =
+        meta(renderArticlePage(view(), { ...article, description: null }, body), "description") ??
+        "";
+      expect(description).toMatch(
+        /^Steps Go to Billing &amp; pick &quot;Refund&quot;\. Then wait\./,
+      );
+      expect(description.endsWith("…")).toBe(true);
+      expect(description.replace(/&[a-z]+;/g, "x").length).toBeLessThanOrEqual(160);
+    });
+
+    it("sets the theme colour, icons, and a preconnect to the widget's host", () => {
+      const page = renderHomePage(
+        view({
+          logoUrl: "https://cdn.test/logo.png",
+          theme: { ...DEFAULT_HELP_CENTER_THEME, accentColor: "#123abc" },
+          webchat: { organizationId: "org-1", baseUrl: "https://api.hay.test" },
+        }),
+        [],
+      );
+      expect(meta(page, "theme-color")).toBe("#123abc");
+      expect(page).toContain('<link rel="icon" href="https://cdn.test/logo.png" />');
+      expect(page).toContain('<link rel="apple-touch-icon" href="https://cdn.test/logo.png" />');
+      expect(page).toContain('<link rel="preconnect" href="https://api.hay.test" />');
+
+      const plain = renderHomePage(
+        view({ theme: { ...DEFAULT_HELP_CENTER_THEME, accentColor: "red;}" } }),
+        [],
+      );
+      expect(plain).not.toContain("theme-color");
+      expect(plain).not.toContain("apple-touch-icon");
+      expect(plain).not.toContain("preconnect");
+    });
   });
 
   it("falls back to English labels and a valid lang attribute", () => {

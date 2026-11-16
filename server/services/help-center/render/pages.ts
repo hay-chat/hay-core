@@ -6,7 +6,15 @@
 import type { HelpCenterTheme } from "@server/database/entities/help-center.entity";
 import type { PublicArticle, PublicArticleSummary, PublicCollection } from "../public-content";
 import { SEARCH_QUERY_MAX_LENGTH } from "../public-content";
-import { html, raw, scriptJson, type HtmlValue, type SafeHtml } from "./html";
+import {
+  html,
+  raw,
+  scriptJson,
+  textExcerpt,
+  truncateText,
+  type HtmlValue,
+  type SafeHtml,
+} from "./html";
 import { htmlLang, siteStrings, type SiteStrings } from "./strings";
 import { SITE_CSS_PATH, themeCss } from "./styles";
 import { articlePath, collectionPath } from "./urls";
@@ -25,6 +33,11 @@ export interface SiteView {
   canonicalBase: string;
   theme: HelpCenterTheme;
   logoUrl: string | null;
+  /**
+   * Absolute address of the image link previews show (og:image), or null for
+   * none. Today the organization's logo; a dedicated upload would go here.
+   */
+  socialImageUrl: string | null;
   noindex: boolean;
   /** CSP nonce of this response. */
   nonce: string;
@@ -126,10 +139,41 @@ interface PageParts {
   /** Passed to the chat widget so the assistant knows what the visitor is reading. */
   chatContext?: Record<string, string>;
   narrow?: boolean;
+  /** Open Graph type of a page that has a canonical address. */
+  ogType?: "website" | "article";
+}
+
+/** Meta descriptions longer than this are cut off in search results anyway. */
+const DESCRIPTION_MAX_LENGTH = 160;
+
+function absoluteHttpUrl(value: string | null): string | null {
+  return value && /^https?:\/\//i.test(value) ? value : null;
+}
+
+/** The theme accent for the browser's toolbar, when it is a valid colour. */
+function themeColor(theme: HelpCenterTheme): string | null {
+  const accent: unknown = theme.accentColor;
+  return typeof accent === "string" && /^#[0-9a-fA-F]{6}$/.test(accent) ? accent : null;
+}
+
+/** Link preview tags (Open Graph, read by Twitter/X too), on pages with a canonical address only. */
+function socialTags(view: SiteView, parts: PageParts): HtmlValue {
+  if (!parts.canonicalPath || !view.name) return null;
+  const image = absoluteHttpUrl(view.socialImageUrl);
+  return html`<meta property="og:type" content="${parts.ogType ?? "website"}" />
+    <meta property="og:site_name" content="${view.name}" />
+    <meta property="og:title" content="${parts.title ?? view.name}" />
+    ${parts.description ? html`<meta property="og:description" content="${parts.description}" />` : null}
+    <meta property="og:url" content="${view.canonicalBase}${parts.canonicalPath}" />
+    <meta property="og:locale" content="${htmlLang(view.language).replace("-", "_")}" />
+    ${image ? html`<meta property="og:image" content="${image}" />` : null}
+    <meta name="twitter:card" content="summary" />`;
 }
 
 function page(view: SiteView, strings: SiteStrings, parts: PageParts): string {
   const title = [parts.title, view.name].filter(Boolean).join(" · ");
+  const color = themeColor(view.theme);
+  const icon = absoluteHttpUrl(view.logoUrl);
   const brand = view.name
     ? html`<a class="hc-brand" href="${siteHref(view, "/")}"
         >${view.logoUrl ? html`<img src="${view.logoUrl}" alt="" />` : null}<span
@@ -150,7 +194,15 @@ function page(view: SiteView, strings: SiteStrings, parts: PageParts): string {
             : null
         }
         ${view.noindex || parts.noindex ? html`<meta name="robots" content="noindex" />` : null}
+        ${socialTags(view, parts)}
+        ${color ? html`<meta name="theme-color" content="${color}" />` : null}
         <link rel="icon" href="${view.logoUrl ?? "data:,"}" />
+        ${icon ? html`<link rel="apple-touch-icon" href="${icon}" />` : null}
+        ${
+          // The widget's script, frame and socket all come from the API host: open the
+          // connection while the page is still parsing.
+          view.webchat ? html`<link rel="preconnect" href="${view.webchat.baseUrl}" />` : null
+        }
         <link rel="stylesheet" href="${SITE_CSS_PATH}" />
         <style nonce="${view.nonce}">
           ${themeCss(view.theme)}
@@ -208,6 +260,11 @@ function breadcrumb(view: SiteView, trail: Array<{ label: string; path: string }
   </nav>`;
 }
 
+/** A description for a page with none of its own: the titles it lists. */
+function listDescription(titles: string[]): string | null {
+  return truncateText(titles.filter(Boolean).join(" · "), DESCRIPTION_MAX_LENGTH);
+}
+
 function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -251,7 +308,7 @@ export function renderHomePage(view: SiteView, collections: PublicCollection[]):
 
   return page(view, strings, {
     title: null,
-    description: subtitle,
+    description: subtitle ?? listDescription(collections.map((collection) => collection.title)),
     canonicalPath: "/",
     hero,
     headerSearch: false,
@@ -264,7 +321,9 @@ export function renderCollectionPage(view: SiteView, collection: PublicCollectio
   const strings = siteStrings(view.language);
   return page(view, strings, {
     title: collection.title,
-    description: collection.description,
+    description:
+      collection.description ??
+      listDescription(collection.articles.map((article) => article.title)),
     canonicalPath: collectionPath(collection),
     main: html`${breadcrumb(view, [{ label: view.name, path: "/" }])}
       <h1>
@@ -284,8 +343,9 @@ export function renderArticlePage(view: SiteView, article: PublicArticle, body: 
   const path = articlePath(article);
   return page(view, strings, {
     title: article.title,
-    description: article.description,
+    description: article.description ?? textExcerpt(body.value, DESCRIPTION_MAX_LENGTH),
     canonicalPath: path,
+    ogType: "article",
     narrow: true,
     main: html`${breadcrumb(view, [
         { label: view.name, path: "/" },

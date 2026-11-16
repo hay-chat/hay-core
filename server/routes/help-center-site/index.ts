@@ -207,6 +207,7 @@ function emptyView(nonce: string): SiteView {
     canonicalBase: "",
     theme: DEFAULT_HELP_CENTER_THEME,
     logoUrl: null,
+    socialImageUrl: null,
     noindex: true,
     nonce,
     preview: null,
@@ -245,12 +246,15 @@ async function loadSiteView(
   ]);
   if (!organization || organization.suspendedAt) return null;
   if (!helpCenter.isPublished && !preview) return null;
+  const logoUrl = organization.logoUpload ? storageService.getUrl(organization.logoUpload) : null;
   return {
     name: helpCenter.name,
     language: helpCenter.defaultLanguage,
     canonicalBase: canonicalUrl(helpCenter),
     theme: resolveTheme({ ...themePatch(helpCenter.theme), ...preview?.themePatch }),
-    logoUrl: organization.logoUpload ? storageService.getUrl(organization.logoUpload) : null,
+    logoUrl,
+    // TODO: a help center's own sharing image, when there is a setting for one.
+    socialImageUrl: logoUrl,
     noindex: !helpCenter.searchIndexing || preview !== null,
     nonce,
     preview: preview ? { token: preview.token, theme: preview.theme } : null,
