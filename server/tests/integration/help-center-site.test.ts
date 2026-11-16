@@ -403,7 +403,7 @@ describe("help center site", () => {
       const page = await request(HOST, `/articles/editor-${WORD}-guide-d0c00002`);
       expect(page.status).toBe(200);
       expect(page.body).toContain(`The ${WORD} editor body`);
-      expect(page.body).toContain('<img src="https://img.example/a.png"');
+      expect(page.body).toMatch(/<img [^>]*src="https:\/\/img\.example\/a\.png"/);
       expect(page.body).not.toContain("onerror");
       expect(page.body).not.toContain('alert("html")');
     });
@@ -414,9 +414,11 @@ describe("help center site", () => {
       const nonce = /script-src 'nonce-([A-Za-z0-9+/=]+)'/.exec(policy)?.[1];
       expect(nonce).toBeTruthy();
       expect(page.body).toContain(`<script nonce="${nonce}">`);
-      expect(page.body.match(/<script/g)?.length).toBe(
+      // Every executable script carries the nonce; JSON-LD blocks are data and are never run.
+      expect(page.body.match(/<script(?! type="application\/ld\+json")/g)?.length).toBe(
         page.body.match(/<script\s+nonce="/g)?.length,
       );
+      expect(page.body).toContain('<script type="application/ld+json">');
       expect(policy).toContain("default-src 'none'");
       expect(policy).toContain("frame-ancestors 'none'");
       expect(policy).toContain("base-uri 'none'");
@@ -446,6 +448,71 @@ describe("help center site", () => {
       const collection = await request(HOST, "/collections/c0110001");
       expect(collection.status).toBe(301);
       expect(collection.headers.location).toBe("/collections/getting-started-c0110001");
+    });
+
+    it("drops a trailing slash from a page address, and only from one", async () => {
+      const article = await request(HOST, `${VISIBLE_PATH}/`);
+      expect(article.status).toBe(301);
+      expect(article.headers.location).toBe(VISIBLE_PATH);
+      const collection = await request(HOST, "/collections/getting-started-c0110001//");
+      expect(collection.status).toBe(301);
+      expect(collection.headers.location).toBe("/collections/getting-started-c0110001");
+      // Never a redirect off the site, whatever the path.
+      for (const path of ["//evil.example/", "/\\evil.example/", "/search/", "/x/"]) {
+        const reply = await request(HOST, path);
+        expect(reply.status).toBe(404);
+        expect(reply.headers.location).toBeUndefined();
+      }
+    });
+
+    it("answers a revalidation with 304 when only the nonce would differ", async () => {
+      const first = await request(HOST, VISIBLE_PATH);
+      const etag = String(first.headers.etag);
+      expect(etag).toMatch(/^W\/"[A-Za-z0-9_-]{27}"$/);
+      expect(first.headers.vary).toContain("Accept-Encoding");
+
+      const again = await request(HOST, VISIBLE_PATH, { headers: { "if-none-match": etag } });
+      expect(again.status).toBe(304);
+      expect(again.body).toBe("");
+      expect(again.headers.etag).toBe(etag);
+      expect(again.headers["cache-control"]).toBe("public, max-age=60");
+      // The browser keeps the policy it stored with its copy, whose nonce matches that copy.
+      expect(again.headers["content-security-policy"]).toBeUndefined();
+
+      const changed = await request(HOST, VISIBLE_PATH, {
+        headers: { "if-none-match": 'W/"something-else"' },
+      });
+      expect(changed.status).toBe(200);
+      expect(changed.headers["content-security-policy"]).toContain("nonce-");
+
+      // Turning the chat widget off changes the page and its policy, so the old copy is stale.
+      const chatSetting = jest
+        .spyOn(webchatSettingsService, "isEnabled")
+        .mockResolvedValueOnce(false);
+      const withoutChat = await request(HOST, VISIBLE_PATH, { headers: { "if-none-match": etag } });
+      expect(withoutChat.status).toBe(200);
+      expect(withoutChat.headers.etag).not.toBe(etag);
+      chatSetting.mockRestore();
+    });
+
+    it("describes the article for search engines and link previews", async () => {
+      const page = await request(HOST, VISIBLE_PATH);
+      const [article] = [
+        ...page.body.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs),
+      ]
+        .map((match) => JSON.parse(match[1]) as Record<string, unknown>)
+        .filter((data) => data["@type"] === "Article");
+      expect(article).toMatchObject({
+        headline: DOCS.visible.title,
+        url: `http://${HOST}${VISIBLE_PATH}`,
+        inLanguage: "en",
+      });
+      expect(Date.parse(String(article.datePublished))).not.toBeNaN();
+      expect(Date.parse(String(article.dateModified))).not.toBeNaN();
+      expect(page.body).toContain(
+        `<meta property="og:url" content="http://${HOST}${VISIBLE_PATH}" />`,
+      );
+      expect(page.body).toContain('<meta property="og:type" content="article" />');
     });
   });
 

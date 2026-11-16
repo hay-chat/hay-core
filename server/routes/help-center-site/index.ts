@@ -79,6 +79,8 @@ const VOTE_WINDOW_SECONDS = 24 * 60 * 60;
 const PAGE_CACHE = "public, max-age=60";
 const NO_STORE = "no-store";
 const PREVIEW_THEME_MAX_LENGTH = 2000;
+/** The address of a collection or article page, with or without its slug. */
+const PAGE_ADDRESS = /^\/(?:collections|articles)\/[a-z0-9-]+$/;
 
 const feedbackSchema = z.object({ articleId: z.string().max(36), helpful: z.boolean() });
 const themePatchSchema = helpCenterThemeSchema.partial();
@@ -184,18 +186,42 @@ function sendText(
   res.send(body);
 }
 
+/**
+ * A validator for a page that ignores its nonce, which is new on every
+ * response: the page and its policy with the nonce taken out. Weak, as the
+ * bytes on the wire differ with compression.
+ */
+function pageEtag(body: string, policy: string, nonce: string): string {
+  const hash = crypto
+    .createHash("sha256")
+    .update(body.split(nonce).join(""))
+    .update("\0")
+    .update(policy.split(nonce).join(""))
+    .digest("base64url")
+    .slice(0, 27);
+  return `W/"${hash}"`;
+}
+
 function sendPage(res: Response, status: number, view: SiteView, body: string): void {
+  const policy = contentSecurityPolicy({
+    nonce: view.nonce,
+    webchat: view.webchat !== null,
+    frameAncestors: view.preview ? getDashboardUrl() : "'none'",
+  });
   res.status(status);
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", view.preview ? NO_STORE : PAGE_CACHE);
-  res.setHeader(
-    "Content-Security-Policy",
-    contentSecurityPolicy({
-      nonce: view.nonce,
-      webchat: view.webchat !== null,
-      frameAncestors: view.preview ? getDashboardUrl() : "'none'",
-    }),
-  );
+  res.setHeader("Vary", "Accept-Encoding");
+  if (status === 200 && !view.preview) {
+    res.setHeader("ETag", pageEtag(body, policy, view.nonce));
+    if (res.req.fresh) {
+      // No policy on the 304: the browser keeps the one stored with its copy, whose
+      // nonce matches that copy's scripts. A new one would block them.
+      res.status(304).end();
+      return;
+    }
+  }
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Content-Security-Policy", policy);
   res.send(body);
 }
 
@@ -348,6 +374,15 @@ async function handleSite(
     const [view, results] = await Promise.all([loadingView, searchArticles(helpCenter, query)]);
     if (!view) return notFound(view);
     return sendPage(res, 200, view, renderSearchPage(view, query, results));
+  }
+
+  // "/articles/x/" is "/articles/x". Only page addresses: a redirect built from any other
+  // path ("//evil.example/") could send the visitor off the site.
+  const withoutSlash = path.replace(/\/+$/, "");
+  if (withoutSlash !== path && PAGE_ADDRESS.test(withoutSlash)) {
+    const view = await loadingView;
+    if (!view) return notFound(view);
+    return redirectToCurrent(res, view, withoutSlash);
   }
 
   const [, section, segment, ...rest] = path.split("/");
