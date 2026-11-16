@@ -287,6 +287,39 @@ describe("robots.txt and sitemap.xml", () => {
       "<loc>https://x.test/?a=1&amp;b=&lt;2&gt;/</loc>",
     );
   });
+
+  it("dates a collection by its newest article and the home page by the newest of all", () => {
+    const summary = (id: string, updatedAt: string) => ({
+      id,
+      title: id,
+      description: null,
+      updatedAt: new Date(updatedAt),
+    });
+    const collection = (id: string, articles: ReturnType<typeof summary>[]) => ({
+      id,
+      title: "c",
+      description: null,
+      icon: null,
+      articles,
+    });
+    const xml = buildSitemapXml("https://h.test", [
+      collection("11111111-0000-4000-8000-000000000000", [
+        summary("aaaaaaaa-0000-4000-8000-000000000000", "2026-03-01T00:00:00Z"),
+        summary("bbbbbbbb-0000-4000-8000-000000000000", "2026-05-01T00:00:00Z"),
+      ]),
+      collection("22222222-0000-4000-8000-000000000000", [
+        summary("cccccccc-0000-4000-8000-000000000000", "2026-04-01T00:00:00Z"),
+      ]),
+    ]);
+    const lastmod = (loc: string) =>
+      new RegExp(`<loc>${loc}</loc><lastmod>([^<]+)</lastmod>`).exec(xml)?.[1];
+    expect(lastmod("https://h.test/")).toBe("2026-05-01T00:00:00.000Z");
+    expect(lastmod("https://h.test/collections/c-11111111")).toBe("2026-05-01T00:00:00.000Z");
+    expect(lastmod("https://h.test/collections/c-22222222")).toBe("2026-04-01T00:00:00.000Z");
+    expect(buildSitemapXml("https://h.test", [])).toContain(
+      "<url><loc>https://h.test/</loc></url>",
+    );
+  });
 });
 
 describe("prepareForPage", () => {
