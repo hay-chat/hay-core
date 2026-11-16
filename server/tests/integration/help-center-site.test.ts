@@ -41,6 +41,9 @@ import { helpCenterSite, helpCenterTlsAskHandler } from "../../routes/help-cente
 import { signPreviewToken } from "../../services/help-center/help-center.service";
 import { clearHelpCenterHostCache } from "../../services/help-center/host-resolver";
 import { SITE_CSS_PATH } from "../../services/help-center/render/styles";
+import sharp from "sharp";
+import { webchatSettingsRepository } from "../../repositories/webchat-settings.repository";
+import { storageService } from "../../services/storage.service";
 import { webchatSettingsService } from "../../services/webchat/webchat-settings.service";
 
 const ORG_ID = "4c000000-0000-4000-8000-0000000000a3";
@@ -942,6 +945,37 @@ describe("help center site", () => {
         expect(policy).toContain("connect-src 'self';");
       } finally {
         await webchatSettingsService.updateSettings(ORG_ID, { isEnabled: true });
+      }
+    });
+  });
+
+  describe("branding", () => {
+    it("shows the logo imported from the website when the organization has none", async () => {
+      const before = await request(HOST, "/");
+      expect(before.body).toContain('<link rel="icon" href="data:,"');
+
+      const png = await sharp({
+        create: { width: 8, height: 8, channels: 3, background: "#e11d48" },
+      })
+        .png()
+        .toBuffer();
+      const { upload } = await storageService.upload({
+        buffer: png,
+        originalName: "webchat-logo.png",
+        mimeType: "image/png",
+        folder: "organizations",
+        organizationId: ORG_ID,
+      });
+      await webchatSettingsRepository.getOrCreate(ORG_ID);
+      await webchatSettingsRepository.patch(ORG_ID, { logoUploadId: upload.id });
+      try {
+        const page = await request(HOST, "/");
+        const logo = storageService.getUrl(upload);
+        expect(page.body).toContain(`<link rel="icon" href="${logo}"`);
+        expect(page.body).toMatch(new RegExp(`class="hc-brand"[^>]*>\\s*<img src="${logo}"`));
+      } finally {
+        await webchatSettingsRepository.patch(ORG_ID, { logoUploadId: null });
+        await storageService.delete(upload.id);
       }
     });
   });

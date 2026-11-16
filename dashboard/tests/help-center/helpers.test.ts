@@ -4,6 +4,8 @@ import {
   HELP_CENTER_PRESETS,
   MIN_TEXT_CONTRAST,
   applyPreset,
+  brandColors,
+  initialTheme,
   matchingPreset,
   readableTextOn,
   contrastRatio,
@@ -135,5 +137,26 @@ describe("theme presets", () => {
         MIN_TEXT_CONTRAST,
       );
     }
+  });
+});
+
+describe("website brand", () => {
+  const brand = { color: "#E11D48", palette: ["#e11d48", "#0F172A", "nope"], logoUrl: null };
+
+  it("lists the brand colour first, each colour once, valid ones only", () => {
+    expect(brandColors(brand)).toEqual(["#e11d48", "#0f172a"]);
+    expect(brandColors({ color: null, palette: [], logoUrl: null })).toEqual([]);
+    expect(brandColors(null)).toEqual([]);
+  });
+
+  it("starts a new help center in the brand colour, or the default without one", () => {
+    expect(initialTheme(brand)).toEqual({
+      ...DEFAULT_HELP_CENTER_THEME,
+      accentColor: "#e11d48",
+      heroGradientFrom: "#e11d48",
+    });
+    expect(initialTheme({ color: null, palette: ["#0f172a"], logoUrl: null })).toEqual(
+      DEFAULT_HELP_CENTER_THEME,
+    );
   });
 });

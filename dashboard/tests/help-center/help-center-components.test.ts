@@ -437,4 +437,19 @@ describe("help center appearance", () => {
       { ...theme, accentColor: "#123abc" },
     ]);
   });
+
+  it("offers the website's colours as one-click swatches", async () => {
+    const plain = mountWithStubs(HelpCenterThemeFields, { props: { modelValue: theme } });
+    expect(plain.find('[data-testid="accent-swatch"]').exists()).toBe(false);
+
+    const wrapper = mountWithStubs(HelpCenterThemeFields, {
+      props: { modelValue: theme, brandColors: ["#e11d48", "#0f172a"] },
+    });
+    const swatches = wrapper.findAll('[data-testid="accent-swatch"]');
+    expect(swatches).toHaveLength(2);
+    await swatches[1]!.trigger("click");
+    expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([
+      { ...theme, accentColor: "#0f172a" },
+    ]);
+  });
 });

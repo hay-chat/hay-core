@@ -79,12 +79,16 @@ export function helpCenter(overrides: Partial<HelpCenterView> = {}): HelpCenterV
   };
 }
 
-export function hubState(view: HelpCenterView | null): HelpCenterState {
+export function hubState(
+  view: HelpCenterView | null,
+  brand: HelpCenterState["brand"] = { color: null, palette: [], logoUrl: null },
+): HelpCenterState {
   return {
     enabled: true,
     baseDomain: BASE_DOMAIN,
     suggestedSubdomain: view ? "" : "acme",
     helpCenter: view,
+    brand,
   };
 }
 

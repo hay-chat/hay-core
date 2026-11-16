@@ -60,6 +60,8 @@
       "colorInvalid": "Enter a 6-digit hex colour, such as #2747d6.",
       "contrastWarning": "On a white page this colour has a contrast of {ratio}:1, below the 4.5:1 that text needs. Links will be shown in the normal text colour instead of this one; buttons stay readable.",
       "font": "Font",
+      "brandColors": "From your website",
+      "useBrandColor": "Use {color}",
       "fontSource": "Sans, Serif, Rounded and Mono load from Google Fonts. System uses each visitor's own fonts and loads nothing.",
       "fonts": {
         "sans": "Sans",

@@ -60,6 +60,8 @@
       "colorInvalid": "Digite uma cor hexadecimal de 6 dígitos, como #2747d6.",
       "contrastWarning": "Em uma página branca, esta cor tem contraste de {ratio}:1, abaixo dos 4.5:1 de que um texto precisa. Os links aparecerão na cor normal do texto em vez desta; os botões continuam legíveis.",
       "font": "Fonte",
+      "brandColors": "Do seu site",
+      "useBrandColor": "Usar {color}",
       "fontSource": "Sem serifa, Com serifa, Arredondada e Monoespaçada são carregadas do Google Fonts. Do sistema usa as fontes do próprio visitante e não carrega nada.",
       "fonts": {
         "sans": "Sem serifa",

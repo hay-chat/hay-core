@@ -21,6 +21,7 @@ import {
   signPreviewToken,
 } from "@server/services/help-center/help-center.service";
 import { suggestSubdomain } from "@server/services/help-center/subdomain";
+import { webchatSettingsService } from "@server/services/webchat/webchat-settings.service";
 import {
   defaultUrl,
   helpCenterBaseHostname,
@@ -87,6 +88,10 @@ export const helpCenterRouter = t.router({
       baseDomain: enabled ? helpCenterBaseHostname() : "",
       suggestedSubdomain,
       helpCenter: helpCenter ? await helpCenterService.view(helpCenter) : null,
+      /** Colours and logo imported from the organization's website, to start the theme from. */
+      brand: enabled
+        ? await webchatSettingsService.brand(ctx.organizationId!)
+        : { color: null, palette: [], logoUrl: null },
     };
   }),
 

@@ -289,7 +289,10 @@ async function loadSiteView(
   ]);
   if (!organization || organization.suspendedAt) return null;
   if (!helpCenter.isPublished && !preview) return null;
-  const logoUrl = organization.logoUpload ? storageService.getUrl(organization.logoUpload) : null;
+  // Without an organization logo, the one imported from the website (the chat widget's).
+  const logoUrl = organization.logoUpload
+    ? storageService.getUrl(organization.logoUpload)
+    : await webchatSettingsService.logoUrl(helpCenter.organizationId);
   return {
     name: helpCenter.name,
     language: helpCenter.defaultLanguage,

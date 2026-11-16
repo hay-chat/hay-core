@@ -28,6 +28,7 @@
       v-else-if="!state.helpCenter"
       :base-domain="state.baseDomain"
       :suggested-subdomain="state.suggestedSubdomain"
+      :brand="state.brand"
       data-testid="help-center-setup"
       @created="load"
     />
@@ -74,6 +75,7 @@
             :dirty="themeDirty"
             :preview-link="previewLink"
             :help-center="state.helpCenter"
+            :brand-colors="brandColors(state.brand)"
             @reset="themeDraft = { ...savedTheme }"
             @updated="applySavedTheme"
             @changed="applyHelpCenter"
@@ -108,6 +110,7 @@ import { Hay } from "@/utils/api";
 import { useUnsavedChanges } from "@/composables/useUnsavedChanges";
 import {
   DEFAULT_HELP_CENTER_THEME,
+  brandColors,
   type HelpCenterCollection,
   type HelpCenterPreviewLink,
   type HelpCenterState,

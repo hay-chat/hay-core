@@ -9,6 +9,7 @@
         <HelpCenterThemeFields
           :model-value="modelValue"
           :site-name="helpCenter.name"
+          :brand-colors="brandColors"
           extended
           @update:model-value="emit('update:modelValue', $event)"
         >
@@ -181,6 +182,8 @@ const props = defineProps<{
   dirty: boolean;
   previewLink: HelpCenterPreviewLink | null;
   helpCenter: HelpCenterView;
+  /** Colours imported from the organization's website. */
+  brandColors?: string[];
 }>();
 
 const emit = defineEmits<{

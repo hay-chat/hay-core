@@ -20,6 +20,26 @@
         />
       </div>
     </div>
+    <div
+      v-if="swatches?.length"
+      class="flex flex-wrap items-center gap-1.5"
+      role="group"
+      :aria-label="$t('helpCenter.theme.brandColors')"
+    >
+      <span class="mr-1 text-xs text-neutral-muted">{{ $t("helpCenter.theme.brandColors") }}</span>
+      <button
+        v-for="swatch in swatches"
+        :key="swatch"
+        type="button"
+        class="h-6 w-6 rounded-full border border-input ring-offset-2 ring-offset-background transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        :class="{ 'ring-2 ring-primary': swatch === modelValue }"
+        :style="{ backgroundColor: swatch }"
+        :aria-label="$t('helpCenter.theme.useBrandColor', { color: swatch })"
+        :aria-pressed="swatch === modelValue"
+        :data-testid="`${testId}-swatch`"
+        @click="emit('update:modelValue', swatch)"
+      />
+    </div>
     <div :id="`${id}-notes`" class="space-y-1 text-sm" aria-live="polite">
       <p v-if="!hexValid" class="text-destructive" :data-testid="`${testId}-invalid`">
         {{ $t("helpCenter.theme.colorInvalid") }}
@@ -41,6 +61,8 @@ const props = defineProps<{
   pickerLabel: string;
   /** Prefix of the notes' test ids. */
   testId: string;
+  /** One-click colours, such as the ones imported from the website. */
+  swatches?: string[];
 }>();
 
 const emit = defineEmits<{ "update:modelValue": [value: string] }>();

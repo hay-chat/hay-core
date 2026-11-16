@@ -9,6 +9,7 @@
     <HelpCenterColorField
       id="hc-accent-hex"
       test-id="accent"
+      :swatches="brandColors"
       :model-value="modelValue.accentColor"
       :label="$t('helpCenter.theme.accentColor')"
       :picker-label="$t('helpCenter.theme.accentColorPicker')"
@@ -118,6 +119,7 @@
             <HelpCenterColorField
               id="hc-gradient-from"
               test-id="gradient-from"
+              :swatches="brandColors"
               :model-value="modelValue.heroGradientFrom"
               :label="$t('helpCenter.theme.heroGradientFrom')"
               :picker-label="$t('helpCenter.theme.heroGradientFromPicker')"
@@ -126,6 +128,7 @@
             <HelpCenterColorField
               id="hc-gradient-to"
               test-id="gradient-to"
+              :swatches="brandColors"
               :model-value="modelValue.heroGradientTo"
               :label="$t('helpCenter.theme.heroGradientTo')"
               :picker-label="$t('helpCenter.theme.heroGradientToPicker')"
@@ -279,6 +282,8 @@ const props = defineProps<{
   extended?: boolean;
   /** Shown in the preset thumbnails. */
   siteName?: string;
+  /** Colours imported from the organization's website, offered as swatches. */
+  brandColors?: string[];
 }>();
 
 const emit = defineEmits<{ "update:modelValue": [value: HelpCenterTheme] }>();

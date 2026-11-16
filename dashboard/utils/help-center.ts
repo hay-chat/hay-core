@@ -1,6 +1,7 @@
 import type { RouterOutputs } from "@/types/trpc";
 
 export type HelpCenterState = RouterOutputs["helpCenter"]["get"];
+export type HelpCenterBrand = HelpCenterState["brand"];
 export type HelpCenterView = NonNullable<HelpCenterState["helpCenter"]>;
 export type HelpCenterTheme = HelpCenterView["theme"];
 export type HelpCenterCollection = RouterOutputs["helpCenter"]["listCollections"][number];
@@ -27,6 +28,23 @@ export interface HelpCenterCollectionDraft {
  * The theme a new help center starts with. Mirrors DEFAULT_HELP_CENTER_THEME on the
  * server, which the API only returns once a help center exists.
  */
+/** The website's colours, brand colour first, each once. */
+export function brandColors(brand: HelpCenterBrand | null | undefined): string[] {
+  if (!brand) return [];
+  const colors = [brand.color, ...brand.palette].filter(
+    (color): color is string => typeof color === "string" && isHexColor(color),
+  );
+  return [...new Set(colors.map((color) => color.toLowerCase()))];
+}
+
+/** The theme a new help center starts with: the default, in the brand's colour when there is one. */
+export function initialTheme(brand: HelpCenterBrand | null | undefined): HelpCenterTheme {
+  const color = brand?.color && isHexColor(brand.color) ? brand.color.toLowerCase() : null;
+  return color
+    ? { ...DEFAULT_HELP_CENTER_THEME, accentColor: color, heroGradientFrom: color }
+    : { ...DEFAULT_HELP_CENTER_THEME };
+}
+
 export const DEFAULT_HELP_CENTER_THEME: HelpCenterTheme = {
   accentColor: "#2747d6",
   font: "sans",

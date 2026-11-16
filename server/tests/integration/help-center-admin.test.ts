@@ -37,6 +37,8 @@ import { AuditLog } from "../../entities/audit-log.entity";
 import { Document, DocumentationStatus, DocumentVisibility } from "../../entities/document.entity";
 import { Organization } from "../../entities/organization.entity";
 import { Upload } from "../../entities/upload.entity";
+import { WebchatSettings } from "../../database/entities/webchat-settings.entity";
+import { storageService } from "../../services/storage.service";
 import { User } from "../../entities/user.entity";
 import { UserOrganization } from "../../entities/user-organization.entity";
 import { AuthUser } from "../../lib/auth/AuthUser";
@@ -257,6 +259,7 @@ describe("help center administration", () => {
         baseDomain: "help.test",
         suggestedSubdomain: "cafe-ole",
         helpCenter: null,
+        brand: { color: null, palette: [], logoUrl: null },
       });
       // "api" is reserved, so there is nothing to offer organization B.
       expect((await (await asAdminB()).get()).suggestedSubdomain).toBe("");
@@ -463,6 +466,45 @@ describe("help center administration", () => {
       ]) {
         expect(await codeOf(caller.update({ theme: theme as never }))).toBe("BAD_REQUEST");
       }
+    });
+
+    it("returns the brand imported from the website, to start the theme from", async () => {
+      const png = await sharp({
+        create: { width: 8, height: 8, channels: 3, background: "#e11d48" },
+      })
+        .png()
+        .toBuffer();
+      const { upload } = await storageService.upload({
+        buffer: png,
+        originalName: "webchat-logo.png",
+        mimeType: "image/png",
+        folder: "organizations",
+        organizationId: ORG_A,
+      });
+      const settings = AppDataSource.getRepository(WebchatSettings);
+      await settings.save(
+        settings.create({
+          organizationId: ORG_A,
+          brandColor: "#e11d48",
+          brandColorSource: "website",
+          brandPalette: ["#e11d48", "#0f172a"],
+          logoUploadId: upload.id,
+          logoSource: "website",
+        }),
+      );
+
+      const { brand } = await (await asAdminA()).get();
+      expect(brand).toEqual({
+        color: "#e11d48",
+        palette: ["#e11d48", "#0f172a"],
+        logoUrl: storageService.getUrl(upload),
+      });
+      // Organization B has imported nothing.
+      expect((await (await asAdminB()).get()).brand).toEqual({
+        color: null,
+        palette: [],
+        logoUrl: null,
+      });
     });
 
     it("uploads, replaces and removes the hero image", async () => {
