@@ -16,22 +16,13 @@ import {
   HELP_CENTER_HERO_ALIGNS,
   HELP_CENTER_HERO_OVERLAYS,
   HELP_CENTER_HERO_STYLES,
-  type HelpCenterFont,
   type HelpCenterGradientDirection,
   type HelpCenterHeroOverlay,
   type HelpCenterHeroStyle,
   type HelpCenterTheme,
 } from "@server/database/entities/help-center.entity";
+import { SITE_FONTS, type SiteFont } from "./fonts";
 import { raw, type SafeHtml } from "./html";
-
-/** System fonts only: a visitor's browser asks no third party for anything. */
-const FONT_STACKS: Record<HelpCenterFont, string> = {
-  sans: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-  serif: 'Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif',
-  rounded:
-    'ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", system-ui, sans-serif',
-  mono: 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
-};
 
 const GRADIENT_ANGLES: Record<HelpCenterGradientDirection, string> = {
   diagonal: "135deg",
@@ -129,7 +120,7 @@ export function themeCss(theme: Partial<HelpCenterTheme>): SafeHtml {
   const accent = hexOr(theme.accentColor, defaults.accentColor);
   const from = hexOr(theme.heroGradientFrom, defaults.heroGradientFrom);
   const to = hexOr(theme.heroGradientTo, defaults.heroGradientTo);
-  const font = FONT_STACKS[oneOf(HELP_CENTER_FONTS, theme.font, defaults.font)];
+  const font = siteFont(theme);
   const angle =
     GRADIENT_ANGLES[
       oneOf(
@@ -148,11 +139,16 @@ export function themeCss(theme: Partial<HelpCenterTheme>): SafeHtml {
         `@media (prefers-color-scheme:dark){:root{--hc-link:${linkColor(accent, DARK)}}}`
       : `--hc-link:${linkColor(accent, scheme === "dark" ? DARK : LIGHT)}}`;
   return raw(
-    `:root{--hc-accent:${accent};--hc-on-accent:${readableTextOn(accent)};--hc-font:${font};` +
+    `:root{--hc-accent:${accent};--hc-on-accent:${readableTextOn(accent)};--hc-font:${font.body};--hc-font-heading:${font.heading};` +
       `--hc-hero-from:${from};--hc-hero-to:${to};--hc-hero-angle:${angle};` +
       `--hc-on-gradient:${readableTextOn(from, to)};--hc-hero-overlay:${overlay};` +
       link,
   );
+}
+
+/** The theme's typeface, one of ours whatever the stored value. */
+export function siteFont(theme: Partial<HelpCenterTheme>): SiteFont {
+  return SITE_FONTS[oneOf(HELP_CENTER_FONTS, theme.font, DEFAULT_HELP_CENTER_THEME.font)];
 }
 
 /** Classes for `<body>`: the colour scheme and the corner style, each one of ours. */
@@ -222,6 +218,7 @@ body {
 a { color: var(--hc-link); text-decoration-color: color-mix(in oklab, currentColor 40%, transparent); text-underline-offset: 0.2em; text-decoration-thickness: 1px; }
 a:hover { text-decoration-color: currentColor; }
 :focus-visible { outline: 2px solid var(--hc-link); outline-offset: 3px; border-radius: 4px; }
+h1, h2, h3, .hc-brand { font-family: var(--hc-font-heading, inherit); }
 h1, h2, h3 { line-height: 1.2; margin: 0; letter-spacing: -0.015em; text-wrap: balance; }
 h1 { letter-spacing: -0.025em; }
 img { max-width: 100%; height: auto; }

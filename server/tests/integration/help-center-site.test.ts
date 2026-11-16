@@ -439,6 +439,24 @@ describe("help center site", () => {
       expect(String(again.headers["content-security-policy"])).not.toContain(`'nonce-${nonce}'`);
     });
 
+    it("allows Google Fonts only when the theme's typeface comes from there", async () => {
+      // The default font loads from Google Fonts.
+      const google = String((await request(HOST, VISIBLE_PATH)).headers["content-security-policy"]);
+      expect(google).toContain("style-src 'self' 'unsafe-inline' https://fonts.googleapis.com");
+      expect(google).toContain("font-src https://fonts.gstatic.com");
+
+      await updateHelpCenter(HELP_CENTER_ID, { theme: { layout: "list", font: "system" } });
+      try {
+        const page = await request(HOST, VISIBLE_PATH);
+        const policy = String(page.headers["content-security-policy"]);
+        expect(policy).toContain("style-src 'self' 'unsafe-inline';");
+        expect(policy).not.toContain("font-src");
+        expect(page.body).not.toContain("fonts.googleapis.com");
+      } finally {
+        await updateHelpCenter(HELP_CENTER_ID, { theme: { layout: "list" } });
+      }
+    });
+
     it("redirects an old or missing slug to the current address", async () => {
       for (const stale of ["/articles/an-old-title-d0c00001", "/articles/d0c00001"]) {
         const reply = await request(HOST, stale);

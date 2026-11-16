@@ -21,7 +21,7 @@
 
     <fieldset class="space-y-1.5">
       <legend class="text-sm font-medium">{{ $t("helpCenter.theme.font") }}</legend>
-      <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <label v-for="font in HELP_CENTER_FONTS" :key="font" class="hc-choice">
           <input
             type="radio"
@@ -39,6 +39,7 @@
           </span>
         </label>
       </div>
+      <p class="text-xs text-neutral-muted">{{ $t("helpCenter.theme.fontSource") }}</p>
     </fieldset>
 
     <fieldset class="space-y-1.5">
@@ -254,6 +255,7 @@ import {
   HELP_CENTER_CORNERS,
   HELP_CENTER_FONTS,
   HELP_CENTER_FONT_STACKS,
+  HELP_CENTER_FONTS_STYLESHEET,
   HELP_CENTER_GRADIENT_ANGLES,
   HELP_CENTER_GRADIENT_DIRECTIONS,
   HELP_CENTER_HERO_ALIGNS,
@@ -267,6 +269,9 @@ import {
 } from "@/utils/help-center";
 import HelpCenterColorField from "./HelpCenterColorField.vue";
 import HelpCenterThemePresets from "./HelpCenterThemePresets.vue";
+
+// The site's typefaces, so the font options and theme thumbnails show the real thing.
+useHead({ link: [{ rel: "stylesheet", href: HELP_CENTER_FONTS_STYLESHEET, key: "hc-fonts" }] });
 
 const props = defineProps<{
   modelValue: HelpCenterTheme;

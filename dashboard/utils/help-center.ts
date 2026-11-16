@@ -44,18 +44,33 @@ export const DEFAULT_HELP_CENTER_THEME: HelpCenterTheme = {
   showPoweredBy: true,
 };
 
+const SYSTEM_SANS =
+  'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+
 /**
- * The site's font stacks (FONT_STACKS in server/services/help-center/render/styles.ts),
- * so each font option can be shown in its own typeface.
+ * The site's heading typefaces (SITE_FONTS in server/services/help-center/render/fonts.ts),
+ * so each font option and preset thumbnail can be shown in its own typeface.
  */
 export const HELP_CENTER_FONT_STACKS: Record<HelpCenterTheme["font"], string> = {
-  sans: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-  serif: 'Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif',
-  rounded:
-    'ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", system-ui, sans-serif',
-  mono: 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
+  sans: `"Instrument Sans", ${SYSTEM_SANS}`,
+  serif: 'Newsreader, Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif',
+  rounded: `Nunito, ${SYSTEM_SANS}`,
+  mono: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+  system: SYSTEM_SANS,
 };
-export const HELP_CENTER_FONTS: HelpCenterTheme["font"][] = ["sans", "serif", "rounded", "mono"];
+export const HELP_CENTER_FONTS: HelpCenterTheme["font"][] = [
+  "sans",
+  "serif",
+  "rounded",
+  "mono",
+  "system",
+];
+
+/** One Google Fonts stylesheet with every typeface the font picker shows. */
+export const HELP_CENTER_FONTS_STYLESHEET =
+  "https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700" +
+  "&family=Newsreader:opsz,wght@6..72,400..700&family=Nunito:wght@400..800" +
+  "&family=JetBrains+Mono:wght@500..700&display=swap";
 
 export const HELP_CENTER_LAYOUTS: HelpCenterTheme["layout"][] = ["cards", "list"];
 export const HELP_CENTER_COLOR_SCHEMES: HelpCenterTheme["colorScheme"][] = [

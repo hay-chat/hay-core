@@ -3,8 +3,11 @@ import { OrganizationScopedEntity } from "@server/entities/base.entity";
 import { Organization } from "@server/entities/organization.entity";
 import { Upload } from "@server/entities/upload.entity";
 
-/** Font stacks the public site ships. System fonts only: visitors load nothing from third parties. */
-export const HELP_CENTER_FONTS = ["sans", "serif", "rounded", "mono"] as const;
+/**
+ * Typefaces of the public site (render/fonts.ts). All but "system" load from
+ * Google Fonts; "system" uses the visitor's own fonts and loads nothing.
+ */
+export const HELP_CENTER_FONTS = ["sans", "serif", "rounded", "mono", "system"] as const;
 export type HelpCenterFont = (typeof HELP_CENTER_FONTS)[number];
 
 /** Home page layout: a card per collection, or every article listed under its collection. */

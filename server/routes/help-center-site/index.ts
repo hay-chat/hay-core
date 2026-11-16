@@ -59,7 +59,8 @@ import {
   type SiteView,
 } from "@server/services/help-center/render/pages";
 import { buildRobotsTxt, buildSitemapXml } from "@server/services/help-center/render/seo";
-import { SITE_CSS, SITE_CSS_PATH } from "@server/services/help-center/render/styles";
+import { GOOGLE_FONTS_ORIGINS } from "@server/services/help-center/render/fonts";
+import { SITE_CSS, SITE_CSS_PATH, siteFont } from "@server/services/help-center/render/styles";
 import {
   articlePath,
   collectionPath,
@@ -96,10 +97,17 @@ interface PolicyOptions {
   webchat: boolean;
   /** Who may frame the page: nobody, or the dashboard while previewing. */
   frameAncestors: string;
+  /** The theme's typeface comes from Google Fonts. */
+  googleFonts: boolean;
 }
 
 /** The pages' Content-Security-Policy. The global helmet does not run on help center hosts. */
-export function contentSecurityPolicy({ nonce, webchat, frameAncestors }: PolicyOptions): string {
+export function contentSecurityPolicy({
+  nonce,
+  webchat,
+  frameAncestors,
+  googleFonts,
+}: PolicyOptions): string {
   const api = getApiUrl();
   const socket = `${getWebSocketProtocol()}://${config.domain.api}`;
   // Logos and signed document images come from the API host, plain http in development.
@@ -111,7 +119,8 @@ export function contentSecurityPolicy({ nonce, webchat, frameAncestors }: Policy
     "default-src 'none'",
     `script-src 'nonce-${nonce}'${webchat ? ` ${api}` : ""}`,
     // The chat widget injects <style> elements it cannot put a nonce on.
-    "style-src 'self' 'unsafe-inline'",
+    `style-src 'self' 'unsafe-inline'${googleFonts ? ` ${GOOGLE_FONTS_ORIGINS.styles}` : ""}`,
+    googleFonts ? `font-src ${GOOGLE_FONTS_ORIGINS.files}` : null,
     `img-src ${images.join(" ")}`,
     `connect-src 'self'${webchat ? ` ${api} ${socket}` : ""}`,
     webchat ? `frame-src ${api}` : null,
@@ -212,6 +221,7 @@ function sendPage(res: Response, status: number, view: SiteView, body: string): 
     nonce: view.nonce,
     webchat: view.webchat !== null,
     frameAncestors: view.preview ? getDashboardUrl() : "'none'",
+    googleFonts: siteFont(view.theme).stylesheet !== null,
   });
   res.status(status);
   res.setHeader("Cache-Control", view.preview ? NO_STORE : PAGE_CACHE);

@@ -218,7 +218,8 @@ describe("theme variables", () => {
     }).value;
     expect(css).toContain("--hc-accent:#ffdd00");
     expect(css).toContain("--hc-on-accent:#000000");
-    expect(css).toContain("--hc-font:Charter");
+    expect(css).toContain("--hc-font:Newsreader, Charter");
+    expect(css).toContain("--hc-font-heading:Newsreader, Charter");
     // Yellow is unreadable as link text on white, so links fall back to the text colour there.
     expect(css).toMatch(/--hc-link:#16181d.*prefers-color-scheme:dark.*--hc-link:#ffdd00/);
   });
@@ -674,12 +675,28 @@ describe("pages", () => {
       expect(page).toContain('<link rel="preconnect" href="https://api.hay.test" />');
 
       const plain = renderHomePage(
-        view({ theme: { ...DEFAULT_HELP_CENTER_THEME, accentColor: "red;}" } }),
+        view({ theme: { ...DEFAULT_HELP_CENTER_THEME, accentColor: "red;}", font: "system" } }),
         [],
       );
       expect(plain).not.toContain("theme-color");
       expect(plain).not.toContain("apple-touch-icon");
       expect(plain).not.toContain("preconnect");
+    });
+
+    it("loads the theme's Google font, and nothing for system fonts", () => {
+      const sans = renderHomePage(view(), []);
+      expect(sans).toContain(
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />',
+      );
+      expect(sans).toContain(
+        '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&amp;display=swap" />',
+      );
+      const system = renderHomePage(
+        view({ theme: { ...DEFAULT_HELP_CENTER_THEME, font: "system" } }),
+        [],
+      );
+      expect(system).not.toContain("fonts.googleapis.com");
+      expect(system).not.toContain("fonts.gstatic.com");
     });
   });
 

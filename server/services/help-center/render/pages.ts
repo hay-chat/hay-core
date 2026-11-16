@@ -17,7 +17,8 @@ import {
   type SafeHtml,
 } from "./html";
 import { htmlLang, siteStrings, type SiteStrings } from "./strings";
-import { bodyClass, heroClass, heroStyle, SITE_CSS_PATH, themeCss } from "./styles";
+import { GOOGLE_FONTS_ORIGINS } from "./fonts";
+import { bodyClass, heroClass, heroStyle, siteFont, SITE_CSS_PATH, themeCss } from "./styles";
 import { articlePath, collectionPath } from "./urls";
 
 export const PREVIEW_TOKEN_PARAM = "hc_preview";
@@ -73,6 +74,15 @@ function previewFields(view: SiteView): SafeHtml[] {
 const SEARCH_ICON = raw(
   '<svg class="hc-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="8.75" cy="8.75" r="5.75"/><path d="m13.25 13.25 4 4"/></svg>',
 );
+
+/** The theme's Google Fonts stylesheet, if it has one. Fixed addresses only. */
+function fontLinks(view: SiteView): HtmlValue {
+  const stylesheet = siteFont(view.theme).stylesheet;
+  if (!stylesheet) return null;
+  return html`<link rel="preconnect" href="${GOOGLE_FONTS_ORIGINS.styles}" />
+    <link rel="preconnect" href="${GOOGLE_FONTS_ORIGINS.files}" crossorigin />
+    <link rel="stylesheet" href="${stylesheet}" />`;
+}
 
 function searchForm(view: SiteView, strings: SiteStrings, inputId: string, query = ""): SafeHtml {
   return html`<form class="hc-search" role="search" action="/search" method="get">
@@ -215,6 +225,7 @@ function page(view: SiteView, strings: SiteStrings, parts: PageParts): string {
           // connection while the page is still parsing.
           view.webchat ? html`<link rel="preconnect" href="${view.webchat.baseUrl}" />` : null
         }
+        ${fontLinks(view)}
         <link rel="stylesheet" href="${SITE_CSS_PATH}" />
         <style nonce="${view.nonce}">
           ${themeCss(view.theme)}
