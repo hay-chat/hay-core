@@ -24,7 +24,7 @@
     "fake-indexeddb": "^6.2.7",
     "jsdom": "^31.0.0",
     "terser": "^5.51.2",
-    "typescript": "^5.4.2",
+    "typescript": "^7.0.2",
     "vite": "^6.4.5",
     "vitest": "^5.1.0",
     "vue-tsc": "^2.0.6"
