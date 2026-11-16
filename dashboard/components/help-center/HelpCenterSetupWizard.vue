@@ -47,7 +47,12 @@
           :base-domain="baseDomain"
         />
 
-        <HelpCenterThemeFields v-else-if="stepper.isCurrent('brand')" v-model="theme" />
+        <HelpCenterThemeFields
+          v-else-if="stepper.isCurrent('brand')"
+          v-model="theme"
+          :site-name="basics.name"
+          :brand-colors="brandColors(brand)"
+        />
 
         <div v-else class="space-y-6">
           <HelpCenterCollectionFields v-model="collection" />
@@ -96,9 +101,12 @@ import { Hay } from "@/utils/api";
 import { isLanguageCode } from "@/utils/languages";
 import {
   DEFAULT_HELP_CENTER_THEME,
+  brandColors,
   errorMessage,
+  initialTheme,
   normalizeTheme,
   type HelpCenterBasics,
+  type HelpCenterBrand,
   type HelpCenterCollectionDraft,
   type HelpCenterTheme,
 } from "@/utils/help-center";
@@ -107,7 +115,12 @@ import HelpCenterThemeFields from "./HelpCenterThemeFields.vue";
 import HelpCenterCollectionFields from "./HelpCenterCollectionFields.vue";
 import HelpCenterDocumentPicker from "./HelpCenterDocumentPicker.vue";
 
-const props = defineProps<{ baseDomain: string; suggestedSubdomain: string }>();
+const props = defineProps<{
+  baseDomain: string;
+  suggestedSubdomain: string;
+  /** Imported from the organization's website: the theme starts in its colour. */
+  brand?: HelpCenterBrand | null;
+}>();
 const emit = defineEmits<{ created: [] }>();
 
 const { t } = useI18n();
@@ -124,7 +137,7 @@ const basics = ref<HelpCenterBasics>({
   language: "en",
 });
 const addressOk = ref(false);
-const theme = ref<HelpCenterTheme>({ ...DEFAULT_HELP_CENTER_THEME });
+const theme = ref<HelpCenterTheme>(initialTheme(props.brand));
 const collection = ref<HelpCenterCollectionDraft>({ title: "", description: "", icon: "" });
 const documentIds = ref<string[]>([]);
 const creating = ref(false);

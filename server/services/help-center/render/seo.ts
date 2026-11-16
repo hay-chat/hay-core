@@ -13,19 +13,39 @@ export function buildRobotsTxt(canonicalBase: string | null): string {
   return `User-agent: *\nAllow: /\nDisallow: /search\n\nSitemap: ${canonicalBase}/sitemap.xml\n`;
 }
 
-/** The home page, every collection and every visible article, at their canonical addresses. */
+function latest(dates: Date[]): Date | undefined {
+  let newest: Date | undefined;
+  for (const date of dates) {
+    if (!newest || new Date(date).getTime() > newest.getTime()) newest = new Date(date);
+  }
+  return newest;
+}
+
+/**
+ * The home page, every collection and every visible article, at their
+ * canonical addresses. A collection's lastmod is its newest article's, the
+ * home page's the newest of all: the pages that list articles change when
+ * one does.
+ */
 export function buildSitemapXml(canonicalBase: string, collections: PublicCollection[]): string {
   const entry = (path: string, lastModified?: Date) =>
     `<url><loc>${escapeHtml(canonicalBase + path)}</loc>` +
     (lastModified ? `<lastmod>${lastModified.toISOString()}</lastmod>` : "") +
     `</url>`;
-  const entries = [entry("/")];
-  for (const collection of collections) {
-    entries.push(entry(collectionPath(collection)));
-    for (const article of collection.articles) {
-      entries.push(entry(articlePath(article), article.updatedAt));
-    }
-  }
+  const collectionEntries = collections.map((collection) => {
+    const lastModified = latest(collection.articles.map((article) => article.updatedAt));
+    return {
+      lastModified,
+      entries: [
+        entry(collectionPath(collection), lastModified),
+        ...collection.articles.map((article) =>
+          entry(articlePath(article), new Date(article.updatedAt)),
+        ),
+      ],
+    };
+  });
+  const home = entry("/", latest(collectionEntries.flatMap((c) => c.lastModified ?? [])));
+  const entries = [home, ...collectionEntries.flatMap((c) => c.entries)];
   return (
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries.join("\n")}\n</urlset>\n`

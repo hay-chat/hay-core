@@ -30,6 +30,7 @@ export interface PublicCollection {
 }
 
 export interface PublicArticle extends PublicArticleSummary {
+  createdAt: Date;
   content: string;
   importMethod: string;
   collection: { id: string; title: string };
@@ -127,6 +128,7 @@ interface ArticleRow {
   description: string | null;
   content: string | null;
   import_method: string;
+  created_at: Date;
   updated_at: Date;
   collection_id: string;
   collection_title: string;
@@ -143,7 +145,7 @@ export async function getArticle(
   const range = idRange(documentId8);
   if (!range) return null;
   const rows: ArticleRow[] = await AppDataSource.query(
-    `SELECT d.id, d.title, d.description, d.content, d.import_method, d.updated_at,
+    `SELECT d.id, d.title, d.description, d.content, d.import_method, d.created_at, d.updated_at,
             c.id AS collection_id, c.title AS collection_title
      ${FROM_VISIBLE_ARTICLES} AND d.id BETWEEN $3 AND $4
      LIMIT 2`,
@@ -156,6 +158,7 @@ export async function getArticle(
     title: row.title ?? "",
     description: row.description,
     updatedAt: row.updated_at,
+    createdAt: row.created_at,
     content: row.content ?? "",
     importMethod: row.import_method,
     collection: { id: row.collection_id, title: row.collection_title },
