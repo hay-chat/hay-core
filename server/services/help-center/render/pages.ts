@@ -8,6 +8,7 @@ import type { PublicArticle, PublicArticleSummary, PublicCollection } from "../p
 import { SEARCH_QUERY_MAX_LENGTH } from "../public-content";
 import {
   html,
+  jsonLd,
   raw,
   scriptJson,
   textExcerpt,
@@ -141,10 +142,15 @@ interface PageParts {
   narrow?: boolean;
   /** Open Graph type of a page that has a canonical address. */
   ogType?: "website" | "article";
+  /** Structured data for search engines, one JSON-LD block each. */
+  structuredData?: object[];
 }
 
 /** Meta descriptions longer than this are cut off in search results anyway. */
 const DESCRIPTION_MAX_LENGTH = 160;
+/** Google shows at most this much of an Article's headline. */
+const HEADLINE_MAX_LENGTH = 110;
+const SCHEMA_CONTEXT = "https://schema.org";
 
 function absoluteHttpUrl(value: string | null): string | null {
   return value && /^https?:\/\//i.test(value) ? value : null;
@@ -207,6 +213,7 @@ function page(view: SiteView, strings: SiteStrings, parts: PageParts): string {
         <style nonce="${view.nonce}">
           ${themeCss(view.theme)}
         </style>
+        ${(parts.structuredData ?? []).map((data) => jsonLd(data))}
       </head>
       <body>
         <a class="hc-skip" href="#hc-main">${strings.skipToContent}</a>
@@ -248,6 +255,65 @@ function articleLinks(view: SiteView, articles: PublicArticleSummary[]): SafeHtm
         </li>`,
     )}
   </ul>`;
+}
+
+/** Schema.org BreadcrumbList of the trail to a page, the page itself last. */
+function breadcrumbData(view: SiteView, trail: Array<{ label: string; path: string }>): object {
+  return {
+    "@context": SCHEMA_CONTEXT,
+    "@type": "BreadcrumbList",
+    itemListElement: trail.map((step, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: step.label,
+      item: view.canonicalBase + step.path,
+    })),
+  };
+}
+
+/** Schema.org WebSite, with the site search as its SearchAction. */
+function websiteData(view: SiteView): object {
+  return {
+    "@context": SCHEMA_CONTEXT,
+    "@type": "WebSite",
+    name: view.name,
+    url: `${view.canonicalBase}/`,
+    inLanguage: htmlLang(view.language),
+    potentialAction: {
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: `${view.canonicalBase}/search?q={search_term_string}`,
+      },
+      "query-input": "required name=search_term_string",
+    },
+  };
+}
+
+/** Schema.org Article; the help center's owner is its author and publisher. */
+function articleData(view: SiteView, article: PublicArticle, description: string | null): object {
+  const url = view.canonicalBase + articlePath(article);
+  const image = absoluteHttpUrl(view.socialImageUrl);
+  const organization = {
+    "@type": "Organization",
+    name: view.name,
+    url: `${view.canonicalBase}/`,
+    ...(image ? { logo: image } : {}),
+  };
+  return {
+    "@context": SCHEMA_CONTEXT,
+    "@type": "Article",
+    headline: truncateText(article.title, HEADLINE_MAX_LENGTH) ?? view.name,
+    ...(description ? { description } : {}),
+    url,
+    mainEntityOfPage: url,
+    inLanguage: htmlLang(view.language),
+    datePublished: new Date(article.createdAt).toISOString(),
+    dateModified: new Date(article.updatedAt).toISOString(),
+    ...(image ? { image } : {}),
+    author: organization,
+    publisher: organization,
+  };
 }
 
 function breadcrumb(view: SiteView, trail: Array<{ label: string; path: string }>): SafeHtml {
@@ -310,6 +376,7 @@ export function renderHomePage(view: SiteView, collections: PublicCollection[]):
     title: null,
     description: subtitle ?? listDescription(collections.map((collection) => collection.title)),
     canonicalPath: "/",
+    structuredData: [websiteData(view)],
     hero,
     headerSearch: false,
     main: html`<h2 class="hc-sr-only">${strings.collections}</h2>
@@ -325,6 +392,12 @@ export function renderCollectionPage(view: SiteView, collection: PublicCollectio
       collection.description ??
       listDescription(collection.articles.map((article) => article.title)),
     canonicalPath: collectionPath(collection),
+    structuredData: [
+      breadcrumbData(view, [
+        { label: view.name, path: "/" },
+        { label: collection.title, path: collectionPath(collection) },
+      ]),
+    ],
     main: html`${breadcrumb(view, [{ label: view.name, path: "/" }])}
       <h1>
         ${
@@ -341,11 +414,20 @@ export function renderCollectionPage(view: SiteView, collection: PublicCollectio
 export function renderArticlePage(view: SiteView, article: PublicArticle, body: SafeHtml): string {
   const strings = siteStrings(view.language);
   const path = articlePath(article);
+  const description = article.description ?? textExcerpt(body.value, DESCRIPTION_MAX_LENGTH);
   return page(view, strings, {
     title: article.title,
-    description: article.description ?? textExcerpt(body.value, DESCRIPTION_MAX_LENGTH),
+    description,
     canonicalPath: path,
     ogType: "article",
+    structuredData: [
+      articleData(view, article, description),
+      breadcrumbData(view, [
+        { label: view.name, path: "/" },
+        { label: article.collection.title, path: collectionPath(article.collection) },
+        { label: article.title, path },
+      ]),
+    ],
     narrow: true,
     main: html`${breadcrumb(view, [
         { label: view.name, path: "/" },

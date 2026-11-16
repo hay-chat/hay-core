@@ -313,7 +313,8 @@ describe("pages", () => {
     id: ID,
     title: "Refunds </title><script>alert(1)</script>",
     description: 'How "refunds" work',
-    updatedAt: new Date(),
+    createdAt: new Date("2026-01-02T03:04:05.000Z"),
+    updatedAt: new Date("2026-02-03T04:05:06.000Z"),
     content: "",
     importMethod: "editor",
     collection: { id: collections[0].id, title: "Billing" },
@@ -394,7 +395,8 @@ describe("pages", () => {
       },
     });
     expect(page.match(/<script\s+nonce="Tm9uY2U="/g)).toHaveLength(3);
-    expect(page.match(/<script/g)).toHaveLength(3);
+    // Every executable script carries the nonce; JSON-LD blocks are data and are never run.
+    expect(page.match(/<script(?! type="application\/ld\+json")/g)).toHaveLength(3);
   });
 
   it("keeps preview parameters on every link and form, and is never indexed", () => {
@@ -511,6 +513,101 @@ describe("pages", () => {
       expect(plain).not.toContain("theme-color");
       expect(plain).not.toContain("apple-touch-icon");
       expect(plain).not.toContain("preconnect");
+    });
+  });
+
+  describe("structured data", () => {
+    /** Every JSON-LD block of a page, parsed. */
+    const structuredData = (page: string): Array<Record<string, unknown>> =>
+      [...page.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)].map(
+        (match) => JSON.parse(match[1]) as Record<string, unknown>,
+      );
+    const ofType = (page: string, type: string) =>
+      structuredData(page).filter((data) => data["@type"] === type);
+
+    it("describes the site and its search on the home page", () => {
+      const page = renderHomePage(view(), collections);
+      expect(structuredData(page)).toEqual([
+        {
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: "Acme <Help>",
+          url: "https://acme.haychat.co/",
+          inLanguage: "pt",
+          potentialAction: {
+            "@type": "SearchAction",
+            target: {
+              "@type": "EntryPoint",
+              urlTemplate: "https://acme.haychat.co/search?q={search_term_string}",
+            },
+            "query-input": "required name=search_term_string",
+          },
+        },
+      ]);
+      // Text in a data block cannot close the script element.
+      expect(page).not.toContain('"Acme <Help>"');
+    });
+
+    it("gives a collection its breadcrumb trail", () => {
+      const [trail] = ofType(renderCollectionPage(view(), collections[0]), "BreadcrumbList");
+      expect(trail.itemListElement).toEqual([
+        { "@type": "ListItem", position: 1, name: "Acme <Help>", item: "https://acme.haychat.co/" },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Billing",
+          item: "https://acme.haychat.co/collections/billing-11111111",
+        },
+      ]);
+    });
+
+    it("describes an article with its dates, publisher and breadcrumb trail", () => {
+      const page = renderArticlePage(
+        view({ socialImageUrl: "https://cdn.test/logo.png" }),
+        article,
+        raw("<p>Body</p>"),
+      );
+      expect(page).not.toContain("<script>alert(1)</script>");
+      const url = "https://acme.haychat.co/articles/refunds-title-script-alert-1-script-0a1b2c3d";
+      const publisher = {
+        "@type": "Organization",
+        name: "Acme <Help>",
+        url: "https://acme.haychat.co/",
+        logo: "https://cdn.test/logo.png",
+      };
+      expect(ofType(page, "Article")).toEqual([
+        {
+          "@context": "https://schema.org",
+          "@type": "Article",
+          headline: article.title,
+          description: 'How "refunds" work',
+          url,
+          mainEntityOfPage: url,
+          inLanguage: "pt",
+          datePublished: "2026-01-02T03:04:05.000Z",
+          dateModified: "2026-02-03T04:05:06.000Z",
+          image: "https://cdn.test/logo.png",
+          author: publisher,
+          publisher,
+        },
+      ]);
+      const [trail] = ofType(page, "BreadcrumbList");
+      expect(trail.itemListElement).toHaveLength(3);
+      expect((trail.itemListElement as Array<{ item: string }>)[2].item).toBe(url);
+    });
+
+    it("cuts a long headline and leaves out an image there is none of", () => {
+      const long = { ...article, title: "word ".repeat(40), description: null };
+      const [data] = ofType(renderArticlePage(view(), long, raw("")), "Article");
+      expect(String(data.headline).length).toBeLessThanOrEqual(110);
+      expect(data).not.toHaveProperty("image");
+      expect(data).not.toHaveProperty("description");
+      expect(data.publisher).not.toHaveProperty("logo");
+    });
+
+    it("is left off search and 404 pages", () => {
+      expect(structuredData(renderSearchPage(view(), "x", []))).toEqual([]);
+      expect(structuredData(renderNotFoundPage(view()))).toEqual([]);
     });
   });
 
