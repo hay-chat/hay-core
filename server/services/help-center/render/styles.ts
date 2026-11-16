@@ -41,7 +41,7 @@ const GRADIENT_ANGLES: Record<HelpCenterGradientDirection, string> = {
 
 /** Opacity of the black layer over a hero image; white text sits on top. */
 const OVERLAY_OPACITY: Record<HelpCenterHeroOverlay, string> = {
-  light: "0.35",
+  light: "0.4",
   medium: "0.55",
   strong: "0.75",
 };
