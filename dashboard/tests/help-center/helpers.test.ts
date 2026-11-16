@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_HELP_CENTER_THEME,
+  HELP_CENTER_PRESETS,
   MIN_TEXT_CONTRAST,
+  applyPreset,
+  matchingPreset,
+  readableTextOn,
   contrastRatio,
   encodeThemeParam,
   isHexColor,
@@ -45,6 +49,7 @@ describe("isHexColor", () => {
 
 describe("theme preview encoding", () => {
   const theme: HelpCenterTheme = {
+    ...DEFAULT_HELP_CENTER_THEME,
     accentColor: "#ff8800",
     font: "rounded",
     layout: "list",
@@ -75,8 +80,19 @@ describe("theme preview encoding", () => {
 
   it("stores empty hero text as not set", () => {
     expect(
-      normalizeTheme({ ...theme, accentColor: "#FF8800", heroTitle: "  ", heroSubtitle: " Hi " }),
-    ).toMatchObject({ accentColor: "#ff8800", heroTitle: null, heroSubtitle: "Hi" });
+      normalizeTheme({
+        ...theme,
+        accentColor: "#FF8800",
+        heroGradientTo: "#ABCDEF",
+        heroTitle: "  ",
+        heroSubtitle: " Hi ",
+      }),
+    ).toMatchObject({
+      accentColor: "#ff8800",
+      heroGradientTo: "#abcdef",
+      heroTitle: null,
+      heroSubtitle: "Hi",
+    });
   });
 });
 
@@ -86,5 +102,38 @@ describe("moved", () => {
     expect(moved(["a", "b", "c"], 2, -1)).toEqual(["a", "c", "b"]);
     expect(moved(["a", "b", "c"], 0, -1)).toEqual(["a", "b", "c"]);
     expect(moved(["a", "b", "c"], 2, 1)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("theme presets", () => {
+  it("are all different, and the default theme is Classic", () => {
+    const looks = HELP_CENTER_PRESETS.map((preset) =>
+      JSON.stringify(applyPreset(DEFAULT_HELP_CENTER_THEME, preset)),
+    );
+    expect(new Set(looks).size).toBe(HELP_CENTER_PRESETS.length);
+    expect(matchingPreset(DEFAULT_HELP_CENTER_THEME)?.id).toBe("classic");
+  });
+
+  it("each match themselves once applied, over any theme", () => {
+    const start: HelpCenterTheme = {
+      ...DEFAULT_HELP_CENTER_THEME,
+      font: "mono",
+      corners: "sharp",
+      heroStyle: "image",
+    };
+    expect(matchingPreset(start)).toBeNull();
+    for (const preset of HELP_CENTER_PRESETS) {
+      expect(matchingPreset(applyPreset(start, preset))?.id).toBe(preset.id);
+    }
+  });
+
+  it("keep gradient text readable on both stops", () => {
+    for (const preset of HELP_CENTER_PRESETS) {
+      const { heroGradientFrom, heroGradientTo } = preset.style;
+      if (preset.style.heroStyle !== "gradient") continue;
+      expect(readableTextOn(heroGradientFrom!, heroGradientTo!).contrast).toBeGreaterThanOrEqual(
+        MIN_TEXT_CONTRAST,
+      );
+    }
   });
 });

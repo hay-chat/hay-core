@@ -57,7 +57,7 @@
     "theme": {
       "accentColor": "Accent colour",
       "accentColorPicker": "Pick an accent colour",
-      "accentColorInvalid": "Enter a 6-digit hex colour, such as #2747d6.",
+      "colorInvalid": "Enter a 6-digit hex colour, such as #2747d6.",
       "contrastWarning": "On a white page this colour has a contrast of {ratio}:1, below the 4.5:1 that text needs. Links will be shown in the normal text colour instead of this one; buttons stay readable.",
       "font": "Font",
       "fonts": {
@@ -77,7 +77,71 @@
       "heroTitlePlaceholder": "How can we help?",
       "heroSubtitle": "Hero subtitle",
       "heroSubtitlePlaceholder": "Search our guides or browse by topic.",
-      "showPoweredBy": "Show \"Powered by Hay\""
+      "showPoweredBy": "Show \"Powered by Hay\"",
+      "presets": "Theme",
+      "presetsHint": "Start from a ready-made look, then change anything below.",
+      "presetCustomised": "Customised from {name}.",
+      "presetSample": "Help center",
+      "presetNames": {
+        "classic": "Classic",
+        "aurora": "Aurora",
+        "minimal": "Minimal",
+        "midnight": "Midnight",
+        "editorial": "Editorial",
+        "playful": "Playful"
+      },
+      "colorScheme": "Colour scheme",
+      "colorSchemeOptions": {
+        "auto": "Automatic",
+        "light": "Light",
+        "dark": "Dark"
+      },
+      "corners": "Corners",
+      "cornersOptions": {
+        "sharp": "Sharp",
+        "rounded": "Rounded",
+        "pill": "Pill"
+      },
+      "hero": "Hero",
+      "heroStyle": "Background",
+      "heroStyleOptions": {
+        "solid": "Accent",
+        "gradient": "Gradient",
+        "tint": "Tint",
+        "image": "Image",
+        "plain": "None"
+      },
+      "heroGradientFrom": "Gradient start",
+      "heroGradientFromPicker": "Pick the gradient's start colour",
+      "heroGradientTo": "Gradient end",
+      "heroGradientToPicker": "Pick the gradient's end colour",
+      "gradientContrastWarning": "Neither black nor white text reaches 4.5:1 on both ends of this gradient (best: {ratio}:1). Make the colours both lighter or both darker.",
+      "heroGradientDirection": "Direction",
+      "heroGradientDirectionOptions": {
+        "diagonal": "Diagonal",
+        "right": "Across",
+        "down": "Down"
+      },
+      "heroImage": "Background image",
+      "heroImageAlt": "Current hero image",
+      "heroImageUpload": "Upload image",
+      "heroImageReplace": "Replace",
+      "heroImageRemove": "Remove",
+      "heroImageHint": "JPEG, PNG or WebP, up to 5 MB; a wide photo works best. The image is saved as soon as you upload it; your other changes when you save.",
+      "heroImageMissing": "Until you upload an image, the hero shows your accent colour.",
+      "heroImageTooLarge": "That image is larger than 5 MB.",
+      "heroOverlay": "Darken the image",
+      "heroOverlayOptions": {
+        "light": "A little",
+        "medium": "Medium",
+        "strong": "A lot"
+      },
+      "heroOverlayHint": "The hero text is white. On a bright photo, darken it more so the text stays readable.",
+      "heroAlign": "Alignment",
+      "heroAlignOptions": {
+        "center": "Centred",
+        "left": "Left"
+      }
     },
     "collection": {
       "title": "Title",

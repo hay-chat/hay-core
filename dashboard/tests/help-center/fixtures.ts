@@ -2,10 +2,11 @@ import { defineComponent, h, type Component } from "vue";
 import { vi } from "vitest";
 import type { VueWrapper } from "@vue/test-utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import type {
-  HelpCenterCollection,
-  HelpCenterState,
-  HelpCenterView,
+import {
+  DEFAULT_HELP_CENTER_THEME,
+  type HelpCenterCollection,
+  type HelpCenterState,
+  type HelpCenterView,
 } from "../../utils/help-center";
 
 /** Every `Hay` call the help center UI makes. `vi.hoisted` cannot import, so tests build it there. */
@@ -27,6 +28,8 @@ export function createApi() {
     setCustomDomain: fn(),
     verifyCustomDomain: fn(),
     removeCustomDomain: fn(),
+    uploadHeroImage: fn(),
+    removeHeroImage: fn(),
     listDocuments: fn(),
   };
 }
@@ -49,6 +52,8 @@ export function hayMock(api: ReturnType<typeof createApi>) {
       setCustomDomain: { mutate: api.setCustomDomain },
       verifyCustomDomain: { mutate: api.verifyCustomDomain },
       removeCustomDomain: { mutate: api.removeCustomDomain },
+      uploadHeroImage: { mutate: api.uploadHeroImage },
+      removeHeroImage: { mutate: api.removeHeroImage },
     },
     documents: { list: { query: api.listDocuments } },
   };
@@ -65,14 +70,8 @@ export function helpCenter(overrides: Partial<HelpCenterView> = {}): HelpCenterV
     defaultLanguage: "en",
     isPublished: false,
     searchIndexing: true,
-    theme: {
-      accentColor: "#2747d6",
-      font: "sans",
-      layout: "cards",
-      heroTitle: null,
-      heroSubtitle: null,
-      showPoweredBy: true,
-    },
+    theme: { ...DEFAULT_HELP_CENTER_THEME },
+    heroImageUrl: null,
     defaultUrl: `https://acme.${BASE_DOMAIN}`,
     url: `https://acme.${BASE_DOMAIN}`,
     customDomain: null,
