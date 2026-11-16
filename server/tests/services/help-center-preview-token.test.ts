@@ -104,7 +104,7 @@ describe("help center view helpers", () => {
       heroStyle: "solid",
       heroAlign: "center",
       heroGradientFrom: "#2747d6",
-      heroGradientTo: "#7c3aed",
+      heroGradientTo: "#142a8c",
       heroGradientDirection: "diagonal",
       heroOverlay: "medium",
       heroTitle: null,

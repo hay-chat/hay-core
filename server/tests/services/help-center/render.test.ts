@@ -218,9 +218,9 @@ describe("theme variables", () => {
     }).value;
     expect(css).toContain("--hc-accent:#ffdd00");
     expect(css).toContain("--hc-on-accent:#000000");
-    expect(css).toContain("--hc-font:Georgia");
+    expect(css).toContain("--hc-font:Charter");
     // Yellow is unreadable as link text on white, so links fall back to the text colour there.
-    expect(css).toMatch(/--hc-link:#1a1d21.*prefers-color-scheme:dark.*--hc-link:#ffdd00/);
+    expect(css).toMatch(/--hc-link:#16181d.*prefers-color-scheme:dark.*--hc-link:#ffdd00/);
   });
 
   it("falls back to the defaults for anything that is not a colour or one of our values", () => {
@@ -290,10 +290,10 @@ describe("theme variables", () => {
       accentColor: accent,
       colorScheme: "light",
     }).value;
-    expect(light).toContain("--hc-link:#1a1d21");
+    expect(light).toContain("--hc-link:#16181d");
     expect(light).not.toContain("prefers-color-scheme");
     // The stylesheet has a palette for each forced scheme.
-    expect(SITE_CSS).toMatch(/\.hc-scheme-dark \{ color-scheme: dark; --hc-bg: #111418;/);
+    expect(SITE_CSS).toMatch(/\.hc-scheme-dark \{ color-scheme: dark; --hc-bg: #0f1115;/);
     expect(SITE_CSS).toMatch(/\.hc-scheme-light \{ color-scheme: light; --hc-bg: #ffffff;/);
   });
 

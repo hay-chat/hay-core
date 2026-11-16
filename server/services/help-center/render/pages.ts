@@ -70,10 +70,14 @@ function previewFields(view: SiteView): SafeHtml[] {
   );
 }
 
+const SEARCH_ICON = raw(
+  '<svg class="hc-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="8.75" cy="8.75" r="5.75"/><path d="m13.25 13.25 4 4"/></svg>',
+);
+
 function searchForm(view: SiteView, strings: SiteStrings, inputId: string, query = ""): SafeHtml {
   return html`<form class="hc-search" role="search" action="/search" method="get">
     <label class="hc-sr-only" for="${inputId}">${strings.search}</label>
-    <input
+    ${SEARCH_ICON}<input
       type="search"
       id="${inputId}"
       name="q"
@@ -361,7 +365,13 @@ export function renderHomePage(view: SiteView, collections: PublicCollection[]):
             ${collection.icon ? html`<span class="hc-card-icon" aria-hidden="true">${collection.icon}</span>` : null}
             <h2>${collection.title}</h2>
             ${collection.description ? html`<p>${collection.description}</p>` : null}
-            <p class="hc-count">${strings.articleCount(collection.articles.length)}</p>
+            <p class="hc-count">
+              ${strings.articleCount(collection.articles.length)}<span
+                class="hc-arrow"
+                aria-hidden="true"
+                >→</span
+              >
+            </p>
           </a>
         </li>`,
     )}
