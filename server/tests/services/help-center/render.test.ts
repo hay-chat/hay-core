@@ -5,7 +5,10 @@
 import { describe, it, expect } from "@jest/globals";
 import { DEFAULT_HELP_CENTER_THEME } from "../../../database/entities/help-center.entity";
 import { likePattern, normalizeSearchQuery } from "../../../services/help-center/public-content";
-import { sanitizedArticleHtml } from "../../../services/help-center/render/article-body";
+import {
+  prepareForPage,
+  sanitizedArticleHtml,
+} from "../../../services/help-center/render/article-body";
 import { html, raw, scriptJson } from "../../../services/help-center/render/html";
 import {
   renderArticlePage,
@@ -283,6 +286,27 @@ describe("robots.txt and sitemap.xml", () => {
     expect(buildSitemapXml("https://x.test/?a=1&b=<2>", [])).toContain(
       "<loc>https://x.test/?a=1&amp;b=&lt;2&gt;/</loc>",
     );
+  });
+});
+
+describe("prepareForPage", () => {
+  it("moves every heading down a level when the body has a level-1 heading", () => {
+    expect(
+      prepareForPage('<h1 id="a">A</h1><p>x</p><h2>B</h2><h3>C</h3><h6>D</h6><header>h</header>'),
+    ).toBe('<h2 id="a">A</h2><p>x</p><h3>B</h3><h4>C</h4><h6>D</h6><header>h</header>');
+  });
+
+  it("leaves headings alone when the body starts at level 2", () => {
+    expect(prepareForPage("<h2>B</h2><h3>C</h3>")).toBe("<h2>B</h2><h3>C</h3>");
+  });
+
+  it("decodes images asynchronously and lazy-loads all but the first", () => {
+    expect(prepareForPage('<p><img src="a.png" alt=""></p><img src="b.png"><img/>')).toBe(
+      '<p><img decoding="async" src="a.png" alt=""></p>' +
+        '<img loading="lazy" decoding="async" src="b.png">' +
+        '<img loading="lazy" decoding="async"/>',
+    );
+    expect(prepareForPage("<p>an &lt;img&gt; tag</p>")).toBe("<p>an &lt;img&gt; tag</p>");
   });
 });
 
