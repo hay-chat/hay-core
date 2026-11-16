@@ -47,7 +47,11 @@
           :base-domain="baseDomain"
         />
 
-        <HelpCenterThemeFields v-else-if="stepper.isCurrent('brand')" v-model="theme" />
+        <HelpCenterThemeFields
+          v-else-if="stepper.isCurrent('brand')"
+          v-model="theme"
+          :site-name="basics.name"
+        />
 
         <div v-else class="space-y-6">
           <HelpCenterCollectionFields v-model="collection" />

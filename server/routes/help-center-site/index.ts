@@ -31,7 +31,11 @@ import { httpCompression } from "@server/lib/http-compression";
 import { createLogger } from "@server/lib/logger";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { helpCenterThemeSchema } from "@server/routes/v1/help-center";
-import { resolveTheme, verifyPreviewToken } from "@server/services/help-center/help-center.service";
+import {
+  heroImageUrl,
+  resolveTheme,
+  verifyPreviewToken,
+} from "@server/services/help-center/help-center.service";
 import { resolveHelpCenterHost } from "@server/services/help-center/host-resolver";
 import {
   getArticle,
@@ -78,7 +82,8 @@ const VOTE_WINDOW_SECONDS = 24 * 60 * 60;
 
 const PAGE_CACHE = "public, max-age=60";
 const NO_STORE = "no-store";
-const PREVIEW_THEME_MAX_LENGTH = 2000;
+/** Room for a full theme whose hero texts use the longest UTF-8 characters (~2 KB as base64). */
+const PREVIEW_THEME_MAX_LENGTH = 3000;
 /** The address of a collection or article page, with or without its slug. */
 const PAGE_ADDRESS = /^\/(?:collections|articles)\/[a-z0-9-]+$/;
 
@@ -234,6 +239,7 @@ function emptyView(nonce: string): SiteView {
     theme: DEFAULT_HELP_CENTER_THEME,
     logoUrl: null,
     socialImageUrl: null,
+    heroImageUrl: null,
     noindex: true,
     nonce,
     preview: null,
@@ -266,9 +272,10 @@ async function loadSiteView(
   preview: PreviewRequest | null,
   nonce: string,
 ): Promise<SiteView | null> {
-  const [organization, webchatEnabled] = await Promise.all([
+  const [organization, webchatEnabled, heroImage] = await Promise.all([
     organizationRepository.findById(helpCenter.organizationId),
     webchatSettingsService.isEnabled(helpCenter.organizationId),
+    heroImageUrl(helpCenter),
   ]);
   if (!organization || organization.suspendedAt) return null;
   if (!helpCenter.isPublished && !preview) return null;
@@ -281,6 +288,7 @@ async function loadSiteView(
     logoUrl,
     // TODO: a help center's own sharing image, when there is a setting for one.
     socialImageUrl: logoUrl,
+    heroImageUrl: heroImage,
     noindex: !helpCenter.searchIndexing || preview !== null,
     nonce,
     preview: preview ? { token: preview.token, theme: preview.theme } : null,

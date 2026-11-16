@@ -21,8 +21,11 @@ import {
 import { buildRobotsTxt, buildSitemapXml } from "../../../services/help-center/render/seo";
 import { htmlLang, siteStrings } from "../../../services/help-center/render/strings";
 import {
+  bodyClass,
   contrastRatio,
+  heroClass,
   readableTextOn,
+  SITE_CSS,
   SITE_CSS_PATH,
   themeCss,
 } from "../../../services/help-center/render/styles";
@@ -208,7 +211,11 @@ describe("article body", () => {
 
 describe("theme variables", () => {
   it("writes the accent, a readable colour on it, and the font stack", () => {
-    const css = themeCss({ accentColor: "#FFDD00", font: "serif" }).value;
+    const css = themeCss({
+      ...DEFAULT_HELP_CENTER_THEME,
+      accentColor: "#FFDD00",
+      font: "serif",
+    }).value;
     expect(css).toContain("--hc-accent:#ffdd00");
     expect(css).toContain("--hc-on-accent:#000000");
     expect(css).toContain("--hc-font:Georgia");
@@ -216,7 +223,7 @@ describe("theme variables", () => {
     expect(css).toMatch(/--hc-link:#1a1d21.*prefers-color-scheme:dark.*--hc-link:#ffdd00/);
   });
 
-  it("falls back to the defaults for anything that is not a colour or a known font", () => {
+  it("falls back to the defaults for anything that is not a colour or one of our values", () => {
     for (const accentColor of [
       "red;}</style><script>alert(1)</script>",
       "#fff",
@@ -225,13 +232,21 @@ describe("theme variables", () => {
       "url(https://evil.example/x)",
       "#2747d6;background:url(https://evil.example)",
     ]) {
-      const font = "x;}</style><script>" as "sans";
-      const css = themeCss({ accentColor, font }).value;
+      const bad = "x;}</style><script>" as never;
+      const css = themeCss({
+        accentColor,
+        font: bad,
+        colorScheme: bad,
+        heroGradientFrom: accentColor,
+        heroGradientTo: bad,
+        heroGradientDirection: bad,
+        heroOverlay: bad,
+      }).value;
       expect(css).toBe(themeCss(DEFAULT_HELP_CENTER_THEME).value);
       expect(css).not.toContain("<");
       expect(css).not.toContain("evil");
     }
-    expect(themeCss({ accentColor: 7 as unknown as string, font: "sans" }).value).toBe(
+    expect(themeCss({ accentColor: 7 as unknown as string }).value).toBe(
       themeCss(DEFAULT_HELP_CENTER_THEME).value,
     );
   });
@@ -241,6 +256,66 @@ describe("theme variables", () => {
     expect(readableTextOn("#000000")).toBe("#ffffff");
     expect(readableTextOn("#2747d6")).toBe("#ffffff");
     expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21, 5);
+    // On a gradient the text must read on both stops: the worse stop decides.
+    expect(readableTextOn("#2747d6", "#7c3aed")).toBe("#ffffff");
+    // Black on the navy stop alone would be 2.4:1; white is the better worst case.
+    expect(readableTextOn("#9ca3af", "#1e3a8a")).toBe("#ffffff");
+    expect(readableTextOn("#fde68a", "#f472b6")).toBe("#000000");
+  });
+
+  it("writes the gradient stops, their direction, a text colour for both, and the overlay", () => {
+    const css = themeCss({
+      ...DEFAULT_HELP_CENTER_THEME,
+      heroGradientFrom: "#0B1026",
+      heroGradientTo: "#312e81",
+      heroGradientDirection: "down",
+      heroOverlay: "strong",
+    }).value;
+    expect(css).toContain("--hc-hero-from:#0b1026;--hc-hero-to:#312e81;--hc-hero-angle:180deg");
+    expect(css).toContain("--hc-on-gradient:#ffffff");
+    expect(css).toContain("--hc-hero-overlay:0.75");
+  });
+
+  it("uses the link colour of a forced colour scheme only", () => {
+    const accent = "#60a5fa"; // readable on dark, not on white
+    const dark = themeCss({
+      ...DEFAULT_HELP_CENTER_THEME,
+      accentColor: accent,
+      colorScheme: "dark",
+    }).value;
+    expect(dark).toContain(`--hc-link:${accent}`);
+    expect(dark).not.toContain("prefers-color-scheme");
+    const light = themeCss({
+      ...DEFAULT_HELP_CENTER_THEME,
+      accentColor: accent,
+      colorScheme: "light",
+    }).value;
+    expect(light).toContain("--hc-link:#1a1d21");
+    expect(light).not.toContain("prefers-color-scheme");
+    // The stylesheet has a palette for each forced scheme.
+    expect(SITE_CSS).toMatch(/\.hc-scheme-dark \{ color-scheme: dark; --hc-bg: #111418;/);
+    expect(SITE_CSS).toMatch(/\.hc-scheme-light \{ color-scheme: light; --hc-bg: #ffffff;/);
+  });
+
+  it("names body and hero classes from the theme, and only ever ours", () => {
+    expect(bodyClass({ colorScheme: "dark", corners: "pill" })).toBe(
+      "hc-scheme-dark hc-corners-pill",
+    );
+    expect(heroClass({ heroStyle: "gradient", heroAlign: "left" }, false)).toBe(
+      "hc-hero hc-hero-gradient hc-hero-left",
+    );
+    // An image hero without an image shows the accent colour.
+    expect(heroClass({ heroStyle: "image", heroAlign: "center" }, false)).toBe(
+      "hc-hero hc-hero-solid hc-hero-center",
+    );
+    expect(heroClass({ heroStyle: "image", heroAlign: "center" }, true)).toContain("hc-hero-image");
+    const hostile = '"><script>alert(1)</script>' as never;
+    expect(bodyClass({ colorScheme: hostile, corners: hostile })).toBe(
+      "hc-scheme-auto hc-corners-rounded",
+    );
+    expect(heroClass({ heroStyle: hostile, heroAlign: hostile }, true)).toBe(
+      "hc-hero hc-hero-solid hc-hero-center",
+    );
   });
 
   it("names the stylesheet after its content", () => {
@@ -351,6 +426,7 @@ describe("pages", () => {
     theme: { ...DEFAULT_HELP_CENTER_THEME },
     logoUrl: null,
     socialImageUrl: null,
+    heroImageUrl: null,
     noindex: false,
     nonce: "Tm9uY2U=",
     preview: null,
@@ -413,6 +489,40 @@ describe("pages", () => {
     );
     expect(page).toContain("Hi &lt;there&gt;");
     expect(page).toContain('<meta name="description" content="Ask &quot;us&quot;" />');
+  });
+
+  it("puts the scheme and corner classes on the body and the hero style on the hero", () => {
+    const page = renderHomePage(
+      view({
+        theme: {
+          ...DEFAULT_HELP_CENTER_THEME,
+          colorScheme: "dark",
+          corners: "sharp",
+          heroStyle: "plain",
+          heroAlign: "left",
+        },
+      }),
+      collections,
+    );
+    expect(page).toContain('<body class="hc-scheme-dark hc-corners-sharp">');
+    expect(page).toContain('<section class="hc-hero hc-hero-plain hc-hero-left">');
+    expect(page).not.toContain("hc-hero-bg");
+    const articlePage = renderArticlePage(view(), article, raw(""));
+    expect(articlePage).toContain('<body class="hc-scheme-auto hc-corners-rounded">');
+  });
+
+  it("shows the hero image, escaped, only when the hero style is image", () => {
+    const heroImageUrl = 'https://cdn.hay.test/hero.jpg?a=1&b="x"';
+    const imageTheme = { ...DEFAULT_HELP_CENTER_THEME, heroStyle: "image" as const };
+    const page = renderHomePage(view({ theme: imageTheme, heroImageUrl }), []);
+    expect(page).toContain('<section class="hc-hero hc-hero-image hc-hero-center">');
+    expect(page).toContain(
+      '<img class="hc-hero-bg" src="https://cdn.hay.test/hero.jpg?a=1&amp;b=&quot;x&quot;" alt=""',
+    );
+    expect(renderHomePage(view({ heroImageUrl }), [])).not.toContain("hc-hero-bg");
+    const missing = renderHomePage(view({ theme: imageTheme }), []);
+    expect(missing).toContain("hc-hero-solid");
+    expect(missing).not.toContain("hc-hero-bg");
   });
 
   it("renders an article with its body untouched and everything else escaped", () => {

@@ -73,8 +73,10 @@
             v-model="themeDraft"
             :dirty="themeDirty"
             :preview-link="previewLink"
+            :help-center="state.helpCenter"
             @reset="themeDraft = { ...savedTheme }"
             @updated="applySavedTheme"
+            @changed="applyHelpCenter"
           />
         </TabsContent>
         <TabsContent value="domain">

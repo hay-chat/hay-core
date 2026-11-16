@@ -756,10 +756,21 @@ describe("help center site", () => {
       const query = `hc_preview=${encodeURIComponent(signPreviewToken(HELP_CENTER_ID))}`;
       const themed = await request(
         HOST,
-        `/?${query}&hc_theme=${encodeTheme({ accentColor: "#ff0000", heroTitle: "Previewed <title>" })}`,
+        `/?${query}&hc_theme=${encodeTheme({
+          accentColor: "#ff0000",
+          heroTitle: "Previewed <title>",
+          heroStyle: "gradient",
+          heroAlign: "left",
+          heroGradientTo: "#00ff00",
+          colorScheme: "dark",
+          corners: "pill",
+        })}`,
       );
       expect(themed.status).toBe(200);
       expect(themed.body).toContain("--hc-accent:#ff0000");
+      expect(themed.body).toContain("--hc-hero-to:#00ff00");
+      expect(themed.body).toContain('class="hc-scheme-dark hc-corners-pill"');
+      expect(themed.body).toContain('class="hc-hero hc-hero-gradient hc-hero-left"');
       expect(themed.body).toContain("Previewed &lt;title&gt;");
       expect(themed.body).toContain("&amp;hc_theme=");
       // The saved layout still applies: the patch is merged over it.
@@ -768,13 +779,20 @@ describe("help center site", () => {
       for (const bad of [
         encodeTheme({ accentColor: "red;}</style><script>alert(1)</script>" }),
         encodeTheme({ font: "comic" }),
+        encodeTheme({ heroStyle: "video" }),
+        encodeTheme({ heroGradientTo: "red;background:url(https://evil.example)" }),
+        encodeTheme({ colorScheme: '"><script>alert(1)</script>' }),
+        encodeTheme({ corners: "round" }),
+        encodeTheme({ heroOverlay: 2 }),
         encodeTheme("nope"),
         "%%%",
       ]) {
         const reply = await request(HOST, `/?${query}&hc_theme=${bad}`);
         expect(reply.status).toBe(200);
         expect(reply.body).toContain("--hc-accent:#2747d6");
+        expect(reply.body).toContain('class="hc-hero hc-hero-solid hc-hero-center"');
         expect(reply.body).not.toContain("alert(1)");
+        expect(reply.body).not.toContain("evil");
         expect(reply.body).not.toContain("hc_theme");
       }
     });
