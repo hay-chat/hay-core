@@ -20,7 +20,7 @@
     "@nuxtjs/tailwindcss": "^6.8.4",
     "@pinia/nuxt": "^1.0.3",
     "@types/canvas-confetti": "^1.9.0",
-    "@types/diff": "^7.0.2",
+    "@types/diff": "^8.0.0",
     "@types/node": "^26.6.6",
     "@types/uuid": "^9.0.8",
     "@vitejs/plugin-vue": "^6.0.10",
