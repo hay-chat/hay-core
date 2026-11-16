@@ -5,9 +5,16 @@ import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-li
 import { ACTIONS, RESOURCES } from "@server/types/scopes";
 import { LANGUAGE_CODES } from "@server/types/language.types";
 import {
+  HELP_CENTER_COLOR_SCHEMES,
+  HELP_CENTER_CORNERS,
   HELP_CENTER_FONTS,
+  HELP_CENTER_GRADIENT_DIRECTIONS,
+  HELP_CENTER_HERO_ALIGNS,
+  HELP_CENTER_HERO_OVERLAYS,
+  HELP_CENTER_HERO_STYLES,
   HELP_CENTER_LAYOUTS,
 } from "@server/database/entities/help-center.entity";
+import { handleUpload } from "@server/lib/upload-helper";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import {
   helpCenterService,
@@ -24,14 +31,28 @@ const readProcedure = scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ);
 /** Publishing a public website is a decision for the organization's admins. */
 const adminProcedure = scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE);
 
+/** Hero photos are bigger than logos; still small enough to load fast once re-encoded. */
+const HERO_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
 const nameSchema = z.string().trim().min(1).max(120);
 const subdomainSchema = z.string().trim().min(1).max(63);
 const languageSchema = z.enum(LANGUAGE_CODES);
 
+const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
+/** Also checks the theme a preview link carries (routes/help-center-site). */
 export const helpCenterThemeSchema = z.object({
-  accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  accentColor: hexColorSchema,
   font: z.enum(HELP_CENTER_FONTS),
   layout: z.enum(HELP_CENTER_LAYOUTS),
+  colorScheme: z.enum(HELP_CENTER_COLOR_SCHEMES),
+  corners: z.enum(HELP_CENTER_CORNERS),
+  heroStyle: z.enum(HELP_CENTER_HERO_STYLES),
+  heroAlign: z.enum(HELP_CENTER_HERO_ALIGNS),
+  heroGradientFrom: hexColorSchema,
+  heroGradientTo: hexColorSchema,
+  heroGradientDirection: z.enum(HELP_CENTER_GRADIENT_DIRECTIONS),
+  heroOverlay: z.enum(HELP_CENTER_HERO_OVERLAYS),
   heroTitle: z.string().trim().max(120).nullable(),
   heroSubtitle: z.string().trim().max(240).nullable(),
   showPoweredBy: z.boolean(),
@@ -65,7 +86,7 @@ export const helpCenterRouter = t.router({
       enabled,
       baseDomain: enabled ? helpCenterBaseHostname() : "",
       suggestedSubdomain,
-      helpCenter: helpCenter ? helpCenterService.view(helpCenter) : null,
+      helpCenter: helpCenter ? await helpCenterService.view(helpCenter) : null,
     };
   }),
 
@@ -107,6 +128,31 @@ export const helpCenterRouter = t.router({
         await helpCenterService.setPublished(ctx.organizationId!, input.published, actor(ctx)),
       ),
     ),
+
+  /**
+   * Upload the hero's background image (base64 data URI). It is saved straight
+   * away, replacing the previous one; whether the hero shows it is the theme's heroStyle.
+   */
+  uploadHeroImage: adminProcedure
+    .input(z.object({ image: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const result = await handleUpload(
+        input.image,
+        "organizations",
+        ctx.organizationId!,
+        ctx.user!.id,
+        {
+          maxSize: HERO_IMAGE_MAX_BYTES,
+        },
+      );
+      return helpCenterService.view(
+        await helpCenterService.setHeroImage(ctx.organizationId!, result.upload.id),
+      );
+    }),
+
+  removeHeroImage: adminProcedure.mutation(async ({ ctx }) =>
+    helpCenterService.view(await helpCenterService.setHeroImage(ctx.organizationId!, null)),
+  ),
 
   /** A link that shows the site as it is now, even while it is offline. Expires in an hour. */
   getPreviewLink: readProcedure.query(async ({ ctx }) => {

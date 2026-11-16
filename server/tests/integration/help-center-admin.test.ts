@@ -32,9 +32,11 @@ import { AppDataSource } from "../../database/data-source";
 import { HelpCenter } from "../../database/entities/help-center.entity";
 import { HelpCenterArticle } from "../../database/entities/help-center-article.entity";
 import { HelpCenterCollection } from "../../database/entities/help-center-collection.entity";
+import sharp from "sharp";
 import { AuditLog } from "../../entities/audit-log.entity";
 import { Document, DocumentationStatus, DocumentVisibility } from "../../entities/document.entity";
 import { Organization } from "../../entities/organization.entity";
+import { Upload } from "../../entities/upload.entity";
 import { User } from "../../entities/user.entity";
 import { UserOrganization } from "../../entities/user-organization.entity";
 import { AuthUser } from "../../lib/auth/AuthUser";
@@ -426,6 +428,71 @@ describe("help center administration", () => {
       expect(await codeOf(caller.update({ subdomain: "admin" }))).toBe("BAD_REQUEST");
       expect(await codeOf(caller.update({ theme: { accentColor: "red" } }))).toBe("BAD_REQUEST");
       expect((await helpCenterOf(ORG_A)).subdomain).toBe("acme-answers");
+    });
+
+    it("saves the hero, scheme and corner settings and refuses values that are not ours", async () => {
+      await createHelpCenter(ORG_A, "acme", adminA);
+      const caller = await asAdminA();
+      const view = await caller.update({
+        theme: {
+          colorScheme: "dark",
+          corners: "pill",
+          heroStyle: "gradient",
+          heroAlign: "left",
+          heroGradientFrom: "#0B1026",
+          heroGradientTo: "#312e81",
+          heroGradientDirection: "down",
+          heroOverlay: "strong",
+        },
+      });
+      expect(view.theme).toMatchObject({
+        accentColor: "#2747d6",
+        colorScheme: "dark",
+        heroStyle: "gradient",
+        heroGradientFrom: "#0B1026",
+      });
+      expect(view.heroImageUrl).toBeNull();
+      for (const theme of [
+        { heroStyle: "video" },
+        { colorScheme: "sepia" },
+        { corners: "round" },
+        { heroAlign: "right" },
+        { heroGradientTo: "red" },
+        { heroGradientDirection: "up" },
+        { heroOverlay: "none" },
+      ]) {
+        expect(await codeOf(caller.update({ theme: theme as never }))).toBe("BAD_REQUEST");
+      }
+    });
+
+    it("uploads, replaces and removes the hero image", async () => {
+      await createHelpCenter(ORG_A, "acme", adminA);
+      const caller = await asAdminA();
+      const png = await sharp({
+        create: { width: 8, height: 4, channels: 3, background: "#336699" },
+      })
+        .png()
+        .toBuffer();
+      const image = `data:image/png;base64,${png.toString("base64")}`;
+
+      const first = await caller.uploadHeroImage({ image });
+      expect(first.heroImageUrl).toMatch(/^https?:\/\/.+\/organizations\/.+\.png$/);
+      const firstId = (await helpCenterOf(ORG_A)).heroImageUploadId;
+      expect(firstId).toBeTruthy();
+
+      await caller.uploadHeroImage({ image });
+      const secondId = (await helpCenterOf(ORG_A)).heroImageUploadId;
+      expect(secondId).not.toBe(firstId);
+      expect(await Upload.findOne({ where: { id: firstId! } })).toBeNull();
+
+      expect((await caller.removeHeroImage()).heroImageUrl).toBeNull();
+      expect((await helpCenterOf(ORG_A)).heroImageUploadId).toBeNull();
+      expect(await Upload.findOne({ where: { id: secondId! } })).toBeNull();
+
+      expect(
+        await codeOf(caller.uploadHeroImage({ image: "data:text/html;base64,PGI+" })),
+      ).not.toBe("OK");
+      expect(await codeOf((await asMemberA()).removeHeroImage())).toBe("FORBIDDEN");
     });
 
     it("publishes and unpublishes", async () => {

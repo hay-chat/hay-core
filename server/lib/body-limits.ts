@@ -28,6 +28,7 @@ const UPLOAD_PROCEDURES = [
   "organizations.uploadLogo",
   "organizations.assistant.uploadAvatar",
   "webchat.uploadLogo",
+  "helpCenter.uploadHeroImage",
   "conversations.uploadAttachment",
 ];
 

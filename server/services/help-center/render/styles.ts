@@ -3,13 +3,23 @@
  *
  * The stylesheet is the same for every help center, so it is served once
  * under a content-hashed address and cached for good. What differs per site
- * (accent colour, font) is a handful of CSS custom properties written into
- * each page.
+ * is a handful of CSS custom properties written into each page, and a few
+ * classes on `<body>` and the hero that pick variants out of the stylesheet.
  */
 import crypto from "crypto";
 import {
   DEFAULT_HELP_CENTER_THEME,
+  HELP_CENTER_COLOR_SCHEMES,
+  HELP_CENTER_CORNERS,
+  HELP_CENTER_FONTS,
+  HELP_CENTER_GRADIENT_DIRECTIONS,
+  HELP_CENTER_HERO_ALIGNS,
+  HELP_CENTER_HERO_OVERLAYS,
+  HELP_CENTER_HERO_STYLES,
   type HelpCenterFont,
+  type HelpCenterGradientDirection,
+  type HelpCenterHeroOverlay,
+  type HelpCenterHeroStyle,
   type HelpCenterTheme,
 } from "@server/database/entities/help-center.entity";
 import { raw, type SafeHtml } from "./html";
@@ -23,9 +33,48 @@ const FONT_STACKS: Record<HelpCenterFont, string> = {
   mono: 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
 };
 
-/** Page background and text per colour scheme; keep in step with the stylesheet below. */
-const LIGHT = { background: "#ffffff", text: "#1a1d21" };
-const DARK = { background: "#111418", text: "#e8ebee" };
+const GRADIENT_ANGLES: Record<HelpCenterGradientDirection, string> = {
+  diagonal: "135deg",
+  right: "90deg",
+  down: "180deg",
+};
+
+/** Opacity of the black layer over a hero image; white text sits on top. */
+const OVERLAY_OPACITY: Record<HelpCenterHeroOverlay, string> = {
+  light: "0.35",
+  medium: "0.55",
+  strong: "0.75",
+};
+
+interface Palette {
+  background: string;
+  surface: string;
+  text: string;
+  muted: string;
+  border: string;
+}
+
+const LIGHT: Palette = {
+  background: "#ffffff",
+  surface: "#f5f6f8",
+  text: "#1a1d21",
+  muted: "#59626d",
+  border: "#dde1e6",
+};
+const DARK: Palette = {
+  background: "#111418",
+  surface: "#1a1f25",
+  text: "#e8ebee",
+  muted: "#a4adb8",
+  border: "#2e353d",
+};
+
+function paletteCss(palette: Palette): string {
+  return (
+    `--hc-bg: ${palette.background}; --hc-surface: ${palette.surface}; ` +
+    `--hc-text: ${palette.text}; --hc-muted: ${palette.muted}; --hc-border: ${palette.border};`
+  );
+}
 
 /** WCAG AA for body text. */
 const MIN_TEXT_CONTRAST = 4.5;
@@ -50,52 +99,104 @@ export function contrastRatio(first: string, second: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-/** Black or white, whichever reads better on the colour. */
-export function readableTextOn(color: string): "#000000" | "#ffffff" {
-  return contrastRatio(color, "#000000") >= contrastRatio(color, "#ffffff") ? "#000000" : "#ffffff";
+/** Black or white, whichever reads better on every one of the colours (a gradient's stops). */
+export function readableTextOn(...colors: string[]): "#000000" | "#ffffff" {
+  const worst = (text: string) => Math.min(...colors.map((color) => contrastRatio(color, text)));
+  return worst("#000000") >= worst("#ffffff") ? "#000000" : "#ffffff";
 }
 
 /** The accent as a link colour when it is readable on the background, else the text colour. */
-function linkColor(accent: string, scheme: { background: string; text: string }): string {
-  return contrastRatio(accent, scheme.background) >= MIN_TEXT_CONTRAST ? accent : scheme.text;
+function linkColor(accent: string, palette: Palette): string {
+  return contrastRatio(accent, palette.background) >= MIN_TEXT_CONTRAST ? accent : palette.text;
+}
+
+function oneOf<T extends string>(options: readonly T[], value: unknown, fallback: T): T {
+  return options.find((option) => option === value) ?? fallback;
+}
+
+function hexOr(value: unknown, fallback: string): string {
+  return isHexColor(value) ? value.toLowerCase() : fallback;
 }
 
 /**
- * The contents of the page's theme `<style>`. The theme is stored JSON and,
- * in preview, comes from the query string, so nothing from it is trusted: the
- * colour must be `#rrggbb` and the font must be one of ours, or the default
- * is used. Nothing else from the theme reaches CSS.
+ * The page's theme `<style>`. The theme is stored JSON and, in preview, comes
+ * from the query string, so nothing from it is trusted: colours must be
+ * `#rrggbb` and every other value one of ours, or the default is used. Only
+ * values built here reach CSS.
  */
-export function themeCss(theme: Pick<HelpCenterTheme, "accentColor" | "font">): SafeHtml {
-  const accent = isHexColor(theme.accentColor)
-    ? theme.accentColor.toLowerCase()
-    : DEFAULT_HELP_CENTER_THEME.accentColor;
-  const font = new Map(Object.entries(FONT_STACKS)).get(theme.font) ?? FONT_STACKS.sans;
+export function themeCss(theme: Partial<HelpCenterTheme>): SafeHtml {
+  const defaults = DEFAULT_HELP_CENTER_THEME;
+  const accent = hexOr(theme.accentColor, defaults.accentColor);
+  const from = hexOr(theme.heroGradientFrom, defaults.heroGradientFrom);
+  const to = hexOr(theme.heroGradientTo, defaults.heroGradientTo);
+  const font = FONT_STACKS[oneOf(HELP_CENTER_FONTS, theme.font, defaults.font)];
+  const angle =
+    GRADIENT_ANGLES[
+      oneOf(
+        HELP_CENTER_GRADIENT_DIRECTIONS,
+        theme.heroGradientDirection,
+        defaults.heroGradientDirection,
+      )
+    ];
+  const overlay =
+    OVERLAY_OPACITY[oneOf(HELP_CENTER_HERO_OVERLAYS, theme.heroOverlay, defaults.heroOverlay)];
+  const scheme = oneOf(HELP_CENTER_COLOR_SCHEMES, theme.colorScheme, defaults.colorScheme);
+
+  const link =
+    scheme === "auto"
+      ? `--hc-link:${linkColor(accent, LIGHT)}}` +
+        `@media (prefers-color-scheme:dark){:root{--hc-link:${linkColor(accent, DARK)}}}`
+      : `--hc-link:${linkColor(accent, scheme === "dark" ? DARK : LIGHT)}}`;
   return raw(
-    `:root{--hc-accent:${accent};--hc-on-accent:${readableTextOn(accent)};` +
-      `--hc-link:${linkColor(accent, LIGHT)};--hc-font:${font}}` +
-      `@media (prefers-color-scheme:dark){:root{--hc-link:${linkColor(accent, DARK)}}}`,
+    `:root{--hc-accent:${accent};--hc-on-accent:${readableTextOn(accent)};--hc-font:${font};` +
+      `--hc-hero-from:${from};--hc-hero-to:${to};--hc-hero-angle:${angle};` +
+      `--hc-on-gradient:${readableTextOn(from, to)};--hc-hero-overlay:${overlay};` +
+      link,
   );
+}
+
+/** Classes for `<body>`: the colour scheme and the corner style, each one of ours. */
+export function bodyClass(theme: Partial<HelpCenterTheme>): string {
+  const defaults = DEFAULT_HELP_CENTER_THEME;
+  const scheme = oneOf(HELP_CENTER_COLOR_SCHEMES, theme.colorScheme, defaults.colorScheme);
+  const corners = oneOf(HELP_CENTER_CORNERS, theme.corners, defaults.corners);
+  return `hc-scheme-${scheme} hc-corners-${corners}`;
+}
+
+/** The hero's style as shown: an image hero without an image shows the accent colour. */
+export function heroStyle(theme: Partial<HelpCenterTheme>, hasImage: boolean): HelpCenterHeroStyle {
+  const style = oneOf(
+    HELP_CENTER_HERO_STYLES,
+    theme.heroStyle,
+    DEFAULT_HELP_CENTER_THEME.heroStyle,
+  );
+  return style === "image" && !hasImage ? "solid" : style;
+}
+
+/** Classes for the hero section, each one of ours. */
+export function heroClass(theme: Partial<HelpCenterTheme>, hasImage: boolean): string {
+  const align = oneOf(
+    HELP_CENTER_HERO_ALIGNS,
+    theme.heroAlign,
+    DEFAULT_HELP_CENTER_THEME.heroAlign,
+  );
+  return `hc-hero hc-hero-${heroStyle(theme, hasImage)} hc-hero-${align}`;
 }
 
 export const SITE_CSS = `
 :root {
   color-scheme: light dark;
-  --hc-bg: ${LIGHT.background};
-  --hc-surface: #f5f6f8;
-  --hc-text: ${LIGHT.text};
-  --hc-muted: #59626d;
-  --hc-border: #dde1e6;
+  ${paletteCss(LIGHT)}
+  --hc-radius: 12px;
+  --hc-control-radius: 8px;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
-    --hc-bg: ${DARK.background};
-    --hc-surface: #1a1f25;
-    --hc-text: ${DARK.text};
-    --hc-muted: #a4adb8;
-    --hc-border: #2e353d;
-  }
+  :root { ${paletteCss(DARK)} }
 }
+.hc-scheme-light { color-scheme: light; ${paletteCss(LIGHT)} }
+.hc-scheme-dark { color-scheme: dark; ${paletteCss(DARK)} }
+.hc-corners-sharp { --hc-radius: 0; --hc-control-radius: 0; }
+.hc-corners-pill { --hc-radius: 24px; --hc-control-radius: 999px; }
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
@@ -143,21 +244,50 @@ img { max-width: 100%; height: auto; }
 .hc-header .hc-search { max-width: 18rem; }
 .hc-search input {
   flex: 1; min-width: 0; padding: 0.6rem 0.8rem;
-  border: 1px solid var(--hc-border); border-right: 0; border-radius: 8px 0 0 8px;
+  border: 1px solid var(--hc-border); border-right: 0;
+  border-radius: var(--hc-control-radius) 0 0 var(--hc-control-radius);
   background: var(--hc-bg); color: var(--hc-text); font: inherit;
 }
 .hc-search button {
-  padding: 0.6rem 1rem; border: 1px solid var(--hc-text); border-radius: 0 8px 8px 0;
+  padding: 0.6rem 1rem; border: 1px solid var(--hc-text);
+  border-radius: 0 var(--hc-control-radius) var(--hc-control-radius) 0;
   background: var(--hc-text); color: var(--hc-bg); font: inherit; font-weight: 600; cursor: pointer;
 }
 .hc-header .hc-search input, .hc-header .hc-search button { padding-top: 0.4rem; padding-bottom: 0.4rem; }
 
-.hc-hero { background: var(--hc-accent); color: var(--hc-on-accent); padding: 3rem 0; text-align: center; }
+.hc-hero {
+  position: relative; isolation: isolate; padding: 3rem 0; text-align: center;
+  background: var(--hc-accent); color: var(--hc-on-accent);
+}
 .hc-hero h1 { font-size: clamp(1.6rem, 5vw, 2.4rem); }
 .hc-hero p { margin: 0.75rem auto 0; max-width: 40rem; font-size: 1.1rem; }
 .hc-hero .hc-search { margin: 1.5rem auto 0; }
 .hc-hero .hc-search input { border-color: transparent; }
-.hc-hero :focus-visible { outline-color: var(--hc-on-accent); }
+.hc-hero :focus-visible { outline-color: currentColor; }
+.hc-hero-gradient {
+  background: linear-gradient(var(--hc-hero-angle), var(--hc-hero-from), var(--hc-hero-to));
+  color: var(--hc-on-gradient);
+}
+.hc-hero-image { padding: 4.5rem 0; background: #1a1d21; color: #ffffff; text-shadow: 0 1px 3px rgb(0 0 0 / 0.5); }
+.hc-hero-image::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: rgb(0 0 0 / var(--hc-hero-overlay));
+}
+.hc-hero-bg {
+  position: absolute; inset: 0; z-index: -2;
+  width: 100%; height: 100%; max-width: none; object-fit: cover;
+}
+.hc-hero-image .hc-search { text-shadow: none; }
+.hc-hero-tint {
+  background: var(--hc-surface);
+  background: color-mix(in srgb, var(--hc-accent) 14%, var(--hc-bg));
+  color: var(--hc-text);
+}
+.hc-hero-plain { padding-bottom: 0.5rem; background: var(--hc-bg); color: var(--hc-text); }
+.hc-hero-plain .hc-search input,
+.hc-hero-tint .hc-search input { border-color: var(--hc-border); }
+.hc-hero-left { text-align: left; }
+.hc-hero-left p, .hc-hero-left .hc-search { margin-left: 0; }
 
 .hc-main { flex: 1; padding-top: 2rem; padding-bottom: 3rem; }
 .hc-main h1 { font-size: clamp(1.5rem, 4.5vw, 2.1rem); margin-bottom: 0.5rem; }
@@ -169,7 +299,7 @@ img { max-width: 100%; height: auto; }
 }
 .hc-card {
   display: block; height: 100%; padding: 1.25rem;
-  border: 1px solid var(--hc-border); border-radius: 12px;
+  border: 1px solid var(--hc-border); border-radius: var(--hc-radius);
   background: var(--hc-surface); color: var(--hc-text); text-decoration: none;
 }
 .hc-card:hover { border-color: var(--hc-link); }
@@ -206,13 +336,14 @@ img { max-width: 100%; height: auto; }
 .hc-prose pre code { padding: 0; background: none; }
 .hc-prose hr { margin: 2rem 0; border: 0; border-top: 1px solid var(--hc-border); }
 
-.hc-panel { margin-top: 2.5rem; padding: 1.25rem; border: 1px solid var(--hc-border); border-radius: 12px; background: var(--hc-surface); }
+.hc-panel { margin-top: 2.5rem; padding: 1.25rem; border: 1px solid var(--hc-border); border-radius: var(--hc-radius); background: var(--hc-surface); }
 .hc-panel + .hc-panel { margin-top: 1rem; }
 .hc-panel h2 { font-size: 1.05rem; }
 .hc-panel p { margin: 0.4rem 0 0; }
 .hc-feedback-buttons { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
 .hc-feedback-buttons button {
-  min-width: 4.5rem; padding: 0.5rem 1rem; border: 1px solid var(--hc-border); border-radius: 8px;
+  min-width: 4.5rem; padding: 0.5rem 1rem; border: 1px solid var(--hc-border);
+  border-radius: var(--hc-control-radius);
   background: var(--hc-bg); color: var(--hc-text); font: inherit; cursor: pointer;
 }
 .hc-feedback-buttons button:hover { border-color: var(--hc-link); }

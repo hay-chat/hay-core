@@ -8,7 +8,7 @@ import type { PublicArticle, PublicArticleSummary, PublicCollection } from "../p
 import { SEARCH_QUERY_MAX_LENGTH } from "../public-content";
 import { html, raw, scriptJson, type HtmlValue, type SafeHtml } from "./html";
 import { htmlLang, siteStrings, type SiteStrings } from "./strings";
-import { SITE_CSS_PATH, themeCss } from "./styles";
+import { bodyClass, heroClass, heroStyle, SITE_CSS_PATH, themeCss } from "./styles";
 import { articlePath, collectionPath } from "./urls";
 
 export const PREVIEW_TOKEN_PARAM = "hc_preview";
@@ -25,6 +25,8 @@ export interface SiteView {
   canonicalBase: string;
   theme: HelpCenterTheme;
   logoUrl: string | null;
+  /** The hero's background image, when the help center has one. */
+  heroImageUrl: string | null;
   noindex: boolean;
   /** CSP nonce of this response. */
   nonce: string;
@@ -156,7 +158,7 @@ function page(view: SiteView, strings: SiteStrings, parts: PageParts): string {
           ${themeCss(view.theme)}
         </style>
       </head>
-      <body>
+      <body class="${bodyClass(view.theme)}">
         <a class="hc-skip" href="#hc-main">${strings.skipToContent}</a>
         <header class="hc-header">
           <div class="hc-wrap">
@@ -215,7 +217,13 @@ function text(value: unknown): string | null {
 export function renderHomePage(view: SiteView, collections: PublicCollection[]): string {
   const strings = siteStrings(view.language);
   const subtitle = text(view.theme.heroSubtitle);
-  const hero = html`<section class="hc-hero">
+  const showImage = heroStyle(view.theme, view.heroImageUrl !== null) === "image";
+  const hero = html`<section class="${heroClass(view.theme, view.heroImageUrl !== null)}">
+    ${
+      showImage
+        ? html`<img class="hc-hero-bg" src="${view.heroImageUrl}" alt="" fetchpriority="high" />`
+        : null
+    }
     <div class="hc-wrap">
       <h1>${text(view.theme.heroTitle) ?? view.name}</h1>
       ${subtitle ? html`<p>${subtitle}</p>` : null} ${searchForm(view, strings, "hc-search")}
