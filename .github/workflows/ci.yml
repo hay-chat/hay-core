@@ -207,3 +207,29 @@ jobs:
         run: npm run build
       - name: Check performance budget
         run: npm run check:perf
+
+  # React Native SDK (packages/react-native): its own install, outside the
+  # workspaces, so React Native stays out of the main dependency tree.
+  react-native-sdk:
+    name: React Native SDK
+    if: github.ref_name != 'staging' && github.base_ref != 'staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: packages/react-native
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: packages/react-native/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
