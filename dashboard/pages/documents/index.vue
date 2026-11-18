@@ -406,7 +406,7 @@
               <input
                 type="file"
                 accept=".txt,.md,.pdf"
-                class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
                 @change="handleFileUpload"
               />
               <p class="text-xs text-neutral-muted mt-2">
