@@ -17,7 +17,11 @@
         <AccessNoticeBanner />
         <!-- The team paused the AI everywhere (D11-9) -->
         <AiPauseBanner />
-        <main class="min-h-0 flex-1 overflow-y-auto bg-neutral-50 [scrollbar-gutter:stable]">
+        <!-- relative: contains absolutely positioned children (e.g. sr-only radio inputs) so they
+             can't stretch the document past the viewport and add a second scrollbar -->
+        <main
+          class="relative min-h-0 flex-1 overflow-y-auto bg-neutral-50 [scrollbar-gutter:stable]"
+        >
           <slot />
         </main>
       </div>

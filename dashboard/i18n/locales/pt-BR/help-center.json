@@ -57,14 +57,18 @@
     "theme": {
       "accentColor": "Cor de destaque",
       "accentColorPicker": "Escolher uma cor de destaque",
-      "accentColorInvalid": "Digite uma cor hexadecimal de 6 dígitos, como #2747d6.",
+      "colorInvalid": "Digite uma cor hexadecimal de 6 dígitos, como #2747d6.",
       "contrastWarning": "Em uma página branca, esta cor tem contraste de {ratio}:1, abaixo dos 4.5:1 de que um texto precisa. Os links aparecerão na cor normal do texto em vez desta; os botões continuam legíveis.",
       "font": "Fonte",
+      "brandColors": "Do seu site",
+      "useBrandColor": "Usar {color}",
+      "fontSource": "Sem serifa, Com serifa, Arredondada e Monoespaçada são carregadas do Google Fonts. Do sistema usa as fontes do próprio visitante e não carrega nada.",
       "fonts": {
         "sans": "Sem serifa",
         "serif": "Com serifa",
         "rounded": "Arredondada",
-        "mono": "Monoespaçada"
+        "mono": "Monoespaçada",
+        "system": "Do sistema"
       },
       "layout": "Layout da página inicial",
       "layouts": {
@@ -77,7 +81,71 @@
       "heroTitlePlaceholder": "Como podemos ajudar?",
       "heroSubtitle": "Subtítulo de destaque",
       "heroSubtitlePlaceholder": "Pesquise nossos guias ou navegue por tema.",
-      "showPoweredBy": "Mostrar \"Powered by Hay\""
+      "showPoweredBy": "Mostrar \"Powered by Hay\"",
+      "presets": "Tema",
+      "presetsHint": "Comece com um visual pronto e depois ajuste o que quiser abaixo.",
+      "presetCustomised": "Personalizado a partir de {name}.",
+      "presetSample": "Central de ajuda",
+      "presetNames": {
+        "classic": "Clássico",
+        "aurora": "Aurora",
+        "minimal": "Minimalista",
+        "midnight": "Meia-noite",
+        "editorial": "Editorial",
+        "playful": "Divertido"
+      },
+      "colorScheme": "Esquema de cores",
+      "colorSchemeOptions": {
+        "auto": "Automático",
+        "light": "Claro",
+        "dark": "Escuro"
+      },
+      "corners": "Cantos",
+      "cornersOptions": {
+        "sharp": "Retos",
+        "rounded": "Arredondados",
+        "pill": "Pílula"
+      },
+      "hero": "Destaque",
+      "heroStyle": "Fundo",
+      "heroStyleOptions": {
+        "solid": "Destaque",
+        "gradient": "Gradiente",
+        "tint": "Suave",
+        "image": "Imagem",
+        "plain": "Nenhum"
+      },
+      "heroGradientFrom": "Início do gradiente",
+      "heroGradientFromPicker": "Escolher a cor inicial do gradiente",
+      "heroGradientTo": "Fim do gradiente",
+      "heroGradientToPicker": "Escolher a cor final do gradiente",
+      "gradientContrastWarning": "Nem texto preto nem branco chega a 4.5:1 nas duas pontas deste gradiente (melhor: {ratio}:1). Deixe as duas cores mais claras ou as duas mais escuras.",
+      "heroGradientDirection": "Direção",
+      "heroGradientDirectionOptions": {
+        "diagonal": "Diagonal",
+        "right": "Horizontal",
+        "down": "Vertical"
+      },
+      "heroImage": "Imagem de fundo",
+      "heroImageAlt": "Imagem de destaque atual",
+      "heroImageUpload": "Enviar imagem",
+      "heroImageReplace": "Substituir",
+      "heroImageRemove": "Remover",
+      "heroImageHint": "JPEG, PNG ou WebP, até 5 MB; uma foto larga funciona melhor. A imagem é salva assim que você a envia; as outras mudanças, quando você salvar.",
+      "heroImageMissing": "Até você enviar uma imagem, o destaque mostra sua cor de destaque.",
+      "heroImageTooLarge": "Essa imagem tem mais de 5 MB.",
+      "heroOverlay": "Escurecer a imagem",
+      "heroOverlayOptions": {
+        "light": "Pouco",
+        "medium": "Médio",
+        "strong": "Muito"
+      },
+      "heroOverlayHint": "O texto do destaque é branco. Em uma foto clara, escureça mais para o texto continuar legível.",
+      "heroAlign": "Alinhamento",
+      "heroAlignOptions": {
+        "center": "Centralizado",
+        "left": "À esquerda"
+      }
     },
     "collection": {
       "title": "Título",

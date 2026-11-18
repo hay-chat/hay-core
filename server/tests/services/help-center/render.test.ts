@@ -5,10 +5,14 @@
 import { describe, it, expect } from "@jest/globals";
 import { DEFAULT_HELP_CENTER_THEME } from "../../../database/entities/help-center.entity";
 import { likePattern, normalizeSearchQuery } from "../../../services/help-center/public-content";
-import { sanitizedArticleHtml } from "../../../services/help-center/render/article-body";
+import {
+  prepareForPage,
+  sanitizedArticleHtml,
+} from "../../../services/help-center/render/article-body";
 import { html, raw, scriptJson } from "../../../services/help-center/render/html";
 import {
   renderArticlePage,
+  renderCollectionPage,
   renderHomePage,
   renderNotFoundPage,
   renderSearchPage,
@@ -17,8 +21,11 @@ import {
 import { buildRobotsTxt, buildSitemapXml } from "../../../services/help-center/render/seo";
 import { htmlLang, siteStrings } from "../../../services/help-center/render/strings";
 import {
+  bodyClass,
   contrastRatio,
+  heroClass,
   readableTextOn,
+  SITE_CSS,
   SITE_CSS_PATH,
   themeCss,
 } from "../../../services/help-center/render/styles";
@@ -204,15 +211,20 @@ describe("article body", () => {
 
 describe("theme variables", () => {
   it("writes the accent, a readable colour on it, and the font stack", () => {
-    const css = themeCss({ accentColor: "#FFDD00", font: "serif" }).value;
+    const css = themeCss({
+      ...DEFAULT_HELP_CENTER_THEME,
+      accentColor: "#FFDD00",
+      font: "serif",
+    }).value;
     expect(css).toContain("--hc-accent:#ffdd00");
     expect(css).toContain("--hc-on-accent:#000000");
-    expect(css).toContain("--hc-font:Georgia");
+    expect(css).toContain("--hc-font:Newsreader, Charter");
+    expect(css).toContain("--hc-font-heading:Newsreader, Charter");
     // Yellow is unreadable as link text on white, so links fall back to the text colour there.
-    expect(css).toMatch(/--hc-link:#1a1d21.*prefers-color-scheme:dark.*--hc-link:#ffdd00/);
+    expect(css).toMatch(/--hc-link:#16181d.*prefers-color-scheme:dark.*--hc-link:#ffdd00/);
   });
 
-  it("falls back to the defaults for anything that is not a colour or a known font", () => {
+  it("falls back to the defaults for anything that is not a colour or one of our values", () => {
     for (const accentColor of [
       "red;}</style><script>alert(1)</script>",
       "#fff",
@@ -221,13 +233,21 @@ describe("theme variables", () => {
       "url(https://evil.example/x)",
       "#2747d6;background:url(https://evil.example)",
     ]) {
-      const font = "x;}</style><script>" as "sans";
-      const css = themeCss({ accentColor, font }).value;
+      const bad = "x;}</style><script>" as never;
+      const css = themeCss({
+        accentColor,
+        font: bad,
+        colorScheme: bad,
+        heroGradientFrom: accentColor,
+        heroGradientTo: bad,
+        heroGradientDirection: bad,
+        heroOverlay: bad,
+      }).value;
       expect(css).toBe(themeCss(DEFAULT_HELP_CENTER_THEME).value);
       expect(css).not.toContain("<");
       expect(css).not.toContain("evil");
     }
-    expect(themeCss({ accentColor: 7 as unknown as string, font: "sans" }).value).toBe(
+    expect(themeCss({ accentColor: 7 as unknown as string }).value).toBe(
       themeCss(DEFAULT_HELP_CENTER_THEME).value,
     );
   });
@@ -237,6 +257,66 @@ describe("theme variables", () => {
     expect(readableTextOn("#000000")).toBe("#ffffff");
     expect(readableTextOn("#2747d6")).toBe("#ffffff");
     expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21, 5);
+    // On a gradient the text must read on both stops: the worse stop decides.
+    expect(readableTextOn("#2747d6", "#7c3aed")).toBe("#ffffff");
+    // Black on the navy stop alone would be 2.4:1; white is the better worst case.
+    expect(readableTextOn("#9ca3af", "#1e3a8a")).toBe("#ffffff");
+    expect(readableTextOn("#fde68a", "#f472b6")).toBe("#000000");
+  });
+
+  it("writes the gradient stops, their direction, a text colour for both, and the overlay", () => {
+    const css = themeCss({
+      ...DEFAULT_HELP_CENTER_THEME,
+      heroGradientFrom: "#0B1026",
+      heroGradientTo: "#312e81",
+      heroGradientDirection: "down",
+      heroOverlay: "strong",
+    }).value;
+    expect(css).toContain("--hc-hero-from:#0b1026;--hc-hero-to:#312e81;--hc-hero-angle:180deg");
+    expect(css).toContain("--hc-on-gradient:#ffffff");
+    expect(css).toContain("--hc-hero-overlay:0.75");
+  });
+
+  it("uses the link colour of a forced colour scheme only", () => {
+    const accent = "#60a5fa"; // readable on dark, not on white
+    const dark = themeCss({
+      ...DEFAULT_HELP_CENTER_THEME,
+      accentColor: accent,
+      colorScheme: "dark",
+    }).value;
+    expect(dark).toContain(`--hc-link:${accent}`);
+    expect(dark).not.toContain("prefers-color-scheme");
+    const light = themeCss({
+      ...DEFAULT_HELP_CENTER_THEME,
+      accentColor: accent,
+      colorScheme: "light",
+    }).value;
+    expect(light).toContain("--hc-link:#16181d");
+    expect(light).not.toContain("prefers-color-scheme");
+    // The stylesheet has a palette for each forced scheme.
+    expect(SITE_CSS).toMatch(/\.hc-scheme-dark \{ color-scheme: dark; --hc-bg: #0f1115;/);
+    expect(SITE_CSS).toMatch(/\.hc-scheme-light \{ color-scheme: light; --hc-bg: #ffffff;/);
+  });
+
+  it("names body and hero classes from the theme, and only ever ours", () => {
+    expect(bodyClass({ colorScheme: "dark", corners: "pill" })).toBe(
+      "hc-scheme-dark hc-corners-pill",
+    );
+    expect(heroClass({ heroStyle: "gradient", heroAlign: "left" }, false)).toBe(
+      "hc-hero hc-hero-gradient hc-hero-left",
+    );
+    // An image hero without an image shows the accent colour.
+    expect(heroClass({ heroStyle: "image", heroAlign: "center" }, false)).toBe(
+      "hc-hero hc-hero-solid hc-hero-center",
+    );
+    expect(heroClass({ heroStyle: "image", heroAlign: "center" }, true)).toContain("hc-hero-image");
+    const hostile = '"><script>alert(1)</script>' as never;
+    expect(bodyClass({ colorScheme: hostile, corners: hostile })).toBe(
+      "hc-scheme-auto hc-corners-rounded",
+    );
+    expect(heroClass({ heroStyle: hostile, heroAlign: hostile }, true)).toBe(
+      "hc-hero hc-hero-solid hc-hero-center",
+    );
   });
 
   it("names the stylesheet after its content", () => {
@@ -283,6 +363,60 @@ describe("robots.txt and sitemap.xml", () => {
       "<loc>https://x.test/?a=1&amp;b=&lt;2&gt;/</loc>",
     );
   });
+
+  it("dates a collection by its newest article and the home page by the newest of all", () => {
+    const summary = (id: string, updatedAt: string) => ({
+      id,
+      title: id,
+      description: null,
+      updatedAt: new Date(updatedAt),
+    });
+    const collection = (id: string, articles: ReturnType<typeof summary>[]) => ({
+      id,
+      title: "c",
+      description: null,
+      icon: null,
+      articles,
+    });
+    const xml = buildSitemapXml("https://h.test", [
+      collection("11111111-0000-4000-8000-000000000000", [
+        summary("aaaaaaaa-0000-4000-8000-000000000000", "2026-03-01T00:00:00Z"),
+        summary("bbbbbbbb-0000-4000-8000-000000000000", "2026-05-01T00:00:00Z"),
+      ]),
+      collection("22222222-0000-4000-8000-000000000000", [
+        summary("cccccccc-0000-4000-8000-000000000000", "2026-04-01T00:00:00Z"),
+      ]),
+    ]);
+    const lastmod = (loc: string) =>
+      new RegExp(`<loc>${loc}</loc><lastmod>([^<]+)</lastmod>`).exec(xml)?.[1];
+    expect(lastmod("https://h.test/")).toBe("2026-05-01T00:00:00.000Z");
+    expect(lastmod("https://h.test/collections/c-11111111")).toBe("2026-05-01T00:00:00.000Z");
+    expect(lastmod("https://h.test/collections/c-22222222")).toBe("2026-04-01T00:00:00.000Z");
+    expect(buildSitemapXml("https://h.test", [])).toContain(
+      "<url><loc>https://h.test/</loc></url>",
+    );
+  });
+});
+
+describe("prepareForPage", () => {
+  it("moves every heading down a level when the body has a level-1 heading", () => {
+    expect(
+      prepareForPage('<h1 id="a">A</h1><p>x</p><h2>B</h2><h3>C</h3><h6>D</h6><header>h</header>'),
+    ).toBe('<h2 id="a">A</h2><p>x</p><h3>B</h3><h4>C</h4><h6>D</h6><header>h</header>');
+  });
+
+  it("leaves headings alone when the body starts at level 2", () => {
+    expect(prepareForPage("<h2>B</h2><h3>C</h3>")).toBe("<h2>B</h2><h3>C</h3>");
+  });
+
+  it("decodes images asynchronously and lazy-loads all but the first", () => {
+    expect(prepareForPage('<p><img src="a.png" alt=""></p><img src="b.png"><img/>')).toBe(
+      '<p><img decoding="async" src="a.png" alt=""></p>' +
+        '<img loading="lazy" decoding="async" src="b.png">' +
+        '<img loading="lazy" decoding="async"/>',
+    );
+    expect(prepareForPage("<p>an &lt;img&gt; tag</p>")).toBe("<p>an &lt;img&gt; tag</p>");
+  });
 });
 
 describe("pages", () => {
@@ -292,6 +426,8 @@ describe("pages", () => {
     canonicalBase: "https://acme.haychat.co",
     theme: { ...DEFAULT_HELP_CENTER_THEME },
     logoUrl: null,
+    socialImageUrl: null,
+    heroImageUrl: null,
     noindex: false,
     nonce: "Tm9uY2U=",
     preview: null,
@@ -311,7 +447,8 @@ describe("pages", () => {
     id: ID,
     title: "Refunds </title><script>alert(1)</script>",
     description: 'How "refunds" work',
-    updatedAt: new Date(),
+    createdAt: new Date("2026-01-02T03:04:05.000Z"),
+    updatedAt: new Date("2026-02-03T04:05:06.000Z"),
     content: "",
     importMethod: "editor",
     collection: { id: collections[0].id, title: "Billing" },
@@ -355,6 +492,40 @@ describe("pages", () => {
     expect(page).toContain('<meta name="description" content="Ask &quot;us&quot;" />');
   });
 
+  it("puts the scheme and corner classes on the body and the hero style on the hero", () => {
+    const page = renderHomePage(
+      view({
+        theme: {
+          ...DEFAULT_HELP_CENTER_THEME,
+          colorScheme: "dark",
+          corners: "sharp",
+          heroStyle: "plain",
+          heroAlign: "left",
+        },
+      }),
+      collections,
+    );
+    expect(page).toContain('<body class="hc-scheme-dark hc-corners-sharp">');
+    expect(page).toContain('<section class="hc-hero hc-hero-plain hc-hero-left">');
+    expect(page).not.toContain("hc-hero-bg");
+    const articlePage = renderArticlePage(view(), article, raw(""));
+    expect(articlePage).toContain('<body class="hc-scheme-auto hc-corners-rounded">');
+  });
+
+  it("shows the hero image, escaped, only when the hero style is image", () => {
+    const heroImageUrl = 'https://cdn.hay.test/hero.jpg?a=1&b="x"';
+    const imageTheme = { ...DEFAULT_HELP_CENTER_THEME, heroStyle: "image" as const };
+    const page = renderHomePage(view({ theme: imageTheme, heroImageUrl }), []);
+    expect(page).toContain('<section class="hc-hero hc-hero-image hc-hero-center">');
+    expect(page).toContain(
+      '<img class="hc-hero-bg" src="https://cdn.hay.test/hero.jpg?a=1&amp;b=&quot;x&quot;" alt=""',
+    );
+    expect(renderHomePage(view({ heroImageUrl }), [])).not.toContain("hc-hero-bg");
+    const missing = renderHomePage(view({ theme: imageTheme }), []);
+    expect(missing).toContain("hc-hero-solid");
+    expect(missing).not.toContain("hc-hero-bg");
+  });
+
   it("renders an article with its body untouched and everything else escaped", () => {
     const page = renderArticlePage(view(), article, raw("<p>Body <strong>here</strong></p>"));
     expect(page).toContain("<p>Body <strong>here</strong></p>");
@@ -392,7 +563,8 @@ describe("pages", () => {
       },
     });
     expect(page.match(/<script\s+nonce="Tm9uY2U="/g)).toHaveLength(3);
-    expect(page.match(/<script/g)).toHaveLength(3);
+    // Every executable script carries the nonce; JSON-LD blocks are data and are never run.
+    expect(page.match(/<script(?! type="application\/ld\+json")/g)).toHaveLength(3);
   });
 
   it("keeps preview parameters on every link and form, and is never indexed", () => {
@@ -429,6 +601,198 @@ describe("pages", () => {
     expect(page).toContain("Page not found");
     expect(page).not.toContain("hc-brand");
     expect(page).not.toContain("Back to home");
+  });
+
+  describe("head metadata", () => {
+    const meta = (page: string, key: string) =>
+      new RegExp(`<meta (?:property|name)="${key}" content="([^"]*)" />`).exec(page)?.[1];
+
+    it("describes a page for link previews with escaped values", () => {
+      const page = renderArticlePage(
+        view({ socialImageUrl: "https://cdn.test/logo.png?a=1&b=2" }),
+        article,
+        raw("<p>Body</p>"),
+      );
+      expect(meta(page, "og:type")).toBe("article");
+      expect(meta(page, "og:site_name")).toBe("Acme &lt;Help&gt;");
+      expect(meta(page, "og:title")).toBe(
+        "Refunds &lt;/title&gt;&lt;script&gt;alert(1)&lt;/script&gt;",
+      );
+      expect(meta(page, "og:description")).toBe("How &quot;refunds&quot; work");
+      expect(meta(page, "og:url")).toBe(
+        "https://acme.haychat.co/articles/refunds-title-script-alert-1-script-0a1b2c3d",
+      );
+      expect(meta(page, "og:locale")).toBe("pt");
+      expect(meta(page, "og:image")).toBe("https://cdn.test/logo.png?a=1&amp;b=2");
+      expect(meta(page, "twitter:card")).toBe("summary");
+      expect(meta(renderHomePage(view({ language: "pt-BR" }), []), "og:locale")).toBe("pt_BR");
+      expect(meta(renderHomePage(view(), []), "og:type")).toBe("website");
+    });
+
+    it("leaves out an image that is not an absolute http address", () => {
+      for (const socialImageUrl of [null, "/uploads/logo.png", "javascript:alert(1)"]) {
+        expect(renderHomePage(view({ socialImageUrl }), [])).not.toContain("og:image");
+      }
+    });
+
+    it("has no link preview tags on pages without a canonical address", () => {
+      expect(renderSearchPage(view(), "x", [])).not.toContain("og:");
+      expect(renderNotFoundPage(view())).not.toContain("og:");
+      expect(renderNotFoundPage(view())).not.toContain("twitter:");
+    });
+
+    it("falls back to the listed titles or the article text for a description", () => {
+      expect(meta(renderHomePage(view(), collections), "description")).toBe("Billing");
+      const untitled = { ...collections[0], description: null };
+      expect(meta(renderCollectionPage(view(), untitled), "description")).toBe(
+        "Refunds &lt;fast&gt;",
+      );
+      const body = raw(
+        `<h2>Steps</h2><p>Go to <b>Billing</b> &amp; pick &quot;Refund&quot;. ${"Then wait. ".repeat(30)}</p>`,
+      );
+      const description =
+        meta(renderArticlePage(view(), { ...article, description: null }, body), "description") ??
+        "";
+      expect(description).toMatch(
+        /^Steps Go to Billing &amp; pick &quot;Refund&quot;\. Then wait\./,
+      );
+      expect(description.endsWith("…")).toBe(true);
+      expect(description.replace(/&[a-z]+;/g, "x").length).toBeLessThanOrEqual(160);
+    });
+
+    it("sets the theme colour, icons, and a preconnect to the widget's host", () => {
+      const page = renderHomePage(
+        view({
+          logoUrl: "https://cdn.test/logo.png",
+          theme: { ...DEFAULT_HELP_CENTER_THEME, accentColor: "#123abc" },
+          webchat: { organizationId: "org-1", baseUrl: "https://api.hay.test" },
+        }),
+        [],
+      );
+      expect(meta(page, "theme-color")).toBe("#123abc");
+      expect(page).toContain('<link rel="icon" href="https://cdn.test/logo.png" />');
+      expect(page).toContain('<link rel="apple-touch-icon" href="https://cdn.test/logo.png" />');
+      expect(page).toContain('<link rel="preconnect" href="https://api.hay.test" />');
+
+      const plain = renderHomePage(
+        view({ theme: { ...DEFAULT_HELP_CENTER_THEME, accentColor: "red;}", font: "system" } }),
+        [],
+      );
+      expect(plain).not.toContain("theme-color");
+      expect(plain).not.toContain("apple-touch-icon");
+      expect(plain).not.toContain("preconnect");
+    });
+
+    it("loads the theme's Google font, and nothing for system fonts", () => {
+      const sans = renderHomePage(view(), []);
+      expect(sans).toContain(
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />',
+      );
+      expect(sans).toContain(
+        '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&amp;display=swap" />',
+      );
+      const system = renderHomePage(
+        view({ theme: { ...DEFAULT_HELP_CENTER_THEME, font: "system" } }),
+        [],
+      );
+      expect(system).not.toContain("fonts.googleapis.com");
+      expect(system).not.toContain("fonts.gstatic.com");
+    });
+  });
+
+  describe("structured data", () => {
+    /** Every JSON-LD block of a page, parsed. */
+    const structuredData = (page: string): Array<Record<string, unknown>> =>
+      [...page.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)].map(
+        (match) => JSON.parse(match[1]) as Record<string, unknown>,
+      );
+    const ofType = (page: string, type: string) =>
+      structuredData(page).filter((data) => data["@type"] === type);
+
+    it("describes the site and its search on the home page", () => {
+      const page = renderHomePage(view(), collections);
+      expect(structuredData(page)).toEqual([
+        {
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: "Acme <Help>",
+          url: "https://acme.haychat.co/",
+          inLanguage: "pt",
+          potentialAction: {
+            "@type": "SearchAction",
+            target: {
+              "@type": "EntryPoint",
+              urlTemplate: "https://acme.haychat.co/search?q={search_term_string}",
+            },
+            "query-input": "required name=search_term_string",
+          },
+        },
+      ]);
+      // Text in a data block cannot close the script element.
+      expect(page).not.toContain('"Acme <Help>"');
+    });
+
+    it("gives a collection its breadcrumb trail", () => {
+      const [trail] = ofType(renderCollectionPage(view(), collections[0]), "BreadcrumbList");
+      expect(trail.itemListElement).toEqual([
+        { "@type": "ListItem", position: 1, name: "Acme <Help>", item: "https://acme.haychat.co/" },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Billing",
+          item: "https://acme.haychat.co/collections/billing-11111111",
+        },
+      ]);
+    });
+
+    it("describes an article with its dates, publisher and breadcrumb trail", () => {
+      const page = renderArticlePage(
+        view({ socialImageUrl: "https://cdn.test/logo.png" }),
+        article,
+        raw("<p>Body</p>"),
+      );
+      expect(page).not.toContain("<script>alert(1)</script>");
+      const url = "https://acme.haychat.co/articles/refunds-title-script-alert-1-script-0a1b2c3d";
+      const publisher = {
+        "@type": "Organization",
+        name: "Acme <Help>",
+        url: "https://acme.haychat.co/",
+        logo: "https://cdn.test/logo.png",
+      };
+      expect(ofType(page, "Article")).toEqual([
+        {
+          "@context": "https://schema.org",
+          "@type": "Article",
+          headline: article.title,
+          description: 'How "refunds" work',
+          url,
+          mainEntityOfPage: url,
+          inLanguage: "pt",
+          datePublished: "2026-01-02T03:04:05.000Z",
+          dateModified: "2026-02-03T04:05:06.000Z",
+          image: "https://cdn.test/logo.png",
+          author: publisher,
+          publisher,
+        },
+      ]);
+      const [trail] = ofType(page, "BreadcrumbList");
+      expect(trail.itemListElement).toHaveLength(3);
+      expect((trail.itemListElement as Array<{ item: string }>)[2].item).toBe(url);
+    });
+
+    it("cuts a long headline and leaves out an image there is none of", () => {
+      const long = { ...article, title: "word ".repeat(40), description: null };
+      const [data] = ofType(renderArticlePage(view(), long, raw("")), "Article");
+      expect(String(data.headline).length).toBeLessThanOrEqual(110);
+      expect(data).not.toHaveProperty("image");
+      expect(data).not.toHaveProperty("description");
+      expect(data.publisher).not.toHaveProperty("logo");
+    });
+
+    it("is left off search and 404 pages", () => {
+      expect(structuredData(renderSearchPage(view(), "x", []))).toEqual([]);
+      expect(structuredData(renderNotFoundPage(view()))).toEqual([]);
+    });
   });
 
   it("falls back to English labels and a valid lang attribute", () => {

@@ -41,6 +41,9 @@ import { helpCenterSite, helpCenterTlsAskHandler } from "../../routes/help-cente
 import { signPreviewToken } from "../../services/help-center/help-center.service";
 import { clearHelpCenterHostCache } from "../../services/help-center/host-resolver";
 import { SITE_CSS_PATH } from "../../services/help-center/render/styles";
+import sharp from "sharp";
+import { webchatSettingsRepository } from "../../repositories/webchat-settings.repository";
+import { storageService } from "../../services/storage.service";
 import { webchatSettingsService } from "../../services/webchat/webchat-settings.service";
 
 const ORG_ID = "4c000000-0000-4000-8000-0000000000a3";
@@ -403,7 +406,7 @@ describe("help center site", () => {
       const page = await request(HOST, `/articles/editor-${WORD}-guide-d0c00002`);
       expect(page.status).toBe(200);
       expect(page.body).toContain(`The ${WORD} editor body`);
-      expect(page.body).toContain('<img src="https://img.example/a.png"');
+      expect(page.body).toMatch(/<img [^>]*src="https:\/\/img\.example\/a\.png"/);
       expect(page.body).not.toContain("onerror");
       expect(page.body).not.toContain('alert("html")');
     });
@@ -414,9 +417,11 @@ describe("help center site", () => {
       const nonce = /script-src 'nonce-([A-Za-z0-9+/=]+)'/.exec(policy)?.[1];
       expect(nonce).toBeTruthy();
       expect(page.body).toContain(`<script nonce="${nonce}">`);
-      expect(page.body.match(/<script/g)?.length).toBe(
+      // Every executable script carries the nonce; JSON-LD blocks are data and are never run.
+      expect(page.body.match(/<script(?! type="application\/ld\+json")/g)?.length).toBe(
         page.body.match(/<script\s+nonce="/g)?.length,
       );
+      expect(page.body).toContain('<script type="application/ld+json">');
       expect(policy).toContain("default-src 'none'");
       expect(policy).toContain("frame-ancestors 'none'");
       expect(policy).toContain("base-uri 'none'");
@@ -437,6 +442,24 @@ describe("help center site", () => {
       expect(String(again.headers["content-security-policy"])).not.toContain(`'nonce-${nonce}'`);
     });
 
+    it("allows Google Fonts only when the theme's typeface comes from there", async () => {
+      // The default font loads from Google Fonts.
+      const google = String((await request(HOST, VISIBLE_PATH)).headers["content-security-policy"]);
+      expect(google).toContain("style-src 'self' 'unsafe-inline' https://fonts.googleapis.com");
+      expect(google).toContain("font-src https://fonts.gstatic.com");
+
+      await updateHelpCenter(HELP_CENTER_ID, { theme: { layout: "list", font: "system" } });
+      try {
+        const page = await request(HOST, VISIBLE_PATH);
+        const policy = String(page.headers["content-security-policy"]);
+        expect(policy).toContain("style-src 'self' 'unsafe-inline';");
+        expect(policy).not.toContain("font-src");
+        expect(page.body).not.toContain("fonts.googleapis.com");
+      } finally {
+        await updateHelpCenter(HELP_CENTER_ID, { theme: { layout: "list" } });
+      }
+    });
+
     it("redirects an old or missing slug to the current address", async () => {
       for (const stale of ["/articles/an-old-title-d0c00001", "/articles/d0c00001"]) {
         const reply = await request(HOST, stale);
@@ -446,6 +469,71 @@ describe("help center site", () => {
       const collection = await request(HOST, "/collections/c0110001");
       expect(collection.status).toBe(301);
       expect(collection.headers.location).toBe("/collections/getting-started-c0110001");
+    });
+
+    it("drops a trailing slash from a page address, and only from one", async () => {
+      const article = await request(HOST, `${VISIBLE_PATH}/`);
+      expect(article.status).toBe(301);
+      expect(article.headers.location).toBe(VISIBLE_PATH);
+      const collection = await request(HOST, "/collections/getting-started-c0110001//");
+      expect(collection.status).toBe(301);
+      expect(collection.headers.location).toBe("/collections/getting-started-c0110001");
+      // Never a redirect off the site, whatever the path.
+      for (const path of ["//evil.example/", "/\\evil.example/", "/search/", "/x/"]) {
+        const reply = await request(HOST, path);
+        expect(reply.status).toBe(404);
+        expect(reply.headers.location).toBeUndefined();
+      }
+    });
+
+    it("answers a revalidation with 304 when only the nonce would differ", async () => {
+      const first = await request(HOST, VISIBLE_PATH);
+      const etag = String(first.headers.etag);
+      expect(etag).toMatch(/^W\/"[A-Za-z0-9_-]{27}"$/);
+      expect(first.headers.vary).toContain("Accept-Encoding");
+
+      const again = await request(HOST, VISIBLE_PATH, { headers: { "if-none-match": etag } });
+      expect(again.status).toBe(304);
+      expect(again.body).toBe("");
+      expect(again.headers.etag).toBe(etag);
+      expect(again.headers["cache-control"]).toBe("public, max-age=60");
+      // The browser keeps the policy it stored with its copy, whose nonce matches that copy.
+      expect(again.headers["content-security-policy"]).toBeUndefined();
+
+      const changed = await request(HOST, VISIBLE_PATH, {
+        headers: { "if-none-match": 'W/"something-else"' },
+      });
+      expect(changed.status).toBe(200);
+      expect(changed.headers["content-security-policy"]).toContain("nonce-");
+
+      // Turning the chat widget off changes the page and its policy, so the old copy is stale.
+      const chatSetting = jest
+        .spyOn(webchatSettingsService, "isEnabled")
+        .mockResolvedValueOnce(false);
+      const withoutChat = await request(HOST, VISIBLE_PATH, { headers: { "if-none-match": etag } });
+      expect(withoutChat.status).toBe(200);
+      expect(withoutChat.headers.etag).not.toBe(etag);
+      chatSetting.mockRestore();
+    });
+
+    it("describes the article for search engines and link previews", async () => {
+      const page = await request(HOST, VISIBLE_PATH);
+      const [article] = [
+        ...page.body.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs),
+      ]
+        .map((match) => JSON.parse(match[1]) as Record<string, unknown>)
+        .filter((data) => data["@type"] === "Article");
+      expect(article).toMatchObject({
+        headline: DOCS.visible.title,
+        url: `http://${HOST}${VISIBLE_PATH}`,
+        inLanguage: "en",
+      });
+      expect(Date.parse(String(article.datePublished))).not.toBeNaN();
+      expect(Date.parse(String(article.dateModified))).not.toBeNaN();
+      expect(page.body).toContain(
+        `<meta property="og:url" content="http://${HOST}${VISIBLE_PATH}" />`,
+      );
+      expect(page.body).toContain('<meta property="og:type" content="article" />');
     });
   });
 
@@ -689,10 +777,21 @@ describe("help center site", () => {
       const query = `hc_preview=${encodeURIComponent(signPreviewToken(HELP_CENTER_ID))}`;
       const themed = await request(
         HOST,
-        `/?${query}&hc_theme=${encodeTheme({ accentColor: "#ff0000", heroTitle: "Previewed <title>" })}`,
+        `/?${query}&hc_theme=${encodeTheme({
+          accentColor: "#ff0000",
+          heroTitle: "Previewed <title>",
+          heroStyle: "gradient",
+          heroAlign: "left",
+          heroGradientTo: "#00ff00",
+          colorScheme: "dark",
+          corners: "pill",
+        })}`,
       );
       expect(themed.status).toBe(200);
       expect(themed.body).toContain("--hc-accent:#ff0000");
+      expect(themed.body).toContain("--hc-hero-to:#00ff00");
+      expect(themed.body).toContain('class="hc-scheme-dark hc-corners-pill"');
+      expect(themed.body).toContain('class="hc-hero hc-hero-gradient hc-hero-left"');
       expect(themed.body).toContain("Previewed &lt;title&gt;");
       expect(themed.body).toContain("&amp;hc_theme=");
       // The saved layout still applies: the patch is merged over it.
@@ -701,13 +800,20 @@ describe("help center site", () => {
       for (const bad of [
         encodeTheme({ accentColor: "red;}</style><script>alert(1)</script>" }),
         encodeTheme({ font: "comic" }),
+        encodeTheme({ heroStyle: "video" }),
+        encodeTheme({ heroGradientTo: "red;background:url(https://evil.example)" }),
+        encodeTheme({ colorScheme: '"><script>alert(1)</script>' }),
+        encodeTheme({ corners: "round" }),
+        encodeTheme({ heroOverlay: 2 }),
         encodeTheme("nope"),
         "%%%",
       ]) {
         const reply = await request(HOST, `/?${query}&hc_theme=${bad}`);
         expect(reply.status).toBe(200);
         expect(reply.body).toContain("--hc-accent:#2747d6");
+        expect(reply.body).toContain('class="hc-hero hc-hero-solid hc-hero-center"');
         expect(reply.body).not.toContain("alert(1)");
+        expect(reply.body).not.toContain("evil");
         expect(reply.body).not.toContain("hc_theme");
       }
     });
@@ -839,6 +945,37 @@ describe("help center site", () => {
         expect(policy).toContain("connect-src 'self';");
       } finally {
         await webchatSettingsService.updateSettings(ORG_ID, { isEnabled: true });
+      }
+    });
+  });
+
+  describe("branding", () => {
+    it("shows the logo imported from the website when the organization has none", async () => {
+      const before = await request(HOST, "/");
+      expect(before.body).toContain('<link rel="icon" href="data:,"');
+
+      const png = await sharp({
+        create: { width: 8, height: 8, channels: 3, background: "#e11d48" },
+      })
+        .png()
+        .toBuffer();
+      const { upload } = await storageService.upload({
+        buffer: png,
+        originalName: "webchat-logo.png",
+        mimeType: "image/png",
+        folder: "organizations",
+        organizationId: ORG_ID,
+      });
+      await webchatSettingsRepository.getOrCreate(ORG_ID);
+      await webchatSettingsRepository.patch(ORG_ID, { logoUploadId: upload.id });
+      try {
+        const page = await request(HOST, "/");
+        const logo = storageService.getUrl(upload);
+        expect(page.body).toContain(`<link rel="icon" href="${logo}"`);
+        expect(page.body).toMatch(new RegExp(`class="hc-brand"[^>]*>\\s*<img src="${logo}"`));
+      } finally {
+        await webchatSettingsRepository.patch(ORG_ID, { logoUploadId: null });
+        await storageService.delete(upload.id);
       }
     });
   });

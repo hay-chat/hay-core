@@ -379,7 +379,7 @@
 <script setup lang="ts">
 import { logger } from "@/utils/logger";
 import { Save, Mail, Lock, Shield, Key, UserX, Trash2 } from "lucide-vue-next";
-import type { Icon as LucideIcon } from "lucide-vue-next";
+import type { LucideIcon } from "lucide-vue-next";
 import type { RouterInputs, RouterOutputs } from "@/types/trpc";
 import { Hay } from "@/utils/api";
 
