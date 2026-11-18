@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { classifyLgpdWebhook, handleLgpdWebhook, type LgpdDeps } from "./lgpd.js";
+import {
+  classifyLgpdWebhook,
+  handleLgpdWebhook,
+  isUninstallWebhook,
+  type LgpdDeps,
+} from "./lgpd.js";
 
 // Payloads as documented (resources/webhook → LGPD).
 const STORE_REDACT = { store_id: 789 };
@@ -8,6 +13,7 @@ const CUSTOMERS_REDACT = {
   customer: { id: 1, email: "a@b.com", phone: "+5511999999999", identification: "123" },
   orders_to_redact: [213, 3415, 21515],
 };
+const UNINSTALLED = { store_id: 789, event: "app/uninstalled", id: 1 };
 const DATA_REQUEST = {
   store_id: 789,
   customer: { id: 1, email: "a@b.com", phone: "+5511999999999", identification: "123" },
@@ -36,6 +42,7 @@ function response() {
 function deps(overrides: Partial<LgpdDeps> = {}): LgpdDeps {
   return {
     storeId: () => "789",
+    tokenRejected: vi.fn(async () => true),
     revokeConnection: vi.fn(async () => {}),
     requestPrivacy: vi.fn(async () => ({ matched: 1 })),
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -57,6 +64,51 @@ describe("classifyLgpdWebhook", () => {
     expect(classifyLgpdWebhook({ customer: {} })).toBeNull();
     expect(classifyLgpdWebhook(null)).toBeNull();
     expect(classifyLgpdWebhook([STORE_REDACT])).toBeNull();
+  });
+});
+
+describe("app/uninstalled", () => {
+  it("is recognised by its event name only", () => {
+    expect(isUninstallWebhook(UNINSTALLED)).toBe(true);
+    expect(isUninstallWebhook({ store_id: 789, event: "order/created", id: 1 })).toBe(false);
+    expect(isUninstallWebhook({ event: "app/uninstalled" })).toBe(false);
+    expect(isUninstallWebhook(STORE_REDACT)).toBe(false);
+  });
+
+  it("disconnects the store once Nuvemshop rejects the token", async () => {
+    const d = deps();
+    const res = response();
+    await handleLgpdWebhook({ headers: verified, body: UNINSTALLED }, res, d);
+    expect(d.revokeConnection).toHaveBeenCalledWith("nuvemshop app/uninstalled");
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("keeps a reinstalled store connected when a late delivery arrives", async () => {
+    const d = deps({ tokenRejected: vi.fn(async () => false) });
+    const res = response();
+    await handleLgpdWebhook({ headers: verified, body: UNINSTALLED }, res, d);
+    expect(d.revokeConnection).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("answers 500 without disconnecting when the token check cannot tell", async () => {
+    const d = deps({ tokenRejected: vi.fn(async () => Promise.reject(new Error("HTTP 503"))) });
+    const res = response();
+    await handleLgpdWebhook({ headers: verified, body: UNINSTALLED }, res, d);
+    expect(d.revokeConnection).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(500);
+  });
+
+  it("ignores an uninstall for another store and an unverified one", async () => {
+    const other = deps({ storeId: () => "111" });
+    await handleLgpdWebhook({ headers: verified, body: UNINSTALLED }, response(), other);
+    expect(other.revokeConnection).not.toHaveBeenCalled();
+
+    const unverified = deps();
+    const res = response();
+    await handleLgpdWebhook({ headers: {}, body: UNINSTALLED }, res, unverified);
+    expect(res.statusCode).toBe(401);
+    expect(unverified.revokeConnection).not.toHaveBeenCalled();
   });
 });
 
