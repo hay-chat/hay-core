@@ -535,6 +535,36 @@ export class OAuthService {
   }
 
   /**
+   * Where to send a merchant who installed the app from the provider's side
+   * (an app store's Install button), so the callback carries a code but no
+   * state of ours.
+   *
+   * That code is never exchanged: without our state nothing ties it to the
+   * person in this browser, so accepting it would let anyone attach a store of
+   * their choosing to whoever follows the link. Instead the merchant goes to
+   * the dashboard's connect link, signs in or signs up there, and the normal
+   * flow (with state) runs against the provider, which has the app approved
+   * already.
+   *
+   * Returns the dashboard path, or null when the plugin cannot be connected by
+   * redirect.
+   */
+  async providerInstallPath(pluginId: string): Promise<string | null> {
+    const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
+    const oauth2Method = plugin?.metadata?.authMethods?.find(
+      (method: AuthMethodDescriptor) => method.type === "oauth2",
+    );
+    if (
+      !oauth2Method?.authorizationUrl ||
+      !oauth2Method.tokenUrl ||
+      oauth2Method.connectFlow === "client"
+    ) {
+      return null;
+    }
+    return `/integrations/plugins/${encodeURIComponent(pluginId)}?connect=1`;
+  }
+
+  /**
    * Handle OAuth callback and exchange code for tokens
    */
   async handleCallback(

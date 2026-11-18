@@ -6,9 +6,19 @@
 import type { HelpCenterTheme } from "@server/database/entities/help-center.entity";
 import type { PublicArticle, PublicArticleSummary, PublicCollection } from "../public-content";
 import { SEARCH_QUERY_MAX_LENGTH } from "../public-content";
-import { html, raw, scriptJson, type HtmlValue, type SafeHtml } from "./html";
+import {
+  html,
+  jsonLd,
+  raw,
+  scriptJson,
+  textExcerpt,
+  truncateText,
+  type HtmlValue,
+  type SafeHtml,
+} from "./html";
 import { htmlLang, siteStrings, type SiteStrings } from "./strings";
-import { SITE_CSS_PATH, themeCss } from "./styles";
+import { GOOGLE_FONTS_ORIGINS } from "./fonts";
+import { bodyClass, heroClass, heroStyle, siteFont, SITE_CSS_PATH, themeCss } from "./styles";
 import { articlePath, collectionPath } from "./urls";
 
 export const PREVIEW_TOKEN_PARAM = "hc_preview";
@@ -25,6 +35,13 @@ export interface SiteView {
   canonicalBase: string;
   theme: HelpCenterTheme;
   logoUrl: string | null;
+  /**
+   * Absolute address of the image link previews show (og:image), or null for
+   * none. Today the organization's logo; a dedicated upload would go here.
+   */
+  socialImageUrl: string | null;
+  /** The hero's background image, when the help center has one. */
+  heroImageUrl: string | null;
   noindex: boolean;
   /** CSP nonce of this response. */
   nonce: string;
@@ -54,10 +71,23 @@ function previewFields(view: SiteView): SafeHtml[] {
   );
 }
 
+const SEARCH_ICON = raw(
+  '<svg class="hc-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="8.75" cy="8.75" r="5.75"/><path d="m13.25 13.25 4 4"/></svg>',
+);
+
+/** The theme's Google Fonts stylesheet, if it has one. Fixed addresses only. */
+function fontLinks(view: SiteView): HtmlValue {
+  const stylesheet = siteFont(view.theme).stylesheet;
+  if (!stylesheet) return null;
+  return html`<link rel="preconnect" href="${GOOGLE_FONTS_ORIGINS.styles}" />
+    <link rel="preconnect" href="${GOOGLE_FONTS_ORIGINS.files}" crossorigin />
+    <link rel="stylesheet" href="${stylesheet}" />`;
+}
+
 function searchForm(view: SiteView, strings: SiteStrings, inputId: string, query = ""): SafeHtml {
   return html`<form class="hc-search" role="search" action="/search" method="get">
     <label class="hc-sr-only" for="${inputId}">${strings.search}</label>
-    <input
+    ${SEARCH_ICON}<input
       type="search"
       id="${inputId}"
       name="q"
@@ -126,10 +156,46 @@ interface PageParts {
   /** Passed to the chat widget so the assistant knows what the visitor is reading. */
   chatContext?: Record<string, string>;
   narrow?: boolean;
+  /** Open Graph type of a page that has a canonical address. */
+  ogType?: "website" | "article";
+  /** Structured data for search engines, one JSON-LD block each. */
+  structuredData?: object[];
+}
+
+/** Meta descriptions longer than this are cut off in search results anyway. */
+const DESCRIPTION_MAX_LENGTH = 160;
+/** Google shows at most this much of an Article's headline. */
+const HEADLINE_MAX_LENGTH = 110;
+const SCHEMA_CONTEXT = "https://schema.org";
+
+function absoluteHttpUrl(value: string | null): string | null {
+  return value && /^https?:\/\//i.test(value) ? value : null;
+}
+
+/** The theme accent for the browser's toolbar, when it is a valid colour. */
+function themeColor(theme: HelpCenterTheme): string | null {
+  const accent: unknown = theme.accentColor;
+  return typeof accent === "string" && /^#[0-9a-fA-F]{6}$/.test(accent) ? accent : null;
+}
+
+/** Link preview tags (Open Graph, read by Twitter/X too), on pages with a canonical address only. */
+function socialTags(view: SiteView, parts: PageParts): HtmlValue {
+  if (!parts.canonicalPath || !view.name) return null;
+  const image = absoluteHttpUrl(view.socialImageUrl);
+  return html`<meta property="og:type" content="${parts.ogType ?? "website"}" />
+    <meta property="og:site_name" content="${view.name}" />
+    <meta property="og:title" content="${parts.title ?? view.name}" />
+    ${parts.description ? html`<meta property="og:description" content="${parts.description}" />` : null}
+    <meta property="og:url" content="${view.canonicalBase}${parts.canonicalPath}" />
+    <meta property="og:locale" content="${htmlLang(view.language).replace("-", "_")}" />
+    ${image ? html`<meta property="og:image" content="${image}" />` : null}
+    <meta name="twitter:card" content="summary" />`;
 }
 
 function page(view: SiteView, strings: SiteStrings, parts: PageParts): string {
   const title = [parts.title, view.name].filter(Boolean).join(" · ");
+  const color = themeColor(view.theme);
+  const icon = absoluteHttpUrl(view.logoUrl);
   const brand = view.name
     ? html`<a class="hc-brand" href="${siteHref(view, "/")}"
         >${view.logoUrl ? html`<img src="${view.logoUrl}" alt="" />` : null}<span
@@ -150,13 +216,23 @@ function page(view: SiteView, strings: SiteStrings, parts: PageParts): string {
             : null
         }
         ${view.noindex || parts.noindex ? html`<meta name="robots" content="noindex" />` : null}
+        ${socialTags(view, parts)}
+        ${color ? html`<meta name="theme-color" content="${color}" />` : null}
         <link rel="icon" href="${view.logoUrl ?? "data:,"}" />
+        ${icon ? html`<link rel="apple-touch-icon" href="${icon}" />` : null}
+        ${
+          // The widget's script, frame and socket all come from the API host: open the
+          // connection while the page is still parsing.
+          view.webchat ? html`<link rel="preconnect" href="${view.webchat.baseUrl}" />` : null
+        }
+        ${fontLinks(view)}
         <link rel="stylesheet" href="${SITE_CSS_PATH}" />
         <style nonce="${view.nonce}">
           ${themeCss(view.theme)}
         </style>
+        ${(parts.structuredData ?? []).map((data) => jsonLd(data))}
       </head>
-      <body>
+      <body class="${bodyClass(view.theme)}">
         <a class="hc-skip" href="#hc-main">${strings.skipToContent}</a>
         <header class="hc-header">
           <div class="hc-wrap">
@@ -198,6 +274,65 @@ function articleLinks(view: SiteView, articles: PublicArticleSummary[]): SafeHtm
   </ul>`;
 }
 
+/** Schema.org BreadcrumbList of the trail to a page, the page itself last. */
+function breadcrumbData(view: SiteView, trail: Array<{ label: string; path: string }>): object {
+  return {
+    "@context": SCHEMA_CONTEXT,
+    "@type": "BreadcrumbList",
+    itemListElement: trail.map((step, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: step.label,
+      item: view.canonicalBase + step.path,
+    })),
+  };
+}
+
+/** Schema.org WebSite, with the site search as its SearchAction. */
+function websiteData(view: SiteView): object {
+  return {
+    "@context": SCHEMA_CONTEXT,
+    "@type": "WebSite",
+    name: view.name,
+    url: `${view.canonicalBase}/`,
+    inLanguage: htmlLang(view.language),
+    potentialAction: {
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: `${view.canonicalBase}/search?q={search_term_string}`,
+      },
+      "query-input": "required name=search_term_string",
+    },
+  };
+}
+
+/** Schema.org Article; the help center's owner is its author and publisher. */
+function articleData(view: SiteView, article: PublicArticle, description: string | null): object {
+  const url = view.canonicalBase + articlePath(article);
+  const image = absoluteHttpUrl(view.socialImageUrl);
+  const organization = {
+    "@type": "Organization",
+    name: view.name,
+    url: `${view.canonicalBase}/`,
+    ...(image ? { logo: image } : {}),
+  };
+  return {
+    "@context": SCHEMA_CONTEXT,
+    "@type": "Article",
+    headline: truncateText(article.title, HEADLINE_MAX_LENGTH) ?? view.name,
+    ...(description ? { description } : {}),
+    url,
+    mainEntityOfPage: url,
+    inLanguage: htmlLang(view.language),
+    datePublished: new Date(article.createdAt).toISOString(),
+    dateModified: new Date(article.updatedAt).toISOString(),
+    ...(image ? { image } : {}),
+    author: organization,
+    publisher: organization,
+  };
+}
+
 function breadcrumb(view: SiteView, trail: Array<{ label: string; path: string }>): SafeHtml {
   return html`<nav class="hc-breadcrumb" aria-label="Breadcrumb">
     <ol>
@@ -208,6 +343,11 @@ function breadcrumb(view: SiteView, trail: Array<{ label: string; path: string }
   </nav>`;
 }
 
+/** A description for a page with none of its own: the titles it lists. */
+function listDescription(titles: string[]): string | null {
+  return truncateText(titles.filter(Boolean).join(" · "), DESCRIPTION_MAX_LENGTH);
+}
+
 function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -215,7 +355,13 @@ function text(value: unknown): string | null {
 export function renderHomePage(view: SiteView, collections: PublicCollection[]): string {
   const strings = siteStrings(view.language);
   const subtitle = text(view.theme.heroSubtitle);
-  const hero = html`<section class="hc-hero">
+  const showImage = heroStyle(view.theme, view.heroImageUrl !== null) === "image";
+  const hero = html`<section class="${heroClass(view.theme, view.heroImageUrl !== null)}">
+    ${
+      showImage
+        ? html`<img class="hc-hero-bg" src="${view.heroImageUrl}" alt="" fetchpriority="high" />`
+        : null
+    }
     <div class="hc-wrap">
       <h1>${text(view.theme.heroTitle) ?? view.name}</h1>
       ${subtitle ? html`<p>${subtitle}</p>` : null} ${searchForm(view, strings, "hc-search")}
@@ -230,7 +376,13 @@ export function renderHomePage(view: SiteView, collections: PublicCollection[]):
             ${collection.icon ? html`<span class="hc-card-icon" aria-hidden="true">${collection.icon}</span>` : null}
             <h2>${collection.title}</h2>
             ${collection.description ? html`<p>${collection.description}</p>` : null}
-            <p class="hc-count">${strings.articleCount(collection.articles.length)}</p>
+            <p class="hc-count">
+              ${strings.articleCount(collection.articles.length)}<span
+                class="hc-arrow"
+                aria-hidden="true"
+                >→</span
+              >
+            </p>
           </a>
         </li>`,
     )}
@@ -251,8 +403,9 @@ export function renderHomePage(view: SiteView, collections: PublicCollection[]):
 
   return page(view, strings, {
     title: null,
-    description: subtitle,
+    description: subtitle ?? listDescription(collections.map((collection) => collection.title)),
     canonicalPath: "/",
+    structuredData: [websiteData(view)],
     hero,
     headerSearch: false,
     main: html`<h2 class="hc-sr-only">${strings.collections}</h2>
@@ -264,8 +417,16 @@ export function renderCollectionPage(view: SiteView, collection: PublicCollectio
   const strings = siteStrings(view.language);
   return page(view, strings, {
     title: collection.title,
-    description: collection.description,
+    description:
+      collection.description ??
+      listDescription(collection.articles.map((article) => article.title)),
     canonicalPath: collectionPath(collection),
+    structuredData: [
+      breadcrumbData(view, [
+        { label: view.name, path: "/" },
+        { label: collection.title, path: collectionPath(collection) },
+      ]),
+    ],
     main: html`${breadcrumb(view, [{ label: view.name, path: "/" }])}
       <h1>
         ${
@@ -282,10 +443,20 @@ export function renderCollectionPage(view: SiteView, collection: PublicCollectio
 export function renderArticlePage(view: SiteView, article: PublicArticle, body: SafeHtml): string {
   const strings = siteStrings(view.language);
   const path = articlePath(article);
+  const description = article.description ?? textExcerpt(body.value, DESCRIPTION_MAX_LENGTH);
   return page(view, strings, {
     title: article.title,
-    description: article.description,
+    description,
     canonicalPath: path,
+    ogType: "article",
+    structuredData: [
+      articleData(view, article, description),
+      breadcrumbData(view, [
+        { label: view.name, path: "/" },
+        { label: article.collection.title, path: collectionPath(article.collection) },
+        { label: article.title, path },
+      ]),
+    ],
     narrow: true,
     main: html`${breadcrumb(view, [
         { label: view.name, path: "/" },

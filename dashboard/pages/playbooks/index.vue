@@ -4,7 +4,12 @@
     <template #header>
       <div class="flex items-center space-x-2">
         <RefreshIndicator :active="refreshing" />
-        <Button variant="outline" size="icon" @click="router.push('/playbooks/new')">
+        <Button
+          variant="outline"
+          size="icon"
+          :aria-label="t('actions.createPlaybook')"
+          @click="router.push('/playbooks/new')"
+        >
           <Plus class="h-4 w-4" />
         </Button>
         <DropdownMenu>

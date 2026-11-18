@@ -10,10 +10,12 @@ import {
 } from "@server/database/entities/help-center.entity";
 import { HelpCenterCollection } from "@server/database/entities/help-center-collection.entity";
 import { Document, DocumentVisibility } from "@server/entities/document.entity";
+import { Upload } from "@server/entities/upload.entity";
 import { deriveServiceKey } from "@server/lib/auth/utils/service-keys";
 import { createLogger } from "@server/lib/logger";
 import { auditLogService } from "@server/services/audit-log.service";
 import { rateLimitService } from "@server/services/rate-limit.service";
+import { storageService } from "@server/services/storage.service";
 import { normalizeDomain } from "@server/services/sso.service";
 import { clearHelpCenterHostCache, isPlatformHostname } from "./host-resolver";
 import {
@@ -73,6 +75,17 @@ function isUniqueViolation(error: unknown): boolean {
 /** The stored theme with defaults filled in. */
 export function resolveTheme(theme: Partial<HelpCenterTheme> | null | undefined): HelpCenterTheme {
   return { ...DEFAULT_HELP_CENTER_THEME, ...(theme ?? {}) };
+}
+
+/** Public address of the help center's hero image, or null when it has none. */
+export async function heroImageUrl(
+  helpCenter: Pick<HelpCenter, "heroImageUploadId" | "organizationId">,
+): Promise<string | null> {
+  if (!helpCenter.heroImageUploadId) return null;
+  const upload = await Upload.findOne({
+    where: { id: helpCenter.heroImageUploadId, organizationId: helpCenter.organizationId },
+  });
+  return upload ? storageService.getUrl(upload) : null;
 }
 
 /** The DNS records that prove control of a custom domain. Either one is enough. */
@@ -142,7 +155,7 @@ export class HelpCenterService {
   }
 
   /** What the dashboard shows for a help center. */
-  view(helpCenter: HelpCenter) {
+  async view(helpCenter: HelpCenter) {
     return {
       id: helpCenter.id,
       name: helpCenter.name,
@@ -151,6 +164,7 @@ export class HelpCenterService {
       isPublished: helpCenter.isPublished,
       searchIndexing: helpCenter.searchIndexing,
       theme: resolveTheme(helpCenter.theme),
+      heroImageUrl: await heroImageUrl(helpCenter),
       defaultUrl: defaultUrl(helpCenter),
       url: canonicalUrl(helpCenter),
       customDomain: helpCenter.customDomain
@@ -257,27 +271,51 @@ export class HelpCenterService {
     },
   ): Promise<HelpCenter> {
     const helpCenter = await this.require(organizationId);
-    if (input.name !== undefined) helpCenter.name = input.name;
-    if (input.defaultLanguage !== undefined) helpCenter.defaultLanguage = input.defaultLanguage;
-    if (input.searchIndexing !== undefined) helpCenter.searchIndexing = input.searchIndexing;
-    if (input.theme !== undefined) helpCenter.theme = { ...helpCenter.theme, ...input.theme };
+    const changes: Partial<
+      Pick<HelpCenter, "name" | "defaultLanguage" | "searchIndexing" | "theme" | "subdomain">
+    > = {};
+    if (input.name !== undefined) changes.name = input.name;
+    if (input.defaultLanguage !== undefined) changes.defaultLanguage = input.defaultLanguage;
+    if (input.searchIndexing !== undefined) changes.searchIndexing = input.searchIndexing;
+    if (input.theme !== undefined) changes.theme = { ...helpCenter.theme, ...input.theme };
     if (input.subdomain !== undefined) {
       const subdomain = await this.assertSubdomainFree(input.subdomain, organizationId);
       if (subdomain !== helpCenter.subdomain) {
         await this.assertMayRename(organizationId);
-        helpCenter.subdomain = subdomain;
+        changes.subdomain = subdomain;
       }
     }
-    try {
-      await this.helpCenters.save(helpCenter);
-    } catch (error) {
-      if (isUniqueViolation(error)) {
-        throw new TRPCError({ code: "CONFLICT", message: "That address is already taken" });
+    // Only the columns this call sets: the address checks above can be slow, and a
+    // whole-entity save would write back anything else that changed meanwhile.
+    if (Object.keys(changes).length > 0) {
+      try {
+        await this.helpCenters.update({ id: helpCenter.id, organizationId }, changes);
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({ code: "CONFLICT", message: "That address is already taken" });
+        }
+        throw error;
       }
-      throw error;
     }
     clearHelpCenterHostCache();
-    return helpCenter;
+    return this.require(organizationId);
+  }
+
+  /** Set (or with null, remove) the hero image, deleting the one it replaces. */
+  async setHeroImage(organizationId: string, uploadId: string | null): Promise<HelpCenter> {
+    const helpCenter = await this.require(organizationId);
+    const previous = helpCenter.heroImageUploadId;
+    await this.helpCenters.update(
+      { id: helpCenter.id, organizationId },
+      { heroImageUploadId: uploadId },
+    );
+    if (previous && previous !== uploadId) {
+      await storageService.delete(previous).catch((error: unknown) => {
+        logger.warn({ err: error }, "Failed to delete a replaced help center hero image");
+      });
+    }
+    clearHelpCenterHostCache();
+    return this.require(organizationId);
   }
 
   async setPublished(

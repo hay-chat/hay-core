@@ -362,12 +362,28 @@ async function startServer() {
   const pluginProxyRouter = require("@server/routes/v1/plugins/proxy").default;
   server.use("/v1/plugins", pluginProxyRouter);
 
-  // OAuth callback route - handle OAuth redirects from providers
-  server.get("/oauth/callback", async (req, res) => {
+  // OAuth callback route - handle OAuth redirects from providers.
+  // `/oauth/callback/<pluginId>` is the redirect URL to register with a provider
+  // whose app store can start the install itself: that callback has no state,
+  // so the path is the only thing naming the plugin.
+  server.get(["/oauth/callback", "/oauth/callback/:pluginId"], async (req, res) => {
     logger.debug("OAuth callback endpoint hit");
 
     const { oauthService } = await import("@server/services/oauth.service");
     const { getDashboardUrl } = await import("@server/config/env");
+
+    if (req.query.code && !req.query.state && !req.query.error && req.params.pluginId) {
+      try {
+        const installPath = await oauthService.providerInstallPath(req.params.pluginId);
+        if (installPath) {
+          logger.info({ pluginId: req.params.pluginId }, "Provider-started install, handing off");
+          return res.redirect(`${getDashboardUrl()}${installPath}`);
+        }
+      } catch (error) {
+        logger.error({ err: error }, "Provider-started install lookup failed");
+      }
+      // Unknown plugin or lookup failure: fall through to the invalid-state error.
+    }
 
     // HTML-encode a string to prevent XSS in rendered HTML
     const escapeHtml = (str: string) =>

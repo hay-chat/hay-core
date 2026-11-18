@@ -67,3 +67,54 @@ export function scriptJson(value: unknown): SafeHtml {
       .replace(/\u2029/g, "\\u2029"),
   );
 }
+
+/**
+ * A `<script type="application/ld+json">` block. A data block is never run,
+ * so the page's CSP does not apply to it and it needs no nonce.
+ */
+export function jsonLd(value: unknown): SafeHtml {
+  return new SafeHtml(`<script type="application/ld+json">${scriptJson(value).value}</script>`);
+}
+
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+};
+
+function decodeEntity(entity: string, body: string): string {
+  if (body[0] !== "#") return NAMED_ENTITIES[body.toLowerCase()] ?? entity;
+  const code =
+    body[1] === "x" || body[1] === "X" ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+  return Number.isInteger(code) && code > 0 && code <= 0x10ffff
+    ? String.fromCodePoint(code)
+    : entity;
+}
+
+/**
+ * Plain text with whitespace collapsed, cut to `maxLength` characters at a
+ * word boundary; null when there is no text.
+ */
+export function truncateText(value: string, maxLength: number): string | null {
+  const text = value.replace(/\s+/g, " ").trim();
+  if (!text) return null;
+  if (text.length <= maxLength) return text;
+  const cut = text.slice(0, maxLength - 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > maxLength / 2 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:.·-]+$/, "")}…`;
+}
+
+/**
+ * The text of sanitised markup, truncated: a meta description for a page that
+ * has none of its own. Plain text, so it must still go through `html` to
+ * reach a page.
+ */
+export function textExcerpt(markup: string, maxLength: number): string | null {
+  return truncateText(
+    markup.replace(/<[^>]*>/g, " ").replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, decodeEntity),
+    maxLength,
+  );
+}

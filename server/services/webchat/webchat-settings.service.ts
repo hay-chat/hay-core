@@ -273,6 +273,30 @@ export class WebchatSettingsService {
   }
 
   /**
+   * The organization's brand as the website import (or the merchant) set it
+   * for the chat widget: the brand colour (null while it is still the
+   * default), the website's palette and the logo. Starts the import when it
+   * never ran, so a later read has it.
+   */
+  async brand(
+    organizationId: string,
+  ): Promise<{ color: string | null; palette: string[]; logoUrl: string | null }> {
+    const settings = await this.getSettings(organizationId);
+    this.importBrandingIfNeverDone(settings);
+    return {
+      color: settings.brandColorSource ? settings.brandColor : null,
+      palette: settings.brandPalette ?? [],
+      logoUrl: await uploadUrl(settings.logoUploadId),
+    };
+  }
+
+  /** The chat widget's logo (usually the website's icon), or null. */
+  async logoUrl(organizationId: string): Promise<string | null> {
+    const settings = await webchatSettingsRepository.findByOrganizationId(organizationId);
+    return await uploadUrl(settings?.logoUploadId ?? null);
+  }
+
+  /**
    * Check if webchat is enabled for an organization
    */
   async isEnabled(organizationId: string): Promise<boolean> {

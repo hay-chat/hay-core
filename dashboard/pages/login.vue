@@ -204,6 +204,17 @@
             {{ verificationResent ? $t("login.verificationSent") : $t("login.resendVerification") }}
           </Button>
         </div>
+
+        <!-- New here (e.g. arriving from an app store install): keep the destination -->
+        <p class="text-sm text-center text-neutral-muted">
+          {{ $t("login.noAccount") }}
+          <NuxtLink
+            :to="{ path: '/signup', query: signupQuery }"
+            class="text-primary hover:text-primary/80 font-medium"
+          >
+            {{ $t("login.createAccount") }}
+          </NuxtLink>
+        </p>
       </form>
     </div>
   </NuxtLayout>
@@ -231,6 +242,9 @@ const authStore = useAuthStore();
 
 // Get redirect URL from query params
 const redirectUrl = computed(() => safeInternalPath(route.query.redirect));
+const signupQuery = computed(() =>
+  redirectUrl.value === "/" ? {} : { redirect: redirectUrl.value },
+);
 
 // Invitation context
 interface InvitationContext {
