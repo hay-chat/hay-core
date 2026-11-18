@@ -40,6 +40,7 @@ import {
   type NuvemshopCredentials,
 } from "./connection.js";
 import { handleLgpdWebhook } from "./lgpd.js";
+import { ensureUninstallWebhook, uninstallWebhookUrl } from "./uninstall-webhook.js";
 import { pluginApiMutation } from "./plugin-api.js";
 import type {
   CanonicalProduct,
@@ -55,8 +56,10 @@ const DEFAULT_API_VERSION = "2025-03";
 // the merchant sets one (stores price in BRL, ARS, MXN… so no universal number).
 const DEFAULT_COUPON_MAX_PERCENT = 10;
 const DEFAULT_COUPON_MAX_DAYS = 30;
-// Mandatory on every request — Nuvemshop returns 400 without it.
-const USER_AGENT = "Hay (https://hay.chat)";
+// Mandatory on every request (400 without it): the app's name and a contact
+// address, which the app-store review checks for.
+const USER_AGENT = "Hay.chat (support@hay.chat)";
+const PLUGIN_ID = "hay-plugin-nuvemshop";
 
 /** A Nuvemshop i18n field: {"es": "...", "pt": "...", "en": "..."} or a plain string. */
 type I18nField = string | Record<string, string> | null | undefined;
@@ -101,20 +104,26 @@ async function nuvemshopFetch<T>(
   creds: NuvemshopCredentials,
   apiVersion: string,
   path: string,
+  /** A JSON body makes this a POST. */
+  body?: unknown,
 ): Promise<T> {
   const url = `${API_HOST}/${apiVersion}/${creds.storeId}${path}`;
+  const method = body === undefined ? "GET" : "POST";
   const res = await fetch(url, {
+    method,
     headers: {
       Authentication: `bearer ${creds.accessToken}`,
       "User-Agent": USER_AGENT,
       Accept: "application/json",
+      ...(body === undefined ? {} : { "Content-Type": "application/json; charset=utf-8" }),
     },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     const reset = Number(res.headers.get("x-rate-limit-reset"));
     throw new NuvemshopHttpError(
-      `Nuvemshop GET ${path} failed (HTTP ${res.status}): ${text.slice(0, 200)}`,
+      `Nuvemshop ${method} ${path} failed (HTTP ${res.status}): ${text.slice(0, 200)}`,
       res.status,
       Number.isFinite(reset) && reset > 0 ? reset : undefined,
     );
@@ -434,6 +443,7 @@ function staleTrackingEnv(config: {
 export default defineHayPlugin((globalCtx) => {
   /** This org's connected store id, set by onStart (read by the LGPD webhook). */
   let connectedStoreId: string | undefined;
+  let connected: { creds: NuvemshopCredentials; apiVersion: string } | undefined;
 
   return {
     name: "Nuvemshop",
@@ -593,6 +603,17 @@ export default defineHayPlugin((globalCtx) => {
       ctx.register.route("POST", "/webhook", { public: true }, (req, res) =>
         handleLgpdWebhook(req, res, {
           storeId: () => connectedStoreId,
+          tokenRejected: async () => {
+            // No credentials in this worker means there is nothing left to keep.
+            if (!connected) return true;
+            try {
+              await nuvemshopFetch(connected.creds, connected.apiVersion, "/store");
+              return false;
+            } catch (error) {
+              if (error instanceof NuvemshopHttpError && error.status === 401) return true;
+              throw error;
+            }
+          },
           revokeConnection: async (reason) => {
             await pluginApiMutation("connection.revoke", { reason });
           },
@@ -622,17 +643,39 @@ export default defineHayPlugin((globalCtx) => {
 
       let label: string | undefined;
       if (accessToken) {
+        const creds = { storeId, accessToken };
+        const apiVersion = ctx.config.getOptional<string>("apiVersion") || DEFAULT_API_VERSION;
         try {
-          const store = await nuvemshopFetch<NuvemshopStore>(
-            { storeId, accessToken },
-            ctx.config.getOptional<string>("apiVersion") || DEFAULT_API_VERSION,
-            "/store",
-          );
+          const store = await nuvemshopFetch<NuvemshopStore>(creds, apiVersion, "/store");
           label = pickLang(store.name, store.main_language ?? "pt");
         } catch (error) {
           ctx.logger.warn("Nuvemshop connect: could not read the store name", {
             error: error instanceof Error ? error.message : String(error),
           });
+        }
+
+        // So an uninstall disconnects the store here right away. Without it the
+        // store only disconnects on store/redact, which Nuvemshop sends later.
+        const webhookUrl = uninstallWebhookUrl(process.env.HAY_PUBLIC_URL, PLUGIN_ID);
+        if (!webhookUrl) {
+          ctx.logger.warn(
+            "Nuvemshop connect: no public HTTPS URL; app/uninstalled webhook not registered",
+          );
+        } else {
+          try {
+            const created = await ensureUninstallWebhook(
+              {
+                get: (path) => nuvemshopFetch(creds, apiVersion, path),
+                post: (path, body) => nuvemshopFetch(creds, apiVersion, path, body),
+              },
+              webhookUrl,
+            );
+            ctx.logger.info("Nuvemshop connect: app/uninstalled webhook ready", { created });
+          } catch (error) {
+            ctx.logger.warn("Nuvemshop connect: could not register app/uninstalled webhook", {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
         }
       }
 
@@ -695,6 +738,7 @@ export default defineHayPlugin((globalCtx) => {
       }
       connectedStoreId = creds.storeId;
       const apiVersion = ctx.config.getOptional<string>("apiVersion") || DEFAULT_API_VERSION;
+      connected = { creds, apiVersion };
 
       // Best-effort store lookup: the store's main language localizes i18n fields
       // ({es, pt, en} objects) for the agent, and main currency stamps the catalog.

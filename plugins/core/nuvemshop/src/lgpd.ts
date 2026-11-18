@@ -29,6 +29,12 @@
  * Both are idempotent while the job is in flight, so a retried delivery does
  * not queue a second job.
  *
+ * The same URL also receives `app/uninstalled` ({ store_id, event, id }), which
+ * the plugin registers per store on connect (./uninstall-webhook.ts). It
+ * disconnects the store too, but only once Nuvemshop itself rejects the stored
+ * token: deliveries are retried for up to 48 hours and may arrive out of
+ * order, so a late one can land after the merchant has reinstalled.
+ *
  * @see https://tiendanube.github.io/api-documentation/resources/webhook
  */
 
@@ -64,9 +70,18 @@ export interface PrivacySubject {
   reference?: string;
 }
 
+/** True for the `app/uninstalled` store webhook. */
+export function isUninstallWebhook(body: unknown): boolean {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return false;
+  const payload = body as Record<string, unknown>;
+  return payload.event === "app/uninstalled" && payload.store_id != null;
+}
+
 export interface LgpdDeps {
   /** This org's store id, when known (a body for another store is ignored). */
   storeId: () => string | undefined;
+  /** Whether Nuvemshop now rejects this org's stored token (401). Throws when it cannot tell. */
+  tokenRejected: () => Promise<boolean>;
   /** Ask core to disconnect this org's store. */
   revokeConnection: (reason: string) => Promise<void>;
   /** Ask core to erase or export the matching customers (core's privacy.* plugin-api). */
@@ -96,7 +111,8 @@ export async function handleLgpdWebhook(
     return;
   }
 
-  const kind = classifyLgpdWebhook(req.body);
+  const uninstall = isUninstallWebhook(req.body);
+  const kind = uninstall ? "app/uninstalled" : classifyLgpdWebhook(req.body);
   if (!kind) {
     res.status(200).json({ received: true, handled: false });
     return;
@@ -106,8 +122,31 @@ export async function handleLgpdWebhook(
   const storeId = String(payload.store_id);
   const ownStoreId = deps.storeId();
   if (ownStoreId && ownStoreId !== storeId) {
-    deps.logger.warn("Nuvemshop LGPD webhook for another store; ignored", { kind, storeId });
+    deps.logger.warn("Nuvemshop webhook for another store; ignored", { kind, storeId });
     res.status(200).json({ received: true, handled: false });
+    return;
+  }
+
+  if (kind === "app/uninstalled") {
+    try {
+      if (!(await deps.tokenRejected())) {
+        deps.logger.info("Nuvemshop app/uninstalled: the token still works; kept connected", {
+          storeId,
+        });
+        res.status(200).json({ received: true, handled: false });
+        return;
+      }
+      await deps.revokeConnection("nuvemshop app/uninstalled");
+      deps.logger.info("Nuvemshop app/uninstalled: store disconnected", { storeId });
+      res.status(200).json({ received: true, handled: true });
+    } catch (error) {
+      deps.logger.error("Nuvemshop app/uninstalled: disconnect failed", {
+        storeId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // 5xx makes Nuvemshop retry; the check and the revoke are both repeatable.
+      res.status(500).json({ error: "disconnect failed" });
+    }
     return;
   }
 

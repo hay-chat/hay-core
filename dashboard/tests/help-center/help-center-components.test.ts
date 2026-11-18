@@ -13,6 +13,7 @@ import HelpCenterContentTab from "../../components/help-center/HelpCenterContent
 import HelpCenterDomainTab from "../../components/help-center/HelpCenterDomainTab.vue";
 import HelpCenterAppearanceTab from "../../components/help-center/HelpCenterAppearanceTab.vue";
 import HelpCenterThemeFields from "../../components/help-center/HelpCenterThemeFields.vue";
+import { HELP_CENTER_PRESETS } from "../../utils/help-center";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -266,6 +267,7 @@ describe("help center appearance", () => {
         modelValue: { ...theme, accentColor: "#ff8800" },
         dirty: true,
         previewLink: { baseUrl: `https://acme.${BASE_DOMAIN}`, token: "123.sig" },
+        helpCenter: helpCenter(),
       },
     });
 
@@ -282,11 +284,142 @@ describe("help center appearance", () => {
 
   it("shows a placeholder when there is no preview link", () => {
     const wrapper = mountWithStubs(HelpCenterAppearanceTab, {
-      props: { modelValue: theme, dirty: false, previewLink: null },
+      props: { modelValue: theme, dirty: false, previewLink: null, helpCenter: helpCenter() },
     });
 
     expect(wrapper.find('[data-testid="preview-frame"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="preview-placeholder"]').exists()).toBe(true);
+  });
+
+  describe("preview size", () => {
+    let resize: (width: number) => void = () => undefined;
+    beforeEach(() => {
+      vi.stubGlobal(
+        "ResizeObserver",
+        class {
+          constructor(callback: ResizeObserverCallback) {
+            resize = (width) =>
+              callback(
+                [{ contentRect: { width } } as ResizeObserverEntry],
+                this as unknown as ResizeObserver,
+              );
+          }
+          observe() {}
+          unobserve() {}
+          disconnect() {}
+        },
+      );
+    });
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("lays the site out at a real device width and shrinks it to fit the card", async () => {
+      const wrapper = mountWithStubs(HelpCenterAppearanceTab, {
+        props: {
+          modelValue: theme,
+          dirty: false,
+          previewLink: { baseUrl: `https://acme.${BASE_DOMAIN}`, token: "123.sig" },
+          helpCenter: helpCenter(),
+        },
+      });
+      resize(652); // 640 px for the page once the frame's border is taken off
+      await nextTick();
+
+      const frame = wrapper.find('[data-testid="preview-frame"]');
+      expect(frame.attributes("style")).toContain("width: 1280px");
+      expect(frame.attributes("style")).toContain("height: 800px");
+      expect(frame.attributes("style")).toContain("transform: scale(0.5)");
+      expect(wrapper.find('[data-testid="preview-viewport"]').attributes("style")).toContain(
+        "width: 642px",
+      );
+      expect(wrapper.text()).toContain(`acme.${BASE_DOMAIN}`);
+
+      // A phone is laid out at 390 px and kept short enough to sit beside the settings.
+      const mobile = wrapper
+        .findAll("button")
+        .find((button) => button.text().includes("helpCenter.appearance.mobile"))!;
+      await mobile.trigger("click");
+      const phone = wrapper.find('[data-testid="preview-frame"]').attributes("style");
+      expect(phone).toContain("width: 390px");
+      expect(phone).toContain(`transform: scale(${600 / 844})`);
+      expect(frame.attributes("title")).toBe("helpCenter.appearance.previewFrameTitle");
+    });
+  });
+
+  it("applies a preset in one click, keeping the accent colour and hero text", async () => {
+    const own = { ...theme, accentColor: "#ff8800", heroTitle: "Hi" };
+    const wrapper = mountWithStubs(HelpCenterThemeFields, { props: { modelValue: own } });
+    const radio = (id: string) => wrapper.find(`[data-testid="preset-${id}"] input`);
+    expect((radio("classic").element as HTMLInputElement).checked).toBe(true);
+
+    await radio("midnight").trigger("change");
+    const midnight = HELP_CENTER_PRESETS.find((preset) => preset.id === "midnight")!;
+    const applied = wrapper.emitted("update:modelValue")!.at(-1)![0];
+    expect(applied).toEqual({ ...own, ...midnight.style });
+    expect(applied).toMatchObject({ accentColor: "#ff8800", heroTitle: "Hi", colorScheme: "dark" });
+
+    // Once a setting is changed the theme is no longer that preset, and says where it came from.
+    await wrapper.setProps({ modelValue: { ...(applied as object), font: "mono" } });
+    expect(wrapper.findAll('[data-testid^="preset-"] input:checked')).toHaveLength(0);
+    expect(wrapper.find('[data-testid="preset-status"]').text()).toContain(
+      "helpCenter.theme.presetCustomised",
+    );
+    expect(wrapper.find('[data-testid="preset-status"]').text()).toContain(
+      "helpCenter.theme.presetNames.midnight",
+    );
+  });
+
+  it("shows the gradient settings only for a gradient hero, and warns when no text colour reads", async () => {
+    const wrapper = mountWithStubs(HelpCenterThemeFields, {
+      props: { modelValue: theme, extended: true },
+    });
+    expect(wrapper.find("#hc-gradient-from").exists()).toBe(false);
+
+    await wrapper.find('[data-testid="hero-style-gradient"] input').trigger("change");
+    expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([
+      { ...theme, heroStyle: "gradient" },
+    ]);
+    await wrapper.setProps({
+      modelValue: {
+        ...theme,
+        heroStyle: "gradient",
+        heroGradientFrom: "#ffffff",
+        heroGradientTo: "#000000",
+      },
+    });
+    expect(wrapper.find("#hc-gradient-from").exists()).toBe(true);
+    expect(wrapper.find('[data-testid="gradient-contrast-warning"]').exists()).toBe(true);
+
+    await wrapper.setProps({ modelValue: { ...theme, heroStyle: "gradient" } });
+    expect(wrapper.find('[data-testid="gradient-contrast-warning"]').exists()).toBe(false);
+  });
+
+  it("uploads a hero image straight away and reloads the preview", async () => {
+    const withImage = helpCenter({ heroImageUrl: "https://api.example.com/uploads/hero.png" });
+    api.uploadHeroImage.mockResolvedValue(withImage);
+    const wrapper = mountWithStubs(HelpCenterAppearanceTab, {
+      props: {
+        modelValue: { ...theme, heroStyle: "image" },
+        dirty: true,
+        previewLink: { baseUrl: `https://acme.${BASE_DOMAIN}`, token: "123.sig" },
+        helpCenter: helpCenter(),
+      },
+    });
+    expect(wrapper.text()).toContain("helpCenter.theme.heroImageMissing");
+
+    const input = wrapper.find<HTMLInputElement>("#hc-hero-image");
+    const file = new File(["png"], "hero.png", { type: "image/png" });
+    Object.defineProperty(input.element, "files", { value: [file] });
+    await input.trigger("change");
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushPromises();
+
+    expect(api.uploadHeroImage).toHaveBeenCalledWith({
+      image: expect.stringMatching(/^data:image\/png;base64,/),
+    });
+    // The image is saved; the unsaved theme stays a draft.
+    expect(wrapper.emitted("changed")).toEqual([[withImage]]);
+    expect(wrapper.emitted("updated")).toBeUndefined();
   });
 
   it("warns about a light accent colour and ignores a half-typed one", async () => {
@@ -302,6 +435,21 @@ describe("help center appearance", () => {
     await wrapper.find("#hc-accent-hex").setValue("#123ABC");
     expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([
       { ...theme, accentColor: "#123abc" },
+    ]);
+  });
+
+  it("offers the website's colours as one-click swatches", async () => {
+    const plain = mountWithStubs(HelpCenterThemeFields, { props: { modelValue: theme } });
+    expect(plain.find('[data-testid="accent-swatch"]').exists()).toBe(false);
+
+    const wrapper = mountWithStubs(HelpCenterThemeFields, {
+      props: { modelValue: theme, brandColors: ["#e11d48", "#0f172a"] },
+    });
+    const swatches = wrapper.findAll('[data-testid="accent-swatch"]');
+    expect(swatches).toHaveLength(2);
+    await swatches[1]!.trigger("click");
+    expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([
+      { ...theme, accentColor: "#0f172a" },
     ]);
   });
 });
