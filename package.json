@@ -91,6 +91,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.7",
     "eslint-plugin-vue": "^10.12.0",
+    "jsdom": "^31.0.1",
     "prettier": "^3.9.10",
     "prettier-plugin-vue": "^1.1.6",
     "ts-jest": "^29.4.6",

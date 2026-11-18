@@ -103,7 +103,6 @@
   },
   "devDependencies": {
     "@types/adm-zip": "^0.6.0",
-    "@types/amqplib": "^0.10.8",
     "@types/archiver": "^7.0.0",
     "@types/bcrypt": "^6.0.0",
     "@types/cheerio": "^1.0.0",
