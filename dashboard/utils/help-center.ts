@@ -1,6 +1,7 @@
 import type { RouterOutputs } from "@/types/trpc";
 
 export type HelpCenterState = RouterOutputs["helpCenter"]["get"];
+export type HelpCenterBrand = HelpCenterState["brand"];
 export type HelpCenterView = NonNullable<HelpCenterState["helpCenter"]>;
 export type HelpCenterTheme = HelpCenterView["theme"];
 export type HelpCenterCollection = RouterOutputs["helpCenter"]["listCollections"][number];
@@ -27,29 +28,215 @@ export interface HelpCenterCollectionDraft {
  * The theme a new help center starts with. Mirrors DEFAULT_HELP_CENTER_THEME on the
  * server, which the API only returns once a help center exists.
  */
+/** The website's colours, brand colour first, each once. */
+export function brandColors(brand: HelpCenterBrand | null | undefined): string[] {
+  if (!brand) return [];
+  const colors = [brand.color, ...brand.palette].filter(
+    (color): color is string => typeof color === "string" && isHexColor(color),
+  );
+  return [...new Set(colors.map((color) => color.toLowerCase()))];
+}
+
+/** The theme a new help center starts with: the default, in the brand's colour when there is one. */
+export function initialTheme(brand: HelpCenterBrand | null | undefined): HelpCenterTheme {
+  const color = brand?.color && isHexColor(brand.color) ? brand.color.toLowerCase() : null;
+  return color
+    ? { ...DEFAULT_HELP_CENTER_THEME, accentColor: color, heroGradientFrom: color }
+    : { ...DEFAULT_HELP_CENTER_THEME };
+}
+
 export const DEFAULT_HELP_CENTER_THEME: HelpCenterTheme = {
   accentColor: "#2747d6",
   font: "sans",
   layout: "cards",
+  colorScheme: "auto",
+  corners: "rounded",
+  heroStyle: "solid",
+  heroAlign: "center",
+  heroGradientFrom: "#2747d6",
+  heroGradientTo: "#142a8c",
+  heroGradientDirection: "diagonal",
+  heroOverlay: "medium",
   heroTitle: null,
   heroSubtitle: null,
   showPoweredBy: true,
 };
 
+const SYSTEM_SANS =
+  'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+
 /**
- * The site's font stacks (FONT_STACKS in server/services/help-center/render/styles.ts),
- * so each font option can be shown in its own typeface.
+ * The site's heading typefaces (SITE_FONTS in server/services/help-center/render/fonts.ts),
+ * so each font option and preset thumbnail can be shown in its own typeface.
  */
 export const HELP_CENTER_FONT_STACKS: Record<HelpCenterTheme["font"], string> = {
-  sans: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-  serif: 'Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif',
-  rounded:
-    'ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", system-ui, sans-serif',
-  mono: 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
+  sans: `"Instrument Sans", ${SYSTEM_SANS}`,
+  serif: 'Newsreader, Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif',
+  rounded: `Nunito, ${SYSTEM_SANS}`,
+  mono: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+  system: SYSTEM_SANS,
 };
-export const HELP_CENTER_FONTS: HelpCenterTheme["font"][] = ["sans", "serif", "rounded", "mono"];
+export const HELP_CENTER_FONTS: HelpCenterTheme["font"][] = [
+  "sans",
+  "serif",
+  "rounded",
+  "mono",
+  "system",
+];
+
+/** One Google Fonts stylesheet with every typeface the font picker shows. */
+export const HELP_CENTER_FONTS_STYLESHEET =
+  "https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700" +
+  "&family=Newsreader:opsz,wght@6..72,400..700&family=Nunito:wght@400..800" +
+  "&family=JetBrains+Mono:wght@500..700&display=swap";
 
 export const HELP_CENTER_LAYOUTS: HelpCenterTheme["layout"][] = ["cards", "list"];
+export const HELP_CENTER_COLOR_SCHEMES: HelpCenterTheme["colorScheme"][] = [
+  "auto",
+  "light",
+  "dark",
+];
+export const HELP_CENTER_CORNERS: HelpCenterTheme["corners"][] = ["sharp", "rounded", "pill"];
+export const HELP_CENTER_HERO_STYLES: HelpCenterTheme["heroStyle"][] = [
+  "solid",
+  "gradient",
+  "tint",
+  "image",
+  "plain",
+];
+export const HELP_CENTER_HERO_ALIGNS: HelpCenterTheme["heroAlign"][] = ["center", "left"];
+export const HELP_CENTER_HERO_OVERLAYS: HelpCenterTheme["heroOverlay"][] = [
+  "light",
+  "medium",
+  "strong",
+];
+
+/** The site's gradient angles (GRADIENT_ANGLES in server/services/help-center/render/styles.ts). */
+export const HELP_CENTER_GRADIENT_ANGLES: Record<HelpCenterTheme["heroGradientDirection"], string> =
+  { diagonal: "135deg", right: "90deg", down: "180deg" };
+export const HELP_CENTER_GRADIENT_DIRECTIONS = Object.keys(
+  HELP_CENTER_GRADIENT_ANGLES,
+) as HelpCenterTheme["heroGradientDirection"][];
+
+/** The settings a preset sets. The accent colour and the hero text stay the customer's own. */
+export type HelpCenterPresetStyle = Partial<
+  Pick<
+    HelpCenterTheme,
+    | "font"
+    | "layout"
+    | "colorScheme"
+    | "corners"
+    | "heroStyle"
+    | "heroAlign"
+    | "heroGradientFrom"
+    | "heroGradientTo"
+    | "heroGradientDirection"
+  >
+>;
+
+export interface HelpCenterPreset {
+  id: "classic" | "aurora" | "minimal" | "midnight" | "editorial" | "playful";
+  style: HelpCenterPresetStyle;
+}
+
+/**
+ * Ready-made looks, applied in one click and then adjustable. Gradient stops are chosen so
+ * the hero text passes 4.5:1 on both. Every preset sets the same core settings, so picking
+ * one fully replaces the look of another.
+ */
+export const HELP_CENTER_PRESETS: HelpCenterPreset[] = [
+  {
+    id: "classic",
+    style: {
+      font: "sans",
+      layout: "cards",
+      colorScheme: "auto",
+      corners: "rounded",
+      heroStyle: "solid",
+      heroAlign: "center",
+    },
+  },
+  {
+    id: "aurora",
+    style: {
+      font: "sans",
+      layout: "cards",
+      colorScheme: "auto",
+      corners: "rounded",
+      heroStyle: "gradient",
+      heroAlign: "center",
+      heroGradientFrom: "#0c3f4d",
+      heroGradientTo: "#1a7a63",
+      heroGradientDirection: "diagonal",
+    },
+  },
+  {
+    id: "minimal",
+    style: {
+      font: "sans",
+      layout: "cards",
+      colorScheme: "light",
+      corners: "rounded",
+      heroStyle: "plain",
+      heroAlign: "left",
+    },
+  },
+  {
+    id: "midnight",
+    style: {
+      font: "sans",
+      layout: "cards",
+      colorScheme: "dark",
+      corners: "rounded",
+      heroStyle: "gradient",
+      heroAlign: "center",
+      heroGradientFrom: "#0b1026",
+      heroGradientTo: "#1c2a5a",
+      heroGradientDirection: "down",
+    },
+  },
+  {
+    id: "editorial",
+    style: {
+      font: "serif",
+      layout: "list",
+      colorScheme: "auto",
+      corners: "sharp",
+      heroStyle: "tint",
+      heroAlign: "left",
+    },
+  },
+  {
+    id: "playful",
+    style: {
+      font: "rounded",
+      layout: "cards",
+      colorScheme: "auto",
+      corners: "pill",
+      heroStyle: "gradient",
+      heroAlign: "center",
+      heroGradientFrom: "#bbf7d0",
+      heroGradientTo: "#bae6fd",
+      heroGradientDirection: "right",
+    },
+  },
+];
+
+/** The theme with the preset's look; accent colour, hero text and footer are kept. */
+export function applyPreset(theme: HelpCenterTheme, preset: HelpCenterPreset): HelpCenterTheme {
+  return { ...theme, ...preset.style };
+}
+
+/** The preset whose every setting the theme has, if any. */
+export function matchingPreset(theme: HelpCenterTheme): HelpCenterPreset | null {
+  return (
+    HELP_CENTER_PRESETS.find((preset) =>
+      Object.entries(preset.style).every(
+        ([key, value]) => String(theme[key as keyof HelpCenterPresetStyle]).toLowerCase() === value,
+      ),
+    ) ?? null
+  );
+}
 
 /** A short starting set for collection icons; any emoji can be typed instead. */
 export const COLLECTION_EMOJI = [
@@ -105,6 +292,19 @@ export function contrastRatio(first: string, second: string): number {
 /** WCAG AA for normal-size text. */
 export const MIN_TEXT_CONTRAST = 4.5;
 
+/**
+ * Black or white, whichever reads better on all the colours (the stops of a gradient), as
+ * the site picks it (readableTextOn in server/services/help-center/render/styles.ts), with
+ * its contrast on the worst of them.
+ */
+export function readableTextOn(...colors: string[]): { color: string; contrast: number } {
+  const worst = (text: string) => Math.min(...colors.map((color) => contrastRatio(color, text)));
+  const [black, white] = [worst("#000000"), worst("#ffffff")];
+  return black >= white
+    ? { color: "#000000", contrast: black }
+    : { color: "#ffffff", contrast: white };
+}
+
 /** Unpadded URL-safe base64 of the text's UTF-8 bytes. */
 export function toBase64Url(text: string): string {
   let binary = "";
@@ -128,6 +328,8 @@ export function normalizeTheme(theme: HelpCenterTheme): HelpCenterTheme {
   return {
     ...theme,
     accentColor: theme.accentColor.toLowerCase(),
+    heroGradientFrom: theme.heroGradientFrom.toLowerCase(),
+    heroGradientTo: theme.heroGradientTo.toLowerCase(),
     heroTitle: theme.heroTitle?.trim() || null,
     heroSubtitle: theme.heroSubtitle?.trim() || null,
   };

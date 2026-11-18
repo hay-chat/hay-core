@@ -35,6 +35,7 @@
     "test": "npm run test:dashboard && npm run test:server",
     "test:dashboard": "cd dashboard && npm test",
     "test:server": "npm run build:form-schema && cd server && npm test",
+    "docs:screenshots": "playwright test -c playwright.docs.config.ts",
     "lint": "eslint \"server/**/*.{js,ts}\" \"dashboard/**/*.{js,ts,vue}\" --cache --max-warnings 0 && npm run lint:plugin-routers",
     "lint:plugin-routers": "eslint --no-eslintrc --no-inline-config -c .eslintrc.plugin-routers.js --no-ignore \"plugins/*/*/src/router.ts\" --max-warnings 0",
     "lint:fix": "eslint \"server/**/*.{js,ts}\" \"dashboard/**/*.{js,ts,vue}\" --cache --fix",

@@ -31,7 +31,11 @@ import { httpCompression } from "@server/lib/http-compression";
 import { createLogger } from "@server/lib/logger";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { helpCenterThemeSchema } from "@server/routes/v1/help-center";
-import { resolveTheme, verifyPreviewToken } from "@server/services/help-center/help-center.service";
+import {
+  heroImageUrl,
+  resolveTheme,
+  verifyPreviewToken,
+} from "@server/services/help-center/help-center.service";
 import { resolveHelpCenterHost } from "@server/services/help-center/host-resolver";
 import {
   getArticle,
@@ -55,7 +59,8 @@ import {
   type SiteView,
 } from "@server/services/help-center/render/pages";
 import { buildRobotsTxt, buildSitemapXml } from "@server/services/help-center/render/seo";
-import { SITE_CSS, SITE_CSS_PATH } from "@server/services/help-center/render/styles";
+import { GOOGLE_FONTS_ORIGINS } from "@server/services/help-center/render/fonts";
+import { SITE_CSS, SITE_CSS_PATH, siteFont } from "@server/services/help-center/render/styles";
 import {
   articlePath,
   collectionPath,
@@ -78,7 +83,10 @@ const VOTE_WINDOW_SECONDS = 24 * 60 * 60;
 
 const PAGE_CACHE = "public, max-age=60";
 const NO_STORE = "no-store";
-const PREVIEW_THEME_MAX_LENGTH = 2000;
+/** Room for a full theme whose hero texts use the longest UTF-8 characters (~2 KB as base64). */
+const PREVIEW_THEME_MAX_LENGTH = 3000;
+/** The address of a collection or article page, with or without its slug. */
+const PAGE_ADDRESS = /^\/(?:collections|articles)\/[a-z0-9-]+$/;
 
 const feedbackSchema = z.object({ articleId: z.string().max(36), helpful: z.boolean() });
 const themePatchSchema = helpCenterThemeSchema.partial();
@@ -89,10 +97,17 @@ interface PolicyOptions {
   webchat: boolean;
   /** Who may frame the page: nobody, or the dashboard while previewing. */
   frameAncestors: string;
+  /** The theme's typeface comes from Google Fonts. */
+  googleFonts: boolean;
 }
 
 /** The pages' Content-Security-Policy. The global helmet does not run on help center hosts. */
-export function contentSecurityPolicy({ nonce, webchat, frameAncestors }: PolicyOptions): string {
+export function contentSecurityPolicy({
+  nonce,
+  webchat,
+  frameAncestors,
+  googleFonts,
+}: PolicyOptions): string {
   const api = getApiUrl();
   const socket = `${getWebSocketProtocol()}://${config.domain.api}`;
   // Logos and signed document images come from the API host, plain http in development.
@@ -104,7 +119,8 @@ export function contentSecurityPolicy({ nonce, webchat, frameAncestors }: Policy
     "default-src 'none'",
     `script-src 'nonce-${nonce}'${webchat ? ` ${api}` : ""}`,
     // The chat widget injects <style> elements it cannot put a nonce on.
-    "style-src 'self' 'unsafe-inline'",
+    `style-src 'self' 'unsafe-inline'${googleFonts ? ` ${GOOGLE_FONTS_ORIGINS.styles}` : ""}`,
+    googleFonts ? `font-src ${GOOGLE_FONTS_ORIGINS.files}` : null,
     `img-src ${images.join(" ")}`,
     `connect-src 'self'${webchat ? ` ${api} ${socket}` : ""}`,
     webchat ? `frame-src ${api}` : null,
@@ -184,18 +200,43 @@ function sendText(
   res.send(body);
 }
 
+/**
+ * A validator for a page that ignores its nonce, which is new on every
+ * response: the page and its policy with the nonce taken out. Weak, as the
+ * bytes on the wire differ with compression.
+ */
+function pageEtag(body: string, policy: string, nonce: string): string {
+  const hash = crypto
+    .createHash("sha256")
+    .update(body.split(nonce).join(""))
+    .update("\0")
+    .update(policy.split(nonce).join(""))
+    .digest("base64url")
+    .slice(0, 27);
+  return `W/"${hash}"`;
+}
+
 function sendPage(res: Response, status: number, view: SiteView, body: string): void {
+  const policy = contentSecurityPolicy({
+    nonce: view.nonce,
+    webchat: view.webchat !== null,
+    frameAncestors: view.preview ? getDashboardUrl() : "'none'",
+    googleFonts: siteFont(view.theme).stylesheet !== null,
+  });
   res.status(status);
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", view.preview ? NO_STORE : PAGE_CACHE);
-  res.setHeader(
-    "Content-Security-Policy",
-    contentSecurityPolicy({
-      nonce: view.nonce,
-      webchat: view.webchat !== null,
-      frameAncestors: view.preview ? getDashboardUrl() : "'none'",
-    }),
-  );
+  res.setHeader("Vary", "Accept-Encoding");
+  if (status === 200 && !view.preview) {
+    res.setHeader("ETag", pageEtag(body, policy, view.nonce));
+    if (res.req.fresh) {
+      // No policy on the 304: the browser keeps the one stored with its copy, whose
+      // nonce matches that copy's scripts. A new one would block them.
+      res.status(304).end();
+      return;
+    }
+  }
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Content-Security-Policy", policy);
   res.send(body);
 }
 
@@ -207,6 +248,8 @@ function emptyView(nonce: string): SiteView {
     canonicalBase: "",
     theme: DEFAULT_HELP_CENTER_THEME,
     logoUrl: null,
+    socialImageUrl: null,
+    heroImageUrl: null,
     noindex: true,
     nonce,
     preview: null,
@@ -239,18 +282,26 @@ async function loadSiteView(
   preview: PreviewRequest | null,
   nonce: string,
 ): Promise<SiteView | null> {
-  const [organization, webchatEnabled] = await Promise.all([
+  const [organization, webchatEnabled, heroImage] = await Promise.all([
     organizationRepository.findById(helpCenter.organizationId),
     webchatSettingsService.isEnabled(helpCenter.organizationId),
+    heroImageUrl(helpCenter),
   ]);
   if (!organization || organization.suspendedAt) return null;
   if (!helpCenter.isPublished && !preview) return null;
+  // Without an organization logo, the one imported from the website (the chat widget's).
+  const logoUrl = organization.logoUpload
+    ? storageService.getUrl(organization.logoUpload)
+    : await webchatSettingsService.logoUrl(helpCenter.organizationId);
   return {
     name: helpCenter.name,
     language: helpCenter.defaultLanguage,
     canonicalBase: canonicalUrl(helpCenter),
     theme: resolveTheme({ ...themePatch(helpCenter.theme), ...preview?.themePatch }),
-    logoUrl: organization.logoUpload ? storageService.getUrl(organization.logoUpload) : null,
+    logoUrl,
+    // TODO: a help center's own sharing image, when there is a setting for one.
+    socialImageUrl: logoUrl,
+    heroImageUrl: heroImage,
     noindex: !helpCenter.searchIndexing || preview !== null,
     nonce,
     preview: preview ? { token: preview.token, theme: preview.theme } : null,
@@ -344,6 +395,15 @@ async function handleSite(
     const [view, results] = await Promise.all([loadingView, searchArticles(helpCenter, query)]);
     if (!view) return notFound(view);
     return sendPage(res, 200, view, renderSearchPage(view, query, results));
+  }
+
+  // "/articles/x/" is "/articles/x". Only page addresses: a redirect built from any other
+  // path ("//evil.example/") could send the visitor off the site.
+  const withoutSlash = path.replace(/\/+$/, "");
+  if (withoutSlash !== path && PAGE_ADDRESS.test(withoutSlash)) {
+    const view = await loadingView;
+    if (!view) return notFound(view);
+    return redirectToCurrent(res, view, withoutSlash);
   }
 
   const [, section, segment, ...rest] = path.split("/");

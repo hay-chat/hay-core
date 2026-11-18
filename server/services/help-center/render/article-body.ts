@@ -36,6 +36,29 @@ const renderCache = new Map<string, string>();
 const DOCUMENT_LINK =
   /href="\/documents\/([0-9a-f]{8})-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[^"]*"/gi;
 
+/**
+ * Sanitised article HTML adjusted for its place on the page:
+ *
+ * - The page's own `<h1>` is the article title, so when the body has
+ *   headings of level 1 every heading moves down a level (h6 stays h6).
+ * - Images decode off the main thread, and all but the first, which may be in
+ *   view when the page opens, load only as the visitor scrolls near them.
+ *
+ * Runs on sanitiser output, where `<` only ever opens a tag.
+ */
+export function prepareForPage(sanitized: string): string {
+  const demoted = /<h1[\s>]/i.test(sanitized)
+    ? sanitized.replace(
+        /<(\/?)h([1-6])(?=[\s>])/gi,
+        (_match, slash: string, level: string) => `<${slash}h${Math.min(Number(level) + 1, 6)}`,
+      )
+    : sanitized;
+  let images = 0;
+  return demoted.replace(/<img(?=[\s>/])/gi, () =>
+    images++ === 0 ? '<img decoding="async"' : '<img loading="lazy" decoding="async"',
+  );
+}
+
 /** The text as paragraphs, for content that could not be parsed as markdown. */
 function plainTextHtml(content: string): string {
   return content
@@ -78,7 +101,9 @@ async function cachedArticleHtml(article: {
   const key = `${article.id}:${new Date(article.updatedAt).getTime()}`;
   const cached = renderCache.get(key);
   if (cached !== undefined) return cached;
-  const rendered = await sanitizedArticleHtml(article.content, article.importMethod);
+  const rendered = prepareForPage(
+    await sanitizedArticleHtml(article.content, article.importMethod),
+  );
   if (renderCache.size >= RENDER_CACHE_MAX_ENTRIES) {
     renderCache.delete(renderCache.keys().next().value as string);
   }
