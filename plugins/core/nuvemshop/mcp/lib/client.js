@@ -37,7 +37,7 @@ const {
 // host serves any store regardless of country.
 const API_HOST = "https://api.nuvemshop.com.br";
 const DEFAULT_API_VERSION = "2025-03";
-const USER_AGENT = "Hay (https://hay.chat)";
+const USER_AGENT = "Hay.chat (support@hay.chat)";
 const MAX_RETRIES = 3;
 const DEFAULT_TIMEOUT_MS = 30000;
 

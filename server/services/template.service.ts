@@ -187,7 +187,7 @@ export class TemplateService {
     // Compile MJML to HTML
     // NOTE: minify is explicitly disabled due to ReDoS vulnerability in html-minifier (GHSA-pfq8-rq6v-vf5m)
     // We use our own minifyHtml() method instead if needed
-    const result = mjml2html(mjmlWithVars, {
+    const result = await mjml2html(mjmlWithVars, {
       keepComments: false,
       validationLevel: "soft",
       minify: false,
