@@ -45,7 +45,12 @@ export function scriptJson(value: unknown): string {
 const escapeAttribute = (value: string) =>
   value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
-const withoutTrailingSlash = (url: string) => url.replace(/\/+$/, "");
+/** No regular expression: one anchored at the end is slow on a long run of slashes. */
+function withoutTrailingSlash(url: string): string {
+  let end = url.length;
+  while (end > 0 && url[end - 1] === "/") end--;
+  return url.slice(0, end);
+}
 
 export function chatPageHtml(options: ChatPageOptions): string {
   const { waitForConversationStarted, startClosed, ...rest } = options;

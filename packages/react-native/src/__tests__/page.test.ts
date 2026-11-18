@@ -36,7 +36,7 @@ describe("chatPageHtml", () => {
   it("keeps a value from closing the script tag", () => {
     const html = chatPageHtml({ ...options, context: { note: "</script><script>alert(1)" } });
     expect(html).not.toContain("</script><script>alert(1)");
-    expect(html.match(/<\/script>/g)).toHaveLength(2);
+    expect(html.split("</script>")).toHaveLength(3);
   });
 
   it("keeps a base URL from breaking out of the script's src", () => {
@@ -46,7 +46,8 @@ describe("chatPageHtml", () => {
 
   it("produces a config script that runs and reports to the app", async () => {
     const html = chatPageHtml({ ...options, waitForConversationStarted: true });
-    const script = html.match(/<script>([\s\S]*?)<\/script>/)![1];
+    const start = html.indexOf("<script>") + "<script>".length;
+    const script = html.slice(start, html.indexOf("</script>", start));
     const posted: string[] = [];
     const window: Record<string, any> = {
       ReactNativeWebView: { postMessage: (data: string) => posted.push(data) },
@@ -66,6 +67,14 @@ describe("chatPageHtml", () => {
     new Function("window", conversationStartedDoneScript("c-1"))(window);
     await waiting;
     expect(released).toBe(true);
+  });
+});
+
+describe("base URL", () => {
+  it("drops any number of trailing slashes", () => {
+    expect(chatPageHtml({ ...options, baseUrl: "https://api.example.test///" })).toContain(
+      '"baseUrl":"https://api.example.test"',
+    );
   });
 });
 
