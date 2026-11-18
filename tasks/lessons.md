@@ -35,3 +35,8 @@
 - Failure mode: the domain check loaded a help center, awaited DNS for seconds, then saved the whole entity, which could restore `is_published` or a removed domain changed meanwhile.
 - Detection signal: a setting changed during a domain check reverts after the check finishes.
 - Prevention rule: after any slow await, write with `update(where, { only the columns this step owns })` and put the value that was checked in the `where`.
+
+### Changed a provider's registered redirect URL while core still sent the old one
+- **Failure mode**: PR #244 documented a new redirect URL (`/oauth/callback/<pluginId>`) for Nuvemshop, on the README's claim that the extra authorize params core appends "are ignored". Nuvemshop compares `redirect_uri` with the registered URL, so once the portal was changed every connect link answered "Erro ao carregar os dados".
+- **Detection signal**: an authorize page that loads with `?state=` alone and errors with the full link; any plan that changes a registered redirect URL without changing what `getRedirectUri` sends.
+- **Prevention**: the redirect URL registered with a provider and the `redirect_uri` core sends are one value; change them together (manifest `oauthProviderInstall`), and try the real authorize link on a test store before telling anyone to edit the provider's settings.

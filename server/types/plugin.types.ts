@@ -65,6 +65,14 @@ export interface HayPluginManifest {
   trpcRouter?: string;
   /** Hosts a server-managed OAuth client secret may be sent to (exact or `*.suffix`). */
   oauthHosts?: string[];
+  /**
+   * The provider's app store can start the install itself. Such an install calls
+   * the redirect URL with a code and no state, so the URL registered with the
+   * provider must name the plugin: `<API_URL>/oauth/callback/<pluginId>`. Core
+   * sends that URL as `redirect_uri` and hands a state-less callback to the
+   * dashboard's connect page without exchanging its code.
+   */
+  oauthProviderInstall?: boolean;
   /** Outbound destinations the plugin's worker may reach (package.json hay-plugin.network). */
   network?: PluginNetwork;
   services?: Array<{
