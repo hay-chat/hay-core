@@ -490,4 +490,89 @@ describe("widget loader", () => {
       expect(root.hasAttribute("data-launcher-dark-icon")).toBe(true);
     });
   });
+
+  describe("embedded (a mobile app's WebView)", () => {
+    /** A chunk whose chat reports open/closed the way Widget.vue does. */
+    function embeddedChunk() {
+      let options: ChatMountOptions | null = null;
+      let open = false;
+      const toggle = vi.fn(() => {
+        open = !open;
+        options?.launcher.setOpen(open);
+      });
+      const mountChat = vi.fn(async (mountOptions: ChatMountOptions) => {
+        options = mountOptions;
+        if (mountOptions.open) toggle();
+        return { toggle };
+      });
+      const loadChat = vi.fn(async (): Promise<ChatModule> => ({ mountChat }));
+      return { loadChat, mountChat, bridge: () => options!.launcher };
+    }
+
+    it("loads and opens the chat straight away, with no button to press", async () => {
+      mockPublicConfig({ enabled: true });
+      const chunk = embeddedChunk();
+      const onReady = vi.fn();
+
+      const loader = boot({ ...config, embedded: { onReady } }, chunk.loadChat);
+      await loader.chatReady();
+
+      expect(chunk.mountChat).toHaveBeenCalledWith(expect.objectContaining({ open: true }));
+      expect(onReady).toHaveBeenCalledTimes(1);
+      const root = document.getElementById("hay-webchat-root")!;
+      expect(root.hasAttribute("data-embedded")).toBe(true);
+    });
+
+    it("tells the app about a close and the unread count, and reopens on open()", async () => {
+      mockPublicConfig({ enabled: true });
+      const chunk = embeddedChunk();
+      const onClose = vi.fn();
+      const onUnread = vi.fn();
+
+      const loader = boot({ ...config, embedded: { onClose, onUnread } }, chunk.loadChat);
+      await loader.chatReady();
+      expect(onClose).not.toHaveBeenCalled();
+
+      chunk.bridge().setOpen(false); // the visitor pressed the chat's close button
+      expect(onClose).toHaveBeenCalledTimes(1);
+      chunk.bridge().setUnread(2);
+      expect(onUnread).toHaveBeenLastCalledWith(2);
+
+      window.HayChat?.open?.();
+      window.HayChat?.open?.(); // already open: nothing more happens
+      window.HayChat?.close?.();
+      expect(onClose).toHaveBeenCalledTimes(2);
+    });
+
+    it("mounts closed when the app asked for that before the chat loaded", async () => {
+      mockPublicConfig({ enabled: true });
+      const chunk = embeddedChunk();
+
+      const loader = boot({ ...config, embedded: {} }, chunk.loadChat);
+      window.HayChat?.close?.();
+      await loader.chatReady();
+
+      expect(chunk.mountChat).toHaveBeenCalledWith(expect.objectContaining({ open: false }));
+    });
+
+    it("starts closed when the app says so", async () => {
+      mockPublicConfig({ enabled: true });
+      const chunk = embeddedChunk();
+
+      await boot({ ...config, embedded: { startClosed: true } }, chunk.loadChat).chatReady();
+
+      expect(chunk.mountChat).toHaveBeenCalledWith(expect.objectContaining({ open: false }));
+    });
+
+    it("shows nothing when the widget is turned off", async () => {
+      mockPublicConfig({ enabled: false });
+      const chunk = embeddedChunk();
+
+      const loader = boot({ ...config, embedded: {} }, chunk.loadChat);
+
+      expect(await loader.chatReady()).toBeNull();
+      expect(chunk.mountChat).not.toHaveBeenCalled();
+      expect(document.getElementById("hay-webchat-root")).toBeNull();
+    });
+  });
 });
