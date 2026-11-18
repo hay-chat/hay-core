@@ -18,8 +18,7 @@
         <div class="space-y-4">
           <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
             <p class="text-sm text-blue-800">
-              <strong>{{ $t("forgotPassword.didntReceive") }}</strong
-              ><br />
+              <strong>{{ $t("forgotPassword.didntReceive") }}</strong><br />
               {{ $t("forgotPassword.checkSpam") }}
             </p>
           </div>

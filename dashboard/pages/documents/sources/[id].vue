@@ -300,8 +300,7 @@
           <DialogTitle>Disconnect source</DialogTitle>
           <DialogDescription>
             Choose what happens to the documents imported from
-            <span class="font-medium">{{ source?.displayName }}</span
-            >.
+            <span class="font-medium">{{ source?.displayName }}</span>.
           </DialogDescription>
         </DialogHeader>
 
