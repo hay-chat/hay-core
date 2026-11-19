@@ -9,8 +9,7 @@
       <div v-if="showRefreshMessage" class="text-sm text-gray-500">
         {{ $t("common.takingLonger") }}
         <button type="button" class="text-blue-500 underline" @click="refresh">
-          {{ $t("common.refreshPage") }}</button
-        >.
+          {{ $t("common.refreshPage") }}</button>.
       </div>
     </div>
 

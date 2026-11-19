@@ -50,11 +50,11 @@
   "dependencies": {
     "@hay/plugin-sdk": "file:../../../packages/plugin-sdk",
     "@modelcontextprotocol/sdk": "^1.25.2",
-    "dotenv": "^18.0.9"
+    "dotenv": "^18.0.10"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
-    "@vitejs/plugin-vue": "^6.0.10",
+    "@vitejs/plugin-vue": "^6.0.11",
     "typescript": "^5.3.3",
     "vite": "^8.3.8",
     "vue": "^3.5.45"
