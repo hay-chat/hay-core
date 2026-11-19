@@ -383,6 +383,27 @@ describe("oauthService.initiateOAuth", () => {
   });
 });
 
+describe("oauthService.providerInstallPath", () => {
+  it("sends a provider-started install to the dashboard connect link without exchanging anything", async () => {
+    await expect(oauthService.providerInstallPath("hay-plugin-x")).resolves.toBe(
+      "/integrations/plugins/hay-plugin-x?connect=1",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(updateAuthState).not.toHaveBeenCalled();
+  });
+
+  it("returns null for unknown plugins and for plugins that do not connect by redirect", async () => {
+    findByPluginId.mockResolvedValue(null);
+    await expect(oauthService.providerInstallPath("nope")).resolves.toBeNull();
+
+    findByPluginId.mockResolvedValue(registryPlugin({ connectFlow: "client" }));
+    await expect(oauthService.providerInstallPath("p")).resolves.toBeNull();
+
+    findByPluginId.mockResolvedValue({ id: "reg-2", pluginId: "k", metadata: { authMethods: [] } });
+    await expect(oauthService.providerInstallPath("k")).resolves.toBeNull();
+  });
+});
+
 describe("oauthService.initiateOAuth placeholders", () => {
   it("puts the client id in the authorize path when the URL declares {client_id}", async () => {
     findByPluginId.mockResolvedValue(

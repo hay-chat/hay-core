@@ -138,9 +138,21 @@ only changes status, stock and the customer email. So:
   Hay.chat, who forward it to the shopper (the store is the LGPD controller; the shopper is
   never emailed). Both run as background jobs; Nuvemshop customer records themselves are never copied.
 
+- **Install started from Nuvemshop** (the app store's Install button, or
+  `…/apps/{client_id}/authorize` opened directly): the callback arrives with a code and no state.
+  Core never exchanges that code (nothing ties it to the person in the browser). It redirects to
+  the dashboard connect link `/integrations/plugins/hay-plugin-nuvemshop?connect=1`, where the
+  merchant signs in or creates an account, and the normal flow with state runs from there.
+- **Uninstall** (`src/uninstall-webhook.ts`): on connect the plugin registers the store's
+  `app/uninstalled` webhook (`POST /webhooks`, same URL as the LGPD webhooks, needs a public
+  HTTPS `API_URL`). When it arrives the plugin checks the stored token against `GET /store` and
+  disconnects only on a 401, so a late retry cannot disconnect a store that was reinstalled.
+
 Partner-portal registration: scopes `read_products, write_orders, write_customers, write_coupons,
-write_fulfillment_orders` (write implies read), redirect URL `https://<hay>/oauth/callback`, the
-three LGPD webhook URLs above, plus App URL, Preferences URL, privacy policy and support contact.
+write_fulfillment_orders` (write implies read), redirect URL
+`https://<hay>/oauth/callback/hay-plugin-nuvemshop` (the plugin id in the path is what lets core
+recognise an install started from Nuvemshop), the three LGPD webhook URLs above, plus App URL,
+Preferences URL, privacy policy and support contact.
 
 ## Build & test
 
@@ -153,5 +165,8 @@ npm test      --workspace=plugins/core/nuvemshop   # vitest: mocked-fetch unit t
 `scripts/build-plugins.sh` runs `npm install` inside it at build time.
 
 Not yet verified against a live store: fulfillment-order PATCH (merge vs replace of `destination`),
-whether a merchant token may read `/transactions`, the exact shape of `refunded_amount`, and whether
-`POST /coupons` accepts `max_uses`.
+whether a merchant token may read `/transactions`, the exact shape of `refunded_amount`, whether
+`POST /coupons` accepts `max_uses`, whether authorize skips the approval screen for a store that
+already installed the app (the install handoff sends the merchant through it a second time),
+whether `app/uninstalled` can be registered without an extra scope, and what creating the same
+webhook twice returns.
