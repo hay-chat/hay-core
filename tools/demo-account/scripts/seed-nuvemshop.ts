@@ -47,7 +47,6 @@ import {
   finalOrderStatus,
   fulfilmentSteps,
   isShipped,
-  legacyFulfilPayload,
   MARKER_RE,
   orderPayload,
   paymentStatusCandidates,
@@ -194,7 +193,8 @@ export async function seedNuvemshop(options: SeedOptions): Promise<SeededOrder[]
   // ---------- customers ----------
   async function ensureCustomer(customer: Customer): Promise<void> {
     if (!ns.dryRun) {
-      const hits = await ns.get<Array<{ id: number; email?: string }>>("/customers", {
+      // list(), not get(): an empty search answers 404 "Last page is 0".
+      const hits = await ns.list<{ id: number; email?: string }>("/customers", {
         q: customer.email,
       });
       const hit = hits.find((c) => c.email?.toLowerCase() === customer.email.toLowerCase());
@@ -328,37 +328,23 @@ export async function seedNuvemshop(options: SeedOptions): Promise<SeededOrder[]
     if (!order) throw new Error(`${fixture.key}: order was not created`);
     if (ns.dryRun) order.number = order.id;
 
-    // Shipping: fulfillment orders (what the plugin reads first), else the legacy fulfil endpoint.
+    // Shipping goes through fulfillment orders (what the plugin reads); the token needs
+    // read_fulfillment_orders and write_fulfillment_orders.
     const steps = fulfilmentSteps(fixture, now);
     if (steps.length) {
-      let fos: Array<{ id: string }> | null = ns.dryRun ? [{ id: "<fulfillment-order-id>" }] : null;
-      if (!ns.dryRun) {
-        fos = await ns
-          .get<Array<{ id: string }>>(`/orders/${order.id}/fulfillment-orders`)
-          .catch(() => null);
-      }
-      let legacy = !fos || fos.length === 0;
-      if (!legacy) {
-        try {
-          for (const fo of fos!) {
-            for (const s of steps) {
-              await ns.write(
-                s.method,
-                `/orders/${order.id}/fulfillment-orders/${encodeURIComponent(fo.id)}${s.path}`,
-                s.body,
-                {},
-              );
-            }
-          }
-        } catch (err) {
-          row.notes.push(
-            `fulfillment-order update failed (${statusOf(err) ?? "error"}); used legacy /fulfill, no carrier events or delivery date.`,
+      const fos = ns.dryRun
+        ? [{ id: "<fulfillment-order-id>" }]
+        : await ns.get<Array<{ id: string }>>(`/orders/${order.id}/fulfillment-orders`);
+      for (const fo of fos) {
+        for (const s of steps) {
+          await ns.write(
+            s.method,
+            `/orders/${order.id}/fulfillment-orders/${encodeURIComponent(fo.id)}${s.path}`,
+            s.body,
+            {},
           );
-          legacy = true;
         }
       }
-      if (legacy)
-        await ns.write("POST", `/orders/${order.id}/fulfill`, legacyFulfilPayload(fixture), {});
     }
 
     const finalStatus = finalOrderStatus(fixture);
