@@ -385,6 +385,10 @@ describe("oauthService.initiateOAuth", () => {
 
 describe("oauthService.providerInstallPath", () => {
   it("sends a provider-started install to the dashboard connect link without exchanging anything", async () => {
+    findByPluginId.mockResolvedValue({
+      ...registryPlugin(),
+      manifest: { oauthProviderInstall: true },
+    });
     await expect(oauthService.providerInstallPath("hay-plugin-x")).resolves.toBe(
       "/integrations/plugins/hay-plugin-x?connect=1",
     );
@@ -392,15 +396,60 @@ describe("oauthService.providerInstallPath", () => {
     expect(updateAuthState).not.toHaveBeenCalled();
   });
 
-  it("returns null for unknown plugins and for plugins that do not connect by redirect", async () => {
+  it("returns null for unknown plugins and for plugins that did not opt in", async () => {
     findByPluginId.mockResolvedValue(null);
     await expect(oauthService.providerInstallPath("nope")).resolves.toBeNull();
 
-    findByPluginId.mockResolvedValue(registryPlugin({ connectFlow: "client" }));
+    findByPluginId.mockResolvedValue(registryPlugin());
+    await expect(oauthService.providerInstallPath("p")).resolves.toBeNull();
+
+    findByPluginId.mockResolvedValue({
+      ...registryPlugin({ connectFlow: "client" }),
+      manifest: { oauthProviderInstall: true },
+    });
     await expect(oauthService.providerInstallPath("p")).resolves.toBeNull();
 
     findByPluginId.mockResolvedValue({ id: "reg-2", pluginId: "k", metadata: { authMethods: [] } });
     await expect(oauthService.providerInstallPath("k")).resolves.toBeNull();
+  });
+});
+
+describe("oauthService redirect_uri", () => {
+  const base = () => oauthService.getRedirectUri({ pluginId: "p" });
+
+  it("stays the shared callback for plugins that did not opt in", async () => {
+    storeState.mockResolvedValue(undefined);
+    const { authorizationUrl } = await oauthService.initiateOAuth("p", "org-1", "u-1");
+    expect(new URL(authorizationUrl).searchParams.get("redirect_uri")).toBe(base());
+    expect(base().endsWith("/oauth/callback")).toBe(true);
+  });
+
+  it("names the plugin for oauthProviderInstall plugins, on authorize and on the code exchange", async () => {
+    findByPluginId.mockResolvedValue({
+      ...registryPlugin({ tokenRequestFormat: "json" }),
+      manifest: { oauthProviderInstall: true },
+    });
+    storeState.mockResolvedValue(undefined);
+    const expected = `${base()}/p`;
+
+    const { authorizationUrl } = await oauthService.initiateOAuth("p", "org-1", "u-1");
+    expect(new URL(authorizationUrl).searchParams.get("redirect_uri")).toBe(expected);
+
+    retrieveState.mockResolvedValue({
+      pluginId: "p",
+      organizationId: "org-1",
+      userId: "u-1",
+      nonce: "nonce",
+      createdAt: Date.now(),
+    });
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ access_token: "t", token_type: "bearer" }))
+      .mockResolvedValueOnce(jsonResponse({ routingKeys: [] }));
+    await expect(oauthService.handleCallback("auth-code", "nonce")).resolves.toMatchObject({
+      success: true,
+    });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string).redirect_uri).toBe(expected);
   });
 });
 

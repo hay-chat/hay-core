@@ -119,10 +119,16 @@ export function tokenResponseExtras(data: unknown): Record<string, string> | und
 
 export class OAuthService {
   /**
-   * Get OAuth redirect URI
+   * The redirect URI sent to the provider. Plugins whose provider can start
+   * the install itself (manifest `oauthProviderInstall`) register a URL that
+   * names the plugin, and providers that check `redirect_uri` want exactly
+   * that one.
    */
-  getRedirectUri(): string {
-    return process.env.OAUTH_REDIRECT_URI || `${getApiUrl()}/oauth/callback`;
+  getRedirectUri(plugin: { pluginId: string; manifest?: unknown }): string {
+    const base = process.env.OAUTH_REDIRECT_URI || `${getApiUrl()}/oauth/callback`;
+    return (plugin.manifest as HayPluginManifest | undefined)?.oauthProviderInstall
+      ? `${base}/${encodeURIComponent(plugin.pluginId)}`
+      : base;
   }
 
   /**
@@ -398,7 +404,7 @@ export class OAuthService {
   ): Promise<{ authorizationUrl: string; state: string }> {
     logger.info({ pluginId, organizationId, userId }, "OAuth initiate started");
 
-    const { oauth2Method, clientId, clientSecret, resolved, endpointPolicy } =
+    const { plugin, oauth2Method, clientId, clientSecret, resolved, endpointPolicy } =
       await this.resolveOAuthContext(organizationId, pluginId);
 
     // Client-flow plugins obtain the code in their own UI (completeWithCode).
@@ -467,7 +473,7 @@ export class OAuthService {
     assertOAuthEndpoint(oauthConfig.authorizationUrl, endpointPolicy);
 
     // Build authorization URL
-    const redirectUri = this.getRedirectUri();
+    const redirectUri = this.getRedirectUri(plugin);
     const params = new URLSearchParams({
       client_id: validCredentials.clientId,
       redirect_uri: redirectUri,
@@ -546,19 +552,17 @@ export class OAuthService {
    * flow (with state) runs against the provider, which has the app approved
    * already.
    *
-   * Returns the dashboard path, or null when the plugin cannot be connected by
-   * redirect.
+   * Returns the dashboard path, or null when the plugin did not declare
+   * `oauthProviderInstall` in its manifest (read from package.json at startup,
+   * so it is known before any worker of the plugin has run).
    */
   async providerInstallPath(pluginId: string): Promise<string | null> {
     const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
     const oauth2Method = plugin?.metadata?.authMethods?.find(
       (method: AuthMethodDescriptor) => method.type === "oauth2",
     );
-    if (
-      !oauth2Method?.authorizationUrl ||
-      !oauth2Method.tokenUrl ||
-      oauth2Method.connectFlow === "client"
-    ) {
+    const optedIn = (plugin?.manifest as HayPluginManifest | undefined)?.oauthProviderInstall;
+    if (!optedIn || !oauth2Method || oauth2Method.connectFlow === "client") {
       return null;
     }
     return `/integrations/plugins/${encodeURIComponent(pluginId)}?connect=1`;
@@ -618,7 +622,7 @@ export class OAuthService {
 
     try {
       logger.debug({ pluginId }, "Loading plugin for OAuth callback");
-      const { oauth2Method, clientId, clientSecret, resolved, endpointPolicy } =
+      const { plugin, oauth2Method, clientId, clientSecret, resolved, endpointPolicy } =
         await this.resolveOAuthContext(organizationId, pluginId);
 
       // Validate required OAuth fields
@@ -655,6 +659,7 @@ export class OAuthService {
         code,
         oauthConfig,
         validCredentials,
+        this.getRedirectUri(plugin),
         codeVerifier,
       );
       logger.info(
@@ -811,10 +816,9 @@ export class OAuthService {
     code: string,
     oauthConfig: OAuthManifestConfig,
     credentials: { clientId: string; clientSecret: string | null },
+    redirectUri: string,
     codeVerifier?: string,
   ): Promise<OAuthTokenData> {
-    const redirectUri = this.getRedirectUri();
-
     const fields: Record<string, string> = {
       grant_type: "authorization_code",
       code,

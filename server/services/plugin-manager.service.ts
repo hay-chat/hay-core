@@ -54,6 +54,8 @@ interface HayPluginBlock {
   documentImporter?: boolean;
   /** Hosts a server-managed OAuth client secret may be sent to (exact or `*.suffix`). */
   oauthHosts?: string[];
+  /** The provider's app store can start the install (redirect URL names the plugin). */
+  oauthProviderInstall?: boolean;
   /** Outbound destinations the worker may reach. */
   network?: HayPluginManifest["network"];
   /** When in-app setup should suggest this plugin, and what it can do for customers. */
@@ -314,6 +316,7 @@ export class PluginManagerService {
         defaultEnabled: hayPlugin.defaultEnabled === true, // Enabled for new orgs
         trpcRouter: hayPlugin.trpcRouter || undefined, // Optional plugin-side tRPC router file
         oauthHosts: hayPlugin.oauthHosts || undefined, // Hosts a managed OAuth secret may reach
+        oauthProviderInstall: hayPlugin.oauthProviderInstall === true || undefined, // App store can start the install
         network: hayPlugin.network || undefined, // Hosts the worker may reach through the egress proxy
         setup: readSetupHints(hayPlugin.setup), // In-app setup suggestions
         // Plugins can come from organizations: an unknown section is dropped, not trusted.

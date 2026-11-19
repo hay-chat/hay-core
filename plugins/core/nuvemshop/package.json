@@ -36,6 +36,7 @@
         "api.nuvemshop.com.br"
       ]
     },
+    "oauthProviderInstall": true,
     "oauthHosts": [
       "www.nuvemshop.com.br",
       "www.tiendanube.com"

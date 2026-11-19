@@ -122,8 +122,8 @@ only changes status, stock and the customer email. So:
 ## OAuth (partner app)
 
 - **Authorize**: `https://www.nuvemshop.com.br/apps/{client_id}/authorize?state=…`. Core fills
-  `{client_id}`; scopes and the redirect URL are fixed on the app, so the extra standard params
-  core appends are ignored.
+  `{client_id}`; scopes and the redirect URL are fixed on the app. The other standard params core
+  appends are ignored, except `redirect_uri`, which must equal the registered URL.
 - **Token exchange**: `POST https://www.tiendanube.com/apps/authorize/token`, JSON body
   (`tokenRequestFormat: "json"`). The response is `{ access_token, token_type, scope, user_id }`;
   core keeps `user_id` (the store id) in the credentials, and `onConnected` saves it as `storeId`,
@@ -143,6 +143,8 @@ only changes status, stock and the customer email. So:
   Core never exchanges that code (nothing ties it to the person in the browser). It redirects to
   the dashboard connect link `/integrations/plugins/hay-plugin-nuvemshop?connect=1`, where the
   merchant signs in or creates an account, and the normal flow with state runs from there.
+  Seen on the demo store (2026-11-18): Nuvemshop shows its approval screen again on that second
+  pass, so the merchant clicks "Aceitar" twice.
 - **Uninstall** (`src/uninstall-webhook.ts`): on connect the plugin registers the store's
   `app/uninstalled` webhook (`POST /webhooks`, same URL as the LGPD webhooks, needs a public
   HTTPS `API_URL`). When it arrives the plugin checks the stored token against `GET /store` and
@@ -151,7 +153,9 @@ only changes status, stock and the customer email. So:
 Partner-portal registration: scopes `read_products, write_orders, write_customers, write_coupons,
 write_fulfillment_orders` (write implies read), redirect URL
 `https://<hay>/oauth/callback/hay-plugin-nuvemshop` (the plugin id in the path is what lets core
-recognise an install started from Nuvemshop), the three LGPD webhook URLs above, plus App URL,
+recognise an install started from Nuvemshop; the manifest sets `oauthProviderInstall`, so core sends
+this same URL as `redirect_uri`, which Nuvemshop compares with the registered one and answers
+"Erro ao carregar os dados" on a mismatch), the three LGPD webhook URLs above, plus App URL,
 Preferences URL, privacy policy and support contact.
 
 ## Build & test
@@ -166,7 +170,5 @@ npm test      --workspace=plugins/core/nuvemshop   # vitest: mocked-fetch unit t
 
 Not yet verified against a live store: fulfillment-order PATCH (merge vs replace of `destination`),
 whether a merchant token may read `/transactions`, the exact shape of `refunded_amount`, whether
-`POST /coupons` accepts `max_uses`, whether authorize skips the approval screen for a store that
-already installed the app (the install handoff sends the merchant through it a second time),
-whether `app/uninstalled` can be registered without an extra scope, and what creating the same
+`POST /coupons` accepts `max_uses`, whether `app/uninstalled` can be registered without an extra scope, and what creating the same
 webhook twice returns.
