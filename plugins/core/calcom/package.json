@@ -39,7 +39,7 @@
     "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
+    "typescript": "^7.0.2",
     "@types/node": "^26.6.6"
   }
 }
