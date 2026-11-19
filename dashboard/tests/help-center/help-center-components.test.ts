@@ -340,7 +340,8 @@ describe("help center appearance", () => {
       await mobile.trigger("click");
       const phone = wrapper.find('[data-testid="preview-frame"]').attributes("style");
       expect(phone).toContain("width: 390px");
-      expect(phone).toContain(`transform: scale(${600 / 844})`);
+      // The style serialiser may round the factor, so compare the number.
+      expect(Number(/scale\(([\d.]+)\)/.exec(phone!)?.[1])).toBeCloseTo(600 / 844, 3);
       expect(frame.attributes("title")).toBe("helpCenter.appearance.previewFrameTitle");
     });
   });
