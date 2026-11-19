@@ -51,8 +51,13 @@ refunded, cancelled unpaid, high value (over the approval threshold), delivered 
      `shop_not_permitted` when the store and the app are in different organizations.
    - **WooCommerce:** wp-admin → WooCommerce → Settings → Advanced → REST API → Add key (Read/Write).
      Optional `WP_USER` + `WP_APP_PASSWORD` (Users → Profile → Application Passwords) to upload images.
-   - **Nuvemshop:** a custom app on the store (Aplicativos a medida) with read/write on products, orders,
-     fulfillment orders and customers. The Hay.chat partner app can't create products, so it can't be reused.
+   - **Nuvemshop:** a custom app, created in the [partner portal](https://partners.nuvemshop.com.br/applications)
+     (Criar aplicativo → "Para os seus clientes"), with Write products, Write customers and Write orders,
+     plus Read and Write Fulfillment orders (these two sit under **Shipping**, and the install screen does
+     not list them). Install it on the demo store from the app's Visão geral; the portal then shows a curl
+     command that exchanges the code for the token. Put the store id and token in `NUVEMSHOP_STORE_ID` and
+     `NUVEMSHOP_ACCESS_TOKEN`. A changed permission only reaches the token after an uninstall and a new
+     install. The Hay.chat partner app can't create products, so it can't be reused.
 
 2. Preview, then seed:
 
@@ -92,7 +97,7 @@ running `hay demo seed hay` for this store.
 
 ## What each platform can't reproduce
 
-The Shopify script has run against a real development store. The WooCommerce and Nuvemshop scripts have not, so their first run confirms the points below.
+The Shopify and Nuvemshop scripts have run against real test stores. The WooCommerce script has not, so its first run confirms the points below.
 
 - **Shopify:** customer phone numbers only go on the address, because Shopify's check on the customer's own phone field can reject the fake 555 numbers. Development stores allow about 5 new orders a minute, so a full run pauses for a minute or two. Orders are backdated with `processedAt`, but `createdAt` is always the seed time, and
   the Hay.chat Shopify plugin reads `createdAt`, so orders look placed today. Tracking events are
@@ -101,9 +106,12 @@ The Shopify script has run against a real development store. The WooCommerce and
   (`backdateCommand` in `orders/seeded-woocommerce.json`); run it with WP-CLI on the WordPress host.
   There is no delivered status: delivered = completed + a note. The script sets the store currency to
   EUR, the country to PT and turns off 9 order emails (`--keep-emails` skips that).
-- **Nuvemshop:** order dates, refunded/voided payment statuses and delivered tracking events are best
-  guesses from the plugin's code (the API docs weren't reachable when this was written); the script
-  falls back and notes what it did in each order's `owner_note`. Seeded Pix orders have no real Pix code.
+- **Nuvemshop:** the API ignores `created_at`, `gateway_name` and `payment_details` on a created order,
+  so every order is dated the seed day, shows the gateway "A combinar" (`offline`, the only kind the API
+  accepts besides `not-provided`) and has no payment method: the Pix and boleto scenarios have no Pix
+  block. Refunded, partially refunded and voided payment statuses are accepted. Tracking events are
+  backdated, so delivered and stale tracking work. Orders can't be deleted: `--reset-orders` cancels them
+  and retires their marker, so cancelled leftovers stay in the store.
 - **Images:** the default image URL is this repo's `master`, which only resolves after merge. Until then
   Shopify uses staged uploads, Nuvemshop base64, and WooCommerce needs `WP_USER` + `WP_APP_PASSWORD`
   or `--image-base-url`.

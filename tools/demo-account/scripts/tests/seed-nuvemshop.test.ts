@@ -50,8 +50,13 @@ function foAfter(key: string) {
     labels: [],
   };
   for (const step of fulfilmentSteps(fixture(key), NOW)) {
-    if (step.path === "/tracking-events") (fo.tracking_events as unknown[]).push(step.body);
-    else Object.assign(fo, step.body);
+    if (step.path !== "/tracking-events") {
+      Object.assign(fo, step.body);
+      continue;
+    }
+    (fo.tracking_events as unknown[]).push(step.body);
+    // The API moves the fulfillment order to DELIVERED on a delivered event.
+    if (step.body.status === "delivered") fo.status = "DELIVERED";
   }
   return fo;
 }
@@ -68,7 +73,7 @@ describe("Nuvemshop order mapping per state", () => {
       inventory_behaviour: "bypass",
       send_confirmation_email: false,
       send_fulfillment_email: false,
-      gateway: "mercadopago",
+      gateway: "offline",
       created_at: "2026-10-28T12:00:00.000Z",
     });
     expect(String(p.owner_note).startsWith(marker("paid-unfulfilled"))).toBe(true);
@@ -267,7 +272,6 @@ describe("seedNuvemshop against a mocked store", () => {
       "POST /orders/501/fulfillment-orders/FO1/tracking-events",
       "POST /orders/501/fulfillment-orders/FO1/tracking-events",
       "POST /orders/501/fulfillment-orders/FO1/tracking-events",
-      "PATCH /orders/501/fulfillment-orders/FO1",
       "POST /orders/501/close",
     ]);
     expect(rows.map((r) => [r.key, r.result, r.status])).toEqual([

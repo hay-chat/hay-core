@@ -164,14 +164,17 @@ export function shippingFields(fixture: OrderFixture, products: Product[]) {
   };
 }
 
-/** Mercado Pago for every method (brand.md: Pix, boleto, card through Mercado Pago). */
+/**
+ * The API only takes `offline` or `not-provided` as the gateway of an order it creates, so the
+ * Mercado Pago of brand.md stays in the display name and the owner note.
+ */
 export function paymentFields(fixture: OrderFixture) {
   const method = fixture.paymentMethod?.nuvemshop ?? "card";
   const details =
     method === "pix" || method === "boleto"
       ? { method, credit_card_company: null, installments: 1 }
       : { method: "credit_card", credit_card_company: "visa", installments: 1 };
-  return { gateway: "mercadopago", gateway_name: "Mercado Pago", payment_details: details };
+  return { gateway: "offline", gateway_name: "Mercado Pago", payment_details: details };
 }
 
 export const isShipped = (f: OrderFixture) => f.fulfillmentStatus !== "unfulfilled";
@@ -271,6 +274,9 @@ export function orderPayload(
   };
 }
 
+/** Tracking events are refused without a non-empty address. */
+const EVENT_ADDRESS = "São Paulo, SP";
+
 export interface FulfilmentStep {
   method: "PATCH" | "POST";
   /** Relative to /orders/{id}/fulfillment-orders/{fo}. */
@@ -280,7 +286,7 @@ export interface FulfilmentStep {
 
 /**
  * Fulfillment-order writes for a shipped fixture: tracking + DISPATCHED, carrier events with
- * backdated happened_at (the plugin's stale check reads them), DELIVERED for delivered ones.
+ * backdated happened_at (the plugin's stale check reads them), a delivered event for delivered ones.
  * A stale fixture gets the dispatch event only, so the last update is 12 days old.
  */
 export function fulfilmentSteps(fixture: OrderFixture, now: Date): FulfilmentStep[] {
@@ -303,6 +309,7 @@ export function fulfilmentSteps(fixture: OrderFixture, now: Date): FulfilmentSte
       body: {
         status: "dispatched",
         description: `Objeto postado (${carrier})`,
+        address: EVENT_ADDRESS,
         happened_at: shippedAt.toISOString(),
       },
     },
@@ -320,34 +327,25 @@ export function fulfilmentSteps(fixture: OrderFixture, now: Date): FulfilmentSte
     body: {
       status: "in_transit",
       description: "Objeto em trânsito",
+      address: EVENT_ADDRESS,
       happened_at: inTransitAt.toISOString(),
     },
   });
+  // The delivered event moves the fulfillment order to DELIVERED and sets fulfilled_at to its
+  // happened_at; a PATCH to DELIVERED afterwards is refused.
   if (delivered) {
-    steps.push(
-      {
-        method: "POST",
-        path: "/tracking-events",
-        body: {
-          status: "delivered",
-          description: "Objeto entregue ao destinatário",
-          happened_at: delivered.toISOString(),
-        },
+    steps.push({
+      method: "POST",
+      path: "/tracking-events",
+      body: {
+        status: "delivered",
+        description: "Objeto entregue ao destinatário",
+        address: EVENT_ADDRESS,
+        happened_at: delivered.toISOString(),
       },
-      { method: "PATCH", path: "", body: { status: "DELIVERED" } },
-    );
+    });
   }
   return steps;
-}
-
-/** Legacy fallback when fulfillment orders are unavailable: POST /orders/{id}/fulfill. */
-export function legacyFulfilPayload(fixture: OrderFixture): Record<string, unknown> {
-  const code = trackingNumber(fixture, "nuvemshop");
-  return {
-    shipping_tracking_number: code,
-    shipping_tracking_url: trackingUrl(carrierFor(fixture), code),
-    notify_customer: false,
-  };
 }
 
 /** Cancel body (plugin: POST /orders/{id}/cancel {reason, email, restock}). */
