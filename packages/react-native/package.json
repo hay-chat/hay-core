@@ -1,0 +1,57 @@
+{
+  "name": "@hay-chat/react-native",
+  "version": "0.1.0",
+  "description": "Hay chat for React Native and Expo apps",
+  "license": "MIT",
+  "author": "Hay",
+  "homepage": "https://hay.chat",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hay-chat/hay-core.git",
+    "directory": "packages/react-native"
+  },
+  "keywords": [
+    "hay",
+    "chat",
+    "customer-support",
+    "react-native",
+    "expo"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "react-native": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-native": ">=0.72",
+    "react-native-webview": ">=13"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "react": "19.1.0",
+    "react-native": "0.81.4",
+    "react-native-webview": "^13.15.0",
+    "typescript": "^5.4.2",
+    "vitest": "^3.2.7"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

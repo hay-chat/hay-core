@@ -112,6 +112,12 @@
   display: none;
 }
 
+/* The chat is the whole page (a mobile app's WebView): there is no button. */
+#hay-webchat-root[data-embedded] .hay-chat-button,
+#hay-webchat-root[data-embedded] .hay-chat-teaser {
+  display: none;
+}
+
 .hay-chat-button--left {
   left: 20px;
   right: auto;

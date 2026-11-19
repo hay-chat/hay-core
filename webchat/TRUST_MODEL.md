@@ -17,6 +17,14 @@ organization. It relies on the `Origin` a browser sends, so it stops other websi
 your widget. It does not stop a non-browser client, which can send any `Origin`. Rate limits and the
 challenge flow cover those clients. Use real hostnames here: `*` lets every site start conversations.
 
+## Mobile apps
+
+`@hay-chat/react-native` (`packages/react-native`) shows the widget in a WebView whose page is given
+one of the organization's allowed websites as its address, so requests carry that site's `Origin`.
+The app is trusted the way the host page is: it can read the conversation and act as the visitor.
+An app is a non-browser client, so allowed domains do not keep other apps out; rate limits and the
+challenge flow do. The identity secret must stay on the app's server, never inside the app.
+
 ## Who the visitor is
 
 A visitor is anonymous unless the site says otherwise.

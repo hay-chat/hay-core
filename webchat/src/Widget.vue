@@ -285,9 +285,15 @@ function setChallengeHost(el: HTMLElement | null) {
 const rate = (messageId: string, rating: "up" | "down") => void rateMessage(messageId, rating);
 
 // Phones get a full-screen sheet; the preview says which device it shows.
-const sheetQuery = isPreview ? null : (window.matchMedia?.("(max-width: 480px)") ?? null);
+// An embedded chat (a mobile app's WebView) is always one.
+const isEmbedded = Boolean(props.config.embedded);
+const sheetQuery =
+  isPreview || isEmbedded ? null : (window.matchMedia?.("(max-width: 480px)") ?? null);
 const isSheet = ref(
-  props.config.preview ? props.config.preview.device === "mobile" : (sheetQuery?.matches ?? false),
+  isEmbedded ||
+    (props.config.preview
+      ? props.config.preview.device === "mobile"
+      : (sheetQuery?.matches ?? false)),
 );
 sheetQuery?.addEventListener?.("change", (event) => {
   isSheet.value = event.matches;
