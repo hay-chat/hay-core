@@ -55,7 +55,7 @@
     "@trpc/server": "^11.28.0",
     "adm-zip": "^0.6.1",
     "ajv": "^8.20.0",
-    "amqplib": "^0.10.9",
+    "amqplib": "^2.3.1",
     "archiver": "^7.0.1",
     "argon2": "^0.45.2",
     "axios": "^1.21.1",
@@ -103,7 +103,6 @@
   },
   "devDependencies": {
     "@types/adm-zip": "^0.6.0",
-    "@types/amqplib": "^0.10.8",
     "@types/archiver": "^7.0.0",
     "@types/bcrypt": "^6.0.0",
     "@types/cheerio": "^1.0.0",
