@@ -35,10 +35,8 @@ describe("plugin worker environment", () => {
       pluginId: "plugin",
       port: 4100,
       workerSecret: "s",
-      orgConfig: { org: { id: "org" }, config: {} },
-      orgAuth: null,
+      settings: { org: { id: "org" }, config: {}, authMethodId: null },
       capabilities: [],
-      allowedEnvVars: ["OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_HEADERS"],
     });
 
     expect(env.NODE_OPTIONS).toMatch(/^--max-old-space-size=\d+$/);
@@ -47,5 +45,47 @@ describe("plugin worker environment", () => {
 
   it("refuses OTEL settings even when a manifest names them", () => {
     expect(isDeniedPluginEnv("OTEL_EXPORTER_OTLP_HEADERS")).toBe(true);
+  });
+
+  it("carries identity and non-secret settings only: no secret, token or host env value", () => {
+    process.env.DB_PASSWORD = "db-secret";
+    process.env.SHOPIFY_OAUTH_CLIENT_SECRET = "managed-secret";
+    process.env.RESEND_API_KEY = "managed-key";
+
+    const env = (new PluginRunnerService() as unknown as EnvBuilder).buildSDKEnv({
+      orgId: "org",
+      pluginId: "plugin",
+      port: 4100,
+      workerSecret: "s",
+      settings: { org: { id: "org" }, config: { region: "eu" }, authMethodId: "oauth" },
+      capabilities: ["mcp", "credentials"],
+      // A manifest asking for host env values, as the old passthrough honoured.
+      allowedEnvVars: ["SHOPIFY_OAUTH_CLIENT_SECRET", "RESEND_API_KEY"],
+    });
+
+    expect(env.HAY_ORG_SETTINGS).toBe(
+      JSON.stringify({ org: { id: "org" }, config: { region: "eu" }, authMethodId: "oauth" }),
+    );
+    expect(Object.keys(env).sort()).toEqual(
+      [
+        "HAY_API_TOKEN",
+        "HAY_API_URL",
+        "HAY_ORG_ID",
+        "HAY_ORG_SETTINGS",
+        "HAY_PLUGIN_ID",
+        "HAY_PUBLIC_URL",
+        "HAY_WORKER_PORT",
+        "HAY_WORKER_SECRET",
+        "NODE_ENV",
+        "NODE_OPTIONS",
+        "PATH",
+      ].sort(),
+    );
+    expect(env).not.toHaveProperty("HAY_ORG_CONFIG");
+    expect(env).not.toHaveProperty("HAY_ORG_AUTH");
+    const text = JSON.stringify(env);
+    for (const secret of ["db-secret", "managed-secret", "managed-key"]) {
+      expect(text).not.toContain(secret);
+    }
   });
 });

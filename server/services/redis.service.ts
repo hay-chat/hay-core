@@ -2,6 +2,9 @@ import Redis from "ioredis";
 import { config } from "../config/env";
 import { createLogger } from "@server/lib/logger";
 
+/** Longest a publish may hold its caller; the command itself still goes out. */
+const PUBLISH_WAIT_MS = 250;
+
 const logger = createLogger("redis");
 
 const MAX_RETRY_DELAY_MS = 30000;
@@ -107,12 +110,24 @@ export class RedisService {
     }
   }
 
+  private lastUnavailableWarnAt = 0;
+
   /**
    * Publish a message to a channel
    */
   async publish(channel: string, data: unknown): Promise<void> {
     if (!this.publisher) {
       logger.error("Publisher not initialized");
+      return;
+    }
+
+    // Events are live notifications. While Redis is away the client would hold
+    // this call until it reconnects, stalling whatever produced the event.
+    if (!this.isConnected()) {
+      if (Date.now() - this.lastUnavailableWarnAt >= 60_000) {
+        this.lastUnavailableWarnAt = Date.now();
+        logger.warn({ channel }, "Redis unavailable, events are not being published");
+      }
       return;
     }
 
@@ -128,7 +143,14 @@ export class RedisService {
         },
         "Publishing message to channel",
       );
-      await this.publisher.publish(channel, message);
+      // A connection lost after the check above would hold this call the same way.
+      let timer: NodeJS.Timeout | undefined;
+      await Promise.race([
+        this.publisher.publish(channel, message),
+        new Promise((resolve) => {
+          timer = setTimeout(resolve, PUBLISH_WAIT_MS);
+        }),
+      ]).finally(() => clearTimeout(timer));
       logger.debug({ channel }, "Message published successfully");
     } catch (error) {
       logger.error({ err: error, channel }, "Failed to publish");

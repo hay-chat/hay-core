@@ -1,4 +1,5 @@
 import { AppDataSource, createDirectDataSource } from "@server/database/data-source";
+import { runAsSystem } from "@server/database/organization-context";
 import { config } from "@server/config/env";
 import { ScheduledJob } from "@server/entities/scheduled-job.entity";
 import { ScheduledJobHistory } from "@server/entities/scheduled-job-history.entity";
@@ -97,7 +98,7 @@ export class SchedulerService {
     try {
       if (AppDataSource.isInitialized) {
         const scheduledJobRepo = AppDataSource.getRepository(ScheduledJob);
-        const existingJobs = await scheduledJobRepo.find();
+        const existingJobs = await runAsSystem("scheduler startup", () => scheduledJobRepo.find());
 
         logger.debug({ count: existingJobs.length }, "Loaded job records from database");
       }
@@ -355,7 +356,13 @@ export class SchedulerService {
    * one server instance runs it at a time; an instance that cannot take the
    * lock skips the run.
    */
-  private async executeJob(name: string): Promise<void> {
+  private executeJob(name: string): Promise<void> {
+    // Timers keep the context of whoever registered the job, while the lock
+    // connection is shared by every job and has to stay in one context.
+    return runAsSystem("scheduler bookkeeping", () => this.runWithBookkeeping(name));
+  }
+
+  private async runWithBookkeeping(name: string): Promise<void> {
     const job = this.jobs.get(name);
     if (!job) return;
 
@@ -423,7 +430,9 @@ export class SchedulerService {
     const startTime = Date.now();
     const controller = new AbortController();
     job.runController = controller;
-    const run = Promise.resolve().then(() => job.config.handler(controller.signal));
+    const run = Promise.resolve().then(() =>
+      runAsSystem(`scheduled job: ${name}`, () => job.config.handler(controller.signal)),
+    );
 
     let status: "success" | "failed" | "timeout" = "success";
     let errorMessage: string | undefined;

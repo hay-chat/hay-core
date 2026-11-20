@@ -42,7 +42,6 @@ export async function readPluginSetupStatus(
   try {
     const config = resolveConfigForWorker(
       instance.config,
-      instance.authState,
       (metadata.configSchema ?? {}) as Record<string, ConfigFieldDescriptor>,
       configEnvAllowList(plugin),
     );
@@ -54,7 +53,7 @@ export async function readPluginSetupStatus(
     const response = await workerFetch(worker.port, "/setup/status", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ config, authState: instance.authState ?? null }),
+      body: JSON.stringify({ config }),
       signal: AbortSignal.timeout(SETUP_STATUS_TIMEOUT_MS),
     });
     if (!response.ok) {

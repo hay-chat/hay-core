@@ -95,7 +95,8 @@ import scimRoutes from "../../routes/scim";
 import { authRouter } from "../../routes/v1/auth";
 import { ssoRouter } from "../../routes/v1/sso";
 import { authSessionService, RefreshRejectedError } from "../../services/auth-session.service";
-import { roleForGroups } from "../../services/scim.service";
+import { getDatabaseContext } from "../../database/organization-context";
+import { roleForGroups, scimService } from "../../services/scim.service";
 import { SsoLoginError, ssoService } from "../../services/sso.service";
 import { WebSocketService, websocketService } from "../../services/websocket.service";
 import type { Context } from "../../trpc/context";
@@ -311,6 +312,19 @@ describe("SCIM", () => {
         .filter((row) => row.organizationId === ORG_A)
         .map((row) => row.action);
       expect(actions).toEqual(expect.arrayContaining(["scim.token.create", "scim.token.revoke"]));
+    });
+
+    it("runs the request's work in the token's organization", async () => {
+      const seen: unknown[] = [];
+      const listUsers = scimService.listUsers.bind(scimService);
+      jest.spyOn(scimService, "listUsers").mockImplementation(async (organizationId, page) => {
+        seen.push(getDatabaseContext());
+        return listUsers(organizationId, page);
+      });
+
+      expect((await scim("GET", "/Users", { token: tokenA })).status).toBe(200);
+
+      expect(seen).toEqual([{ kind: "organization", organizationId: ORG_A }]);
     });
 
     it("is refused when missing, malformed or wrong, in the SCIM error format", async () => {

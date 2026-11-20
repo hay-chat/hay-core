@@ -2,6 +2,7 @@ import { t, publicProcedure, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { AppDataSource } from "@server/database/data-source";
+import { runAsSystem, runInOrganization } from "@server/database/organization-context";
 import { Raw, type FindOptionsWhere } from "typeorm";
 import { OrganizationInvitation } from "@server/entities/organization-invitation.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
@@ -412,11 +413,13 @@ export const invitationsRouter = t.router({
       const userRepository = AppDataSource.getRepository(User);
       const userOrgRepository = AppDataSource.getRepository(UserOrganization);
 
-      // Find invitation by token
-      const invitation = await invitationRepository.findOne({
-        where: { tokenHash },
-        relations: { organization: true },
-      });
+      // Find invitation by token; the row reveals the organization, so only the lookup runs without one.
+      const invitation = await runAsSystem("invitation lookup by token hash", () =>
+        invitationRepository.findOne({
+          where: { tokenHash },
+          relations: { organization: true },
+        }),
+      );
 
       if (!invitation) {
         throw new TRPCError({
@@ -425,105 +428,107 @@ export const invitationsRouter = t.router({
         });
       }
 
-      if (!invitation.canAccept()) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Invitation cannot be accepted (status: ${invitation.status})`,
-        });
-      }
-
-      // If user is authenticated, use their ID
-      // Otherwise, they need to be invited (existing user) or register first
-      let userId: string;
-
-      if (ctx.user) {
-        // User is already authenticated
-        userId = ctx.user.id;
-
-        // Verify email matches (case-insensitive)
-        const user = await userRepository.findOne({ where: { id: userId } });
-        if (!user || user.email.toLowerCase() !== invitation.email.toLowerCase()) {
+      return runInOrganization(invitation.organizationId, async () => {
+        if (!invitation.canAccept()) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "Invitation email does not match your account",
+            message: `Invitation cannot be accepted (status: ${invitation.status})`,
           });
         }
-      } else if (invitation.invitedUserId) {
-        // Invitation was for an existing user, but they're not authenticated
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Please log in to accept this invitation",
-        });
-      } else {
-        // Invitation was for a new user, they need to register first
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Please create an account to accept this invitation",
-        });
-      }
 
-      if (!invitation.organization.isActive || invitation.organization.suspendedAt) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "This organization cannot accept new members right now",
-        });
-      }
+        // If user is authenticated, use their ID
+        // Otherwise, they need to be invited (existing user) or register first
+        let userId: string;
 
-      // Check if user is already a member
-      const existingMembership = await userOrgRepository.findOne({
-        where: {
+        if (ctx.user) {
+          // User is already authenticated
+          userId = ctx.user.id;
+
+          // Verify email matches (case-insensitive)
+          const user = await userRepository.findOne({ where: { id: userId } });
+          if (!user || user.email.toLowerCase() !== invitation.email.toLowerCase()) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Invitation email does not match your account",
+            });
+          }
+        } else if (invitation.invitedUserId) {
+          // Invitation was for an existing user, but they're not authenticated
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "Please log in to accept this invitation",
+          });
+        } else {
+          // Invitation was for a new user, they need to register first
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "Please create an account to accept this invitation",
+          });
+        }
+
+        if (!invitation.organization.isActive || invitation.organization.suspendedAt) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "This organization cannot accept new members right now",
+          });
+        }
+
+        // Check if user is already a member
+        const existingMembership = await userOrgRepository.findOne({
+          where: {
+            userId,
+            organizationId: invitation.organizationId,
+          },
+        });
+
+        if (existingMembership) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "You are already a member of this organization",
+          });
+        }
+
+        await assertInviterCanStillGrant(invitation);
+
+        // Create UserOrganization membership
+        const userOrg = userOrgRepository.create({
           userId,
           organizationId: invitation.organizationId,
-        },
-      });
-
-      if (existingMembership) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "You are already a member of this organization",
+          role: invitation.role,
+          permissions: invitation.permissions,
+          isActive: true,
+          joinedAt: new Date(),
+          invitedAt: invitation.createdAt,
+          invitedBy: invitation.invitedBy,
         });
-      }
 
-      await assertInviterCanStillGrant(invitation);
+        await userOrgRepository.save(userOrg);
 
-      // Create UserOrganization membership
-      const userOrg = userOrgRepository.create({
-        userId,
-        organizationId: invitation.organizationId,
-        role: invitation.role,
-        permissions: invitation.permissions,
-        isActive: true,
-        joinedAt: new Date(),
-        invitedAt: invitation.createdAt,
-        invitedBy: invitation.invitedBy,
+        // Mark invitation as accepted
+        invitation.accept();
+        await invitationRepository.save(invitation);
+
+        // Log audit event
+        await auditLogService.logInvitationAccept(
+          userId,
+          invitation.organizationId,
+          invitation.role,
+          {
+            invitationId: invitation.id,
+            organizationName: invitation.organization.name,
+          },
+        );
+
+        return {
+          success: true,
+          message: "Invitation accepted successfully",
+          data: {
+            organizationId: invitation.organizationId,
+            organizationName: invitation.organization.name,
+            role: userOrg.role,
+          },
+        };
       });
-
-      await userOrgRepository.save(userOrg);
-
-      // Mark invitation as accepted
-      invitation.accept();
-      await invitationRepository.save(invitation);
-
-      // Log audit event
-      await auditLogService.logInvitationAccept(
-        userId,
-        invitation.organizationId,
-        invitation.role,
-        {
-          invitationId: invitation.id,
-          organizationName: invitation.organization.name,
-        },
-      );
-
-      return {
-        success: true,
-        message: "Invitation accepted successfully",
-        data: {
-          organizationId: invitation.organizationId,
-          organizationName: invitation.organization.name,
-          role: userOrg.role,
-        },
-      };
     }),
 
   /**
@@ -535,9 +540,11 @@ export const invitationsRouter = t.router({
       const tokenHash = hashToken(input.token);
       const invitationRepository = AppDataSource.getRepository(OrganizationInvitation);
 
-      const invitation = await invitationRepository.findOne({
-        where: { tokenHash },
-      });
+      const invitation = await runAsSystem("invitation lookup by token hash", () =>
+        invitationRepository.findOne({
+          where: { tokenHash },
+        }),
+      );
 
       if (!invitation) {
         throw new TRPCError({
@@ -546,28 +553,30 @@ export const invitationsRouter = t.router({
         });
       }
 
-      if (invitation.status !== "pending") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Invitation cannot be declined (status: ${invitation.status})`,
-        });
-      }
+      return runInOrganization(invitation.organizationId, async () => {
+        if (invitation.status !== "pending") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Invitation cannot be declined (status: ${invitation.status})`,
+          });
+        }
 
-      invitation.decline();
-      await invitationRepository.save(invitation);
+        invitation.decline();
+        await invitationRepository.save(invitation);
 
-      // Log audit event (if user is authenticated)
-      if (ctx.user) {
-        await auditLogService.logInvitationDecline(ctx.user.id, invitation.organizationId, {
-          invitationId: invitation.id,
-          email: invitation.email,
-        });
-      }
+        // Log audit event (if user is authenticated)
+        if (ctx.user) {
+          await auditLogService.logInvitationDecline(ctx.user.id, invitation.organizationId, {
+            invitationId: invitation.id,
+            email: invitation.email,
+          });
+        }
 
-      return {
-        success: true,
-        message: "Invitation declined",
-      };
+        return {
+          success: true,
+          message: "Invitation declined",
+        };
+      });
     }),
 
   /**
@@ -580,10 +589,12 @@ export const invitationsRouter = t.router({
       const tokenHash = hashToken(input.token);
       const invitationRepository = AppDataSource.getRepository(OrganizationInvitation);
 
-      const invitation = await invitationRepository.findOne({
-        where: { tokenHash },
-        relations: { organization: { logoUpload: true }, invitedByUser: true },
-      });
+      const invitation = await runAsSystem("invitation lookup by token hash", () =>
+        invitationRepository.findOne({
+          where: { tokenHash },
+          relations: { organization: { logoUpload: true }, invitedByUser: true },
+        }),
+      );
 
       if (!invitation) {
         throw new TRPCError({
@@ -592,35 +603,37 @@ export const invitationsRouter = t.router({
         });
       }
 
-      // Mark as expired if needed
-      if (invitation.status === "pending" && invitation.isExpired()) {
-        invitation.markExpired();
-        await invitationRepository.save(invitation);
-      }
+      return runInOrganization(invitation.organizationId, async () => {
+        // Mark as expired if needed
+        if (invitation.status === "pending" && invitation.isExpired()) {
+          invitation.markExpired();
+          await invitationRepository.save(invitation);
+        }
 
-      return {
-        id: invitation.id,
-        email: invitation.email,
-        role: invitation.role,
-        status: invitation.status,
-        expiresAt: invitation.expiresAt,
-        message: invitation.message,
-        organization: {
-          id: invitation.organization.id,
-          name: invitation.organization.name,
-          logo: invitation.organization.logoUpload
-            ? new StorageService().getUrl(invitation.organization.logoUpload)
+        return {
+          id: invitation.id,
+          email: invitation.email,
+          role: invitation.role,
+          status: invitation.status,
+          expiresAt: invitation.expiresAt,
+          message: invitation.message,
+          organization: {
+            id: invitation.organization.id,
+            name: invitation.organization.name,
+            logo: invitation.organization.logoUpload
+              ? new StorageService().getUrl(invitation.organization.logoUpload)
+              : null,
+          },
+          invitedBy: invitation.invitedByUser
+            ? {
+                name: invitation.invitedByUser.getFullName(),
+                email: invitation.invitedByUser.email,
+              }
             : null,
-        },
-        invitedBy: invitation.invitedByUser
-          ? {
-              name: invitation.invitedByUser.getFullName(),
-              email: invitation.invitedByUser.email,
-            }
-          : null,
-        canAccept: invitation.canAccept(),
-        isExistingUser: invitation.invitedUserId !== null,
-      };
+          canAccept: invitation.canAccept(),
+          isExistingUser: invitation.invitedUserId !== null,
+        };
+      });
     }),
 
   /**

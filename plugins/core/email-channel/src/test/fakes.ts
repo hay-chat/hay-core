@@ -2,7 +2,12 @@ import { vi } from "vitest";
 import type { HayLogger } from "@hay/plugin-sdk/types";
 import type { ChannelContext, ChannelSettings } from "../context.js";
 import { emptyState } from "../context.js";
-import type { PluginApi, SendEmailRequest, SendEmailResult } from "../plugin-api.js";
+import {
+  PluginApiError,
+  type PluginApi,
+  type SendEmailRequest,
+  type SendEmailResult,
+} from "../plugin-api.js";
 import { ResendClient, type ReceivedEmail } from "../resend.js";
 
 export function fakeLogger(): HayLogger {
@@ -21,30 +26,43 @@ export const settings: ChannelSettings = {
   bccArchive: false,
 };
 
-/** Resend API fake: serves received emails, attachment lists and downloads by URL. */
+/**
+ * Fake of the received-mail path: core's `email.received*` procedures serve
+ * emails and attachment lists (404 for an unknown id), downloads come from
+ * signed URLs.
+ */
 export function fakeResend(
   emails: Record<string, ReceivedEmail>,
   files: Record<string, { body: string; type?: string }> = {},
   attachmentLists: Record<string, unknown[]> = {},
 ) {
   const calls: string[] = [];
+  const api: PluginApi = {
+    async mutation() {
+      throw new Error("unexpected mutation");
+    },
+    async query<T>(procedure: string, input: Record<string, unknown>): Promise<T> {
+      const emailId = String(input.emailId);
+      calls.push(`${procedure}:${emailId}`);
+      if (procedure === "email.receivedMessage") {
+        const email = emails[emailId];
+        if (!email) {
+          throw new PluginApiError("Plugin API email.receivedMessage failed: 404", 404);
+        }
+        return email as T;
+      }
+      if (procedure === "email.receivedAttachments") {
+        return { attachments: attachmentLists[emailId] ?? [] } as T;
+      }
+      throw new Error(`unexpected query ${procedure}`);
+    },
+    async sendEmail() {
+      throw new Error("unexpected send");
+    },
+  };
   const fetchImpl = vi.fn(async (input: string | URL | Request) => {
     const url = String(input);
     calls.push(url);
-    const emailMatch = url.match(/\/emails\/receiving\/([^/?]+)$/);
-    if (emailMatch) {
-      const email = emails[decodeURIComponent(emailMatch[1])];
-      return email
-        ? new Response(JSON.stringify(email), { status: 200 })
-        : new Response("not found", { status: 404 });
-    }
-    const listMatch = url.match(/\/emails\/receiving\/([^/?]+)\/attachments$/);
-    if (listMatch) {
-      return new Response(
-        JSON.stringify({ data: attachmentLists[decodeURIComponent(listMatch[1])] ?? [] }),
-        { status: 200 },
-      );
-    }
     const file = files[url];
     if (file) {
       return new Response(file.body, {
@@ -55,10 +73,7 @@ export function fakeResend(
     return new Response("missing", { status: 404 });
   });
   return {
-    client: new ResendClient({
-      apiKey: "re_test",
-      fetchImpl: fetchImpl as unknown as typeof fetch,
-    }),
+    client: new ResendClient({ api, fetchImpl: fetchImpl as unknown as typeof fetch }),
     calls,
   };
 }

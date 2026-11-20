@@ -13,7 +13,8 @@
     "marketplaceCategory": "commerce",
     "capabilities": [
       "mcp",
-      "auth"
+      "auth",
+      "credentials"
     ],
     "network": {
       "egress": [
@@ -30,7 +31,25 @@
         "refunds",
         "order_changes"
       ]
-    }
+    },
+    "credentials": [
+      {
+        "name": "apiKey",
+        "source": "config",
+        "capability": "mcp",
+        "hosts": [
+          "www.wixapis.com"
+        ]
+      },
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "mcp",
+        "hosts": [
+          "www.wixapis.com"
+        ]
+      }
+    ]
   },
   "scripts": {
     "build": "tsc",

@@ -3,9 +3,14 @@
  * `sync_disputes`) must still register: the scheduler rejects maxRetries < 1.
  */
 jest.mock("../../services/plugin-runner.service", () => ({ getPluginRunnerService: jest.fn() }));
+jest.mock("@server/lib/worker-client", () => ({ workerFetch: jest.fn() }));
 jest.mock("../../lib/config-resolver", () => ({ resolveConfigForWorker: jest.fn() }));
 jest.mock("../../repositories/plugin-instance.repository", () => ({
-  pluginInstanceRepository: { findByOrgAndPlugin: jest.fn(), findAll: jest.fn() },
+  pluginInstanceRepository: {
+    findByOrgAndPlugin: jest.fn(),
+    findAll: jest.fn(),
+    updateAuthState: jest.fn(),
+  },
 }));
 jest.mock("../../services/scheduler.service", () => ({
   schedulerService: { registerJob: jest.fn(), unregisterJob: jest.fn() },
@@ -14,6 +19,8 @@ jest.mock("../../services/scheduler.service", () => ({
 import { PluginCronService } from "../../services/plugin-cron.service";
 import { schedulerService } from "../../services/scheduler.service";
 import { pluginInstanceRepository } from "../../repositories/plugin-instance.repository";
+import { getPluginRunnerService } from "../../services/plugin-runner.service";
+import { workerFetch } from "@server/lib/worker-client";
 
 describe("PluginCronService.registerForInstance", () => {
   it("registers a cron without a retryPolicy and leaves maxRetries out", async () => {
@@ -85,5 +92,42 @@ describe("PluginCronService.reconcile", () => {
     await service.reconcile();
 
     expect(unregisterJob).toHaveBeenCalledWith("plugin-cron:shopify:org-1:refresh");
+  });
+});
+
+describe("PluginCronService credential updates", () => {
+  it("keeps the stored refresh token when a cron stages new credentials", async () => {
+    (pluginInstanceRepository.findByOrgAndPlugin as jest.Mock).mockResolvedValue({
+      id: "inst-1",
+      enabled: true,
+      plugin: { metadata: { configSchema: {} } },
+      authState: {
+        methodId: "oauth",
+        credentials: { accessToken: "old", refreshToken: "refresh-1", connectedAt: 5 },
+      },
+    });
+    (getPluginRunnerService as jest.Mock).mockReturnValue({
+      getWorker: () => ({ port: 4000 }),
+      stopWorker: jest.fn(),
+      startWorker: jest.fn(),
+    });
+    (workerFetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        credentialsUpdated: { methodId: "oauth", credentials: { accessToken: "new" } },
+      }),
+    });
+
+    await (
+      new PluginCronService() as unknown as {
+        runCron(org: string, plugin: string, cron: string, signal: AbortSignal): Promise<void>;
+      }
+    ).runCron("org-1", "shopify", "refresh", new AbortController().signal);
+
+    expect(pluginInstanceRepository.updateAuthState).toHaveBeenCalledWith("inst-1", "org-1", {
+      methodId: "oauth",
+      credentials: { accessToken: "new", refreshToken: "refresh-1", connectedAt: 5 },
+    });
   });
 });

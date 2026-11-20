@@ -33,7 +33,6 @@
 import { defineHayPlugin } from "@hay/plugin-sdk";
 import { variantPricing } from "./pricing.js";
 import {
-  defaultAuthMode,
   getAuthMode,
   oauthStoreId,
   readCredentials,
@@ -462,14 +461,12 @@ export default defineHayPlugin((globalCtx) => {
             { label: "Connect with Nuvemshop (recommended)", value: "oauth" },
             { label: "Custom app token", value: "token" },
           ],
-          default: defaultAuthMode(),
         },
         clientId: {
           type: "string",
           label: "OAuth client ID",
           description: "Set by the Hay.chat server (NUVEMSHOP_OAUTH_CLIENT_ID). Leave empty.",
           required: false,
-          serverOnly: true,
           env: "NUVEMSHOP_OAUTH_CLIENT_ID",
           showWhen: { field: "authMode", equals: "oauth" },
         },

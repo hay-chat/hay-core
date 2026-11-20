@@ -29,6 +29,7 @@ import {
 } from "@server/services/webchat/webchat-identity.service";
 import { auditLogService } from "@server/services/audit-log.service";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { runInOrganization } from "@server/database/organization-context";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("webchat-router");
@@ -46,25 +47,27 @@ interface WidgetAvailability {
 }
 
 async function widgetAvailability(organizationId: string): Promise<WidgetAvailability | null> {
-  const [isEnabled, organization] = await Promise.all([
-    webchatSettingsService.isEnabled(organizationId),
-    organizationRepository.findById(organizationId),
-  ]);
-  if (!isEnabled || !organization || organization.suspendedAt) return null;
+  // The organization comes from the client: it must exist before it becomes the context.
+  const organization = await organizationRepository.findById(organizationId);
+  if (!organization || organization.suspendedAt) return null;
 
-  const scope = { organizationId, channel: "web" };
-  const now = new Date();
-  const [availability, typicalReplyMinutes] = await Promise.all([
-    getAvailability(scope, now),
-    typicalFirstReplyMinutes(scope, now),
-  ]);
-  return {
-    state: availability.state,
-    nextOpening: availability.nextOpening?.toISOString() ?? null,
-    timezone: availability.timezone,
-    hasSchedule: availability.hasSchedule,
-    typicalReplyMinutes,
-  };
+  return runInOrganization(organizationId, async () => {
+    if (!(await webchatSettingsService.isEnabled(organizationId))) return null;
+
+    const scope = { organizationId, channel: "web" };
+    const now = new Date();
+    const [availability, typicalReplyMinutes] = await Promise.all([
+      getAvailability(scope, now),
+      typicalFirstReplyMinutes(scope, now),
+    ]);
+    return {
+      state: availability.state,
+      nextOpening: availability.nextOpening?.toISOString() ?? null,
+      timezone: availability.timezone,
+      hasSchedule: availability.hasSchedule,
+      typicalReplyMinutes,
+    };
+  });
 }
 import { formSchemaSchema } from "@hay/form-schema";
 
@@ -257,43 +260,47 @@ export const webchatRouter = router({
     .query(async ({ ctx, input }) => {
       // A disabled webchat or a suspended organization is not an error for the
       // widget: it answers `{ enabled: false }` and the widget renders nothing.
-      const [isEnabled, organization] = await Promise.all([
-        webchatSettingsService.isEnabled(input.organizationId),
-        organizationRepository.findById(input.organizationId),
-      ]);
-
-      if (!isEnabled || !organization || organization.suspendedAt) {
+      // The organization comes from the client: it must exist before it
+      // becomes the context for the rest of the request.
+      const organization = await organizationRepository.findById(input.organizationId);
+      if (!organization || organization.suspendedAt) {
         return { enabled: false as const };
       }
 
-      // Install detection (C2): which site loads the widget, and when.
-      const pageOrigin = widgetPageOrigin(ctx.req.headers);
-      if (pageOrigin) {
-        webchatSettingsService
-          .recordWidgetLoad(input.organizationId, pageOrigin)
-          .catch((error) => logger.warn({ err: error }, "Could not record the widget load"));
-      }
+      return runInOrganization(input.organizationId, async () => {
+        if (!(await webchatSettingsService.isEnabled(input.organizationId))) {
+          return { enabled: false as const };
+        }
 
-      const underAttack = await isUnderAttack(input.organizationId);
-      const [config, contributions] = await Promise.all([
-        webchatSettingsService.getPublicConfig(input.organizationId),
-        webchatExtensionsService.getPublicContributions(
-          input.organizationId,
-          input.supports ?? [],
-          {
-            underAttack,
-          },
-        ),
-      ]);
-      return {
-        enabled: true as const,
-        ...config,
-        // Plugin contributions the widget can render (declarative, never code).
-        contributions,
-        // AI label on AI replies (D14-6). A null text means the widget's localized default.
-        aiLabelShown: isAiLabelShown(organization, "web"),
-        aiLabelText: customAiLabel(organization.settings),
-      };
+        // Install detection (C2): which site loads the widget, and when.
+        const pageOrigin = widgetPageOrigin(ctx.req.headers);
+        if (pageOrigin) {
+          webchatSettingsService
+            .recordWidgetLoad(input.organizationId, pageOrigin)
+            .catch((error) => logger.warn({ err: error }, "Could not record the widget load"));
+        }
+
+        const underAttack = await isUnderAttack(input.organizationId);
+        const [config, contributions] = await Promise.all([
+          webchatSettingsService.getPublicConfig(input.organizationId),
+          webchatExtensionsService.getPublicContributions(
+            input.organizationId,
+            input.supports ?? [],
+            {
+              underAttack,
+            },
+          ),
+        ]);
+        return {
+          enabled: true as const,
+          ...config,
+          // Plugin contributions the widget can render (declarative, never code).
+          contributions,
+          // AI label on AI replies (D14-6). A null text means the widget's localized default.
+          aiLabelShown: isAiLabelShown(organization, "web"),
+          aiLabelText: customAiLabel(organization.settings),
+        };
+      });
     }),
 
   /**

@@ -13,7 +13,7 @@ import type { HayPluginManifest, HayPluginPackageJson } from "../types/index.js"
 /**
  * Runner mode.
  *
- * - `production`: Load config/auth from env vars (HAY_ORG_CONFIG, HAY_ORG_AUTH)
+ * - `production`: Load settings from HAY_ORG_SETTINGS and pull credentials from core
  * - `test`: Use mock data for testing
  */
 export type RunnerMode = "production" | "test";
@@ -208,6 +208,8 @@ export function loadManifest(pluginPath: string): ValidatedManifest {
     "disputes",
     "tickets",
     "privacy",
+    "state",
+    "credentials",
   ];
   for (const cap of manifest.capabilities) {
     if (!validCapabilities.includes(cap)) {
@@ -243,6 +245,32 @@ export function loadManifest(pluginPath: string): ValidatedManifest {
           'Invalid "network.egress" entry in hay-plugin manifest (a host string or { fromConfig })',
         );
       }
+    }
+  }
+
+  // Validate credentials (optional)
+  if (manifest.credentials !== undefined) {
+    if (!Array.isArray(manifest.credentials)) {
+      throw new Error('Invalid "credentials" in hay-plugin manifest (must be an array)');
+    }
+    for (const credential of manifest.credentials) {
+      if (
+        typeof credential?.name !== "string" ||
+        credential.name === "refreshToken" ||
+        (credential.source !== "config" && credential.source !== "auth") ||
+        !validCapabilities.includes(credential.capability) ||
+        !manifest.capabilities.includes(credential.capability)
+      ) {
+        throw new Error(
+          `Invalid credential ${JSON.stringify(credential?.name)} in hay-plugin manifest: ` +
+            'it needs a name, a source ("config" or "auth") and a capability the plugin declares',
+        );
+      }
+    }
+    if (manifest.credentials.length > 0 && !manifest.capabilities.includes("credentials")) {
+      throw new Error(
+        'A plugin that declares credentials must declare the "credentials" capability',
+      );
     }
   }
 

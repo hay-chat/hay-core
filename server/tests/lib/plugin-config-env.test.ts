@@ -73,7 +73,7 @@ describe("config resolver env scoping", () => {
   });
 
   it("reads no env var when no allow-list is given", () => {
-    const config = resolveConfigForWorker({}, null, schema);
+    const config = resolveConfigForWorker({}, schema);
     expect(JSON.stringify(config)).not.toContain("core-secret");
     expect(config.region).toBeUndefined();
     expect(managedFieldKeys(schema)).toEqual([]);

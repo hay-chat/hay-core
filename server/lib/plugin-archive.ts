@@ -1,15 +1,48 @@
 import AdmZip from "adm-zip";
-import { createWriteStream, promises as fs } from "fs";
+import { promises as fs } from "fs";
 import path from "path";
-import { PassThrough, Readable, Transform } from "stream";
-import { pipeline } from "stream/promises";
-import { createInflateRaw, inflateRawSync } from "zlib";
+import { inflateRawSync } from "zlib";
+import { parseCredentialDeclarations } from "@server/lib/plugin-credentials";
+import { isKnownPluginCapability } from "@server/lib/plugin-capabilities";
+import {
+  PACK_LIMITS,
+  PACK_MANIFEST_FILE,
+  PackError,
+  assertSafePackPath,
+  comparePackFiles,
+  packListsFile,
+  parsePackManifest,
+  sha256Hex,
+  type PackManifest,
+} from "@server/lib/plugin-pack";
 
-/** Caps for an uploaded plugin ZIP. */
-const MAX_UNCOMPRESSED_BYTES = 500 * 1024 * 1024;
-const MAX_ENTRIES = 10_000;
-const MAX_PACKAGE_JSON_BYTES = 1024 * 1024;
-const TOO_LARGE_MESSAGE = "ZIP file exceeds maximum uncompressed size (500MB)";
+const TOO_LARGE_MESSAGE = `ZIP file exceeds maximum unpacked size (${PACK_LIMITS.maxTotalBytes / (1024 * 1024)}MB)`;
+
+/**
+ * Archives opened at once in this process. Opening one holds up to
+ * PACK_LIMITS.maxTotalBytes of inflated files in memory, so uploads queue here.
+ */
+export const MAX_CONCURRENT_ARCHIVES = 2;
+
+let archivesOpen = 0;
+const archiveQueue: Array<() => void> = [];
+
+/** Run `work` once fewer than MAX_CONCURRENT_ARCHIVES other archive jobs are running. */
+export async function withArchiveSlot<T>(work: () => Promise<T> | T): Promise<T> {
+  if (archivesOpen >= MAX_CONCURRENT_ARCHIVES) {
+    await new Promise<void>((resolve) => archiveQueue.push(resolve));
+  } else {
+    archivesOpen++;
+  }
+  try {
+    return await work();
+  } finally {
+    // Hand the slot straight to the next waiter, or free it.
+    const next = archiveQueue.shift();
+    if (next) next();
+    else archivesOpen--;
+  }
+}
 
 /** ZIP compression methods a plugin archive may use. */
 const METHOD_STORED = 0;
@@ -34,6 +67,7 @@ interface PluginPackageJson {
     displayName?: string;
     category?: string;
     capabilities?: string[];
+    credentials?: unknown;
     autoActivate?: boolean;
     trpcRouter?: string;
   };
@@ -60,42 +94,44 @@ function isSymlink(entry: AdmZip.IZipEntry): boolean {
   return ((entry.header.attr >>> 16) & S_IFMT) === S_IFLNK;
 }
 
-function isUnsafeEntryName(name: string): boolean {
-  if (name.includes("\\") || name.includes("\0") || path.isAbsolute(name)) {
-    return true;
-  }
-  const normalized = path.posix.normalize(name);
-  return normalized === ".." || normalized.startsWith("../");
-}
-
-/** Decode the root package.json, trusting the bytes it inflates to rather than its header. */
-function readPackageJson(entry: AdmZip.IZipEntry): string {
-  const data = entry.getCompressedData();
-  try {
-    if (entry.header.method === METHOD_DEFLATED) {
-      return inflateRawSync(data, { maxOutputLength: MAX_PACKAGE_JSON_BYTES }).toString("utf8");
-    }
-  } catch {
-    throw new Error("package.json could not be read from the ZIP or is too large");
-  }
-  if (data.length > MAX_PACKAGE_JSON_BYTES) {
-    throw new Error("package.json could not be read from the ZIP or is too large");
-  }
-  return data.toString("utf8");
-}
-
 /** Stored ZIPs live in `plugin-zips/<id>`, and uploads.folder holds 100 characters. */
 const PLUGIN_ID_MAX_LENGTH = 88;
 
 /**
- * Validate a plugin ZIP without extracting it: declared size/entry caps, no path
- * traversal, no symlinks, and a valid root `package.json`. A header can
- * understate an entry's size, so `extractPluginZip` also counts what it writes.
+ * The bytes an entry inflates to. A header can understate an entry's size, so
+ * inflation stops at the per-file cap whatever the header says.
  */
-export function validatePluginZip(zipBuffer: Buffer): {
+function readEntry(entry: AdmZip.IZipEntry): Buffer {
+  const data = entry.getCompressedData();
+  try {
+    if (entry.header.method === METHOD_DEFLATED) {
+      return inflateRawSync(data, { maxOutputLength: PACK_LIMITS.maxFileBytes });
+    }
+  } catch {
+    throw new PackError(`${entry.entryName} could not be read from the ZIP or is too large`);
+  }
+  if (data.length > PACK_LIMITS.maxFileBytes) {
+    throw new PackError(`${entry.entryName} could not be read from the ZIP or is too large`);
+  }
+  return data;
+}
+
+interface VerifiedPlugin {
   manifest: UploadedPluginManifest;
   pluginId: string;
-} {
+  pack: PackManifest;
+  /** `hay-pack.json` exactly as uploaded. */
+  packText: string;
+  /** Every file of the pack, as verified. */
+  files: Map<string, Buffer>;
+}
+
+/**
+ * Open a plugin archive and check it end to end, without writing anything:
+ * entry count and size caps, no traversal, links, encryption or native addons,
+ * every file matching `hay-pack.json`, and a valid manifest in `package.json`.
+ */
+function openPluginZip(zipBuffer: Buffer): VerifiedPlugin {
   let zip: AdmZip;
   try {
     zip = new AdmZip(zipBuffer);
@@ -104,42 +140,108 @@ export function validatePluginZip(zipBuffer: Buffer): {
   }
   const zipEntries = zip.getEntries();
 
-  if (zipEntries.length > MAX_ENTRIES) {
-    throw new Error(`ZIP file has too many entries (max ${MAX_ENTRIES})`);
+  // Directory entries carry no content; only files count toward the pack.
+  if (zipEntries.length > PACK_LIMITS.maxFiles * 2) {
+    throw new Error(`ZIP file has too many entries (max ${PACK_LIMITS.maxFiles} files)`);
   }
 
-  let totalUncompressedSize = 0;
+  let declaredBytes = 0;
+  const fileEntries: AdmZip.IZipEntry[] = [];
   for (const entry of zipEntries) {
-    totalUncompressedSize += entry.header.size;
-    if (totalUncompressedSize > MAX_UNCOMPRESSED_BYTES) {
-      throw new Error(TOO_LARGE_MESSAGE);
-    }
     if (entry.header.encrypted) {
       throw new Error(`Encrypted entries are not allowed in ZIP: ${entry.entryName}`);
     }
     if (entry.header.method !== METHOD_STORED && entry.header.method !== METHOD_DEFLATED) {
       throw new Error(`Unsupported compression in ZIP: ${entry.entryName}`);
     }
-    if (isUnsafeEntryName(entry.entryName)) {
-      throw new Error(`Invalid file path in ZIP: ${entry.entryName}`);
-    }
     if (isSymlink(entry)) {
       throw new Error(`Symbolic links are not allowed in ZIP: ${entry.entryName}`);
     }
+    if (entry.isDirectory) {
+      assertSafePackPath(entry.entryName.replace(/\/+$/, ""));
+      continue;
+    }
+    assertSafePackPath(entry.entryName);
+    if (entry.header.size > PACK_LIMITS.maxFileBytes) {
+      throw new Error(`${entry.entryName} could not be read from the ZIP or is too large`);
+    }
+    declaredBytes += entry.header.size;
+    if (declaredBytes > PACK_LIMITS.maxTotalBytes) {
+      throw new Error(TOO_LARGE_MESSAGE);
+    }
+    fileEntries.push(entry);
   }
 
-  const packageEntry = zipEntries.find((e) => e.entryName === "package.json");
-  if (!packageEntry) {
+  const files = new Map<string, Buffer>();
+  const folded = new Set<string>();
+  let packText: string | null = null;
+  let actualBytes = 0;
+  for (const entry of fileEntries) {
+    const key = entry.entryName.toLowerCase();
+    if (folded.has(key)) throw new Error(`ZIP lists a file twice: ${entry.entryName}`);
+    folded.add(key);
+    const data = readEntry(entry);
+    actualBytes += data.length;
+    if (actualBytes > PACK_LIMITS.maxTotalBytes) throw new Error(TOO_LARGE_MESSAGE);
+    if (entry.entryName === PACK_MANIFEST_FILE) {
+      packText = data.toString("utf8");
+    } else {
+      files.set(entry.entryName, data);
+    }
+  }
+
+  if (packText === null) {
+    throw new Error(
+      `${PACK_MANIFEST_FILE} not found in ZIP root. Build the archive with "hay plugin pack".`,
+    );
+  }
+  const pack = parsePackManifest(packText);
+  comparePackFiles(
+    pack,
+    new Map(
+      [...files].map(([name, data]) => [name, { sha256: sha256Hex(data), size: data.length }]),
+    ),
+  );
+
+  const packageJson = files.get("package.json");
+  if (!packageJson) {
     throw new Error("package.json not found in ZIP root");
   }
+  const { manifest, pluginId } = describePackedPlugin(packageJson.toString("utf8"), pack);
+  return { manifest, pluginId, pack, packText, files };
+}
 
-  return parsePluginPackageJson(readPackageJson(packageEntry));
+/**
+ * Check a verified pack's `package.json` against its `hay-pack.json`: a valid
+ * manifest, the same name and version, and an entry file that is in the pack.
+ */
+export function describePackedPlugin(
+  packageJsonText: string,
+  pack: PackManifest,
+): { manifest: UploadedPluginManifest; pluginId: string } {
+  const { manifest, pluginId } = parsePluginPackageJson(packageJsonText);
+  if (pack.name !== pluginId || pack.version !== manifest.version) {
+    throw new Error(`${PACK_MANIFEST_FILE} does not describe this package.json`);
+  }
+  if (!packListsFile(pack, path.posix.normalize(manifest.entry))) {
+    throw new Error(`Plugin entry file ${manifest.entry} is not in the pack`);
+  }
+  return { manifest, pluginId };
+}
+
+/** Validate a plugin ZIP without extracting it. */
+export function validatePluginZip(zipBuffer: Buffer): {
+  manifest: UploadedPluginManifest;
+  pluginId: string;
+} {
+  const { manifest, pluginId } = openPluginZip(zipBuffer);
+  return { manifest, pluginId };
 }
 
 /**
  * Parse and validate an uploaded plugin's root package.json: it must carry a
- * `hay-plugin` block with an `entry` (and no core-only fields), and a valid
- * package name (the plugin id).
+ * `hay-plugin` block with an `entry` and capabilities core recognises (and no
+ * core-only fields), and a valid package name (the plugin id).
  */
 export function parsePluginPackageJson(content: string): {
   manifest: UploadedPluginManifest;
@@ -188,6 +290,31 @@ export function parsePluginPackageJson(content: string): {
     throw new Error(`Plugin ID (package name) must be at most ${PLUGIN_ID_MAX_LENGTH} characters`);
   }
 
+  const capabilities = hayPlugin.capabilities ?? [];
+  if (
+    !Array.isArray(capabilities) ||
+    !capabilities.every((capability) => typeof capability === "string")
+  ) {
+    throw new Error("hay-plugin capabilities must be a list of strings");
+  }
+  const unknown = capabilities.find((capability) => !isKnownPluginCapability(capability));
+  if (unknown !== undefined) {
+    throw new Error(`Unknown plugin capability: ${JSON.stringify(unknown)}`);
+  }
+
+  const declaredCredentials = parseCredentialDeclarations(hayPlugin.credentials);
+  const missing = declaredCredentials.find(
+    (credential) => !capabilities.includes(credential.capability),
+  );
+  if (missing) {
+    throw new Error(
+      `Credential ${missing.name} needs the '${missing.capability}' capability, which the plugin does not declare`,
+    );
+  }
+  if (declaredCredentials.length > 0 && !capabilities.includes("credentials")) {
+    throw new Error("A plugin that declares credentials must declare the 'credentials' capability");
+  }
+
   const manifest: UploadedPluginManifest = {
     id: pluginId,
     name: hayPlugin.displayName || pluginId,
@@ -196,49 +323,28 @@ export function parsePluginPackageJson(content: string): {
     author: packageJson.author,
     category: hayPlugin.category,
     entry: hayPlugin.entry,
-    capabilities: hayPlugin.capabilities || [],
+    capabilities,
   };
 
   return { manifest, pluginId };
 }
 
 /**
- * Validate a plugin ZIP, then stream it into `destDir`, a directory that does
- * not exist yet. Stops at the first byte over the size cap and removes the
- * partial extraction, whatever the entry headers declared.
+ * Validate a plugin ZIP, then write its verified files into `destDir`, a
+ * directory that does not exist yet. Removes the directory again on failure.
  */
-export async function extractPluginZip(
-  zipBuffer: Buffer,
-  destDir: string,
-  maxBytes = MAX_UNCOMPRESSED_BYTES,
-): Promise<void> {
-  validatePluginZip(zipBuffer);
-
-  let remaining = maxBytes;
-  const countBytes = () =>
-    new Transform({
-      transform(chunk: Buffer, _encoding, callback) {
-        remaining -= chunk.length;
-        callback(remaining < 0 ? new Error(TOO_LARGE_MESSAGE) : null, chunk);
-      },
-    });
-
+export async function extractPluginZip(zipBuffer: Buffer, destDir: string): Promise<void> {
+  const { files, packText } = openPluginZip(zipBuffer);
   try {
     await fs.mkdir(destDir, { recursive: true });
-    for (const entry of new AdmZip(zipBuffer).getEntries()) {
-      const target = path.join(destDir, entry.entryName);
-      if (entry.isDirectory) {
-        await fs.mkdir(target, { recursive: true });
-        continue;
-      }
+    for (const [name, data] of files) {
+      const target = path.join(destDir, name);
       await fs.mkdir(path.dirname(target), { recursive: true });
-      await pipeline(
-        Readable.from([entry.getCompressedData()], { objectMode: false }),
-        entry.header.method === METHOD_DEFLATED ? createInflateRaw() : new PassThrough(),
-        countBytes(),
-        createWriteStream(target),
-      );
+      await fs.writeFile(target, data, { flag: "wx" });
     }
+    await fs.writeFile(path.join(destDir, PACK_MANIFEST_FILE), packText, {
+      flag: "wx",
+    });
   } catch (error) {
     await fs.rm(destDir, { recursive: true, force: true });
     throw error;

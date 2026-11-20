@@ -128,15 +128,13 @@ Auth state:
 In production mode (`--mode=production`), the plugin loads from environment variables:
 
 ```bash
-export HAY_ORG_CONFIG='{
+export HAY_ORG_SETTINGS='{
   "org": {"id": "org_abc123", "name": "Acme Corp"},
-  "config": {"apiKey": "sk_live_xyz789"}
+  "config": {},
+  "authMethodId": "apiKey"
 }'
-
-export HAY_ORG_AUTH='{
-  "methodId": "apiKey",
-  "credentials": {"apiKey": "sk_live_xyz789"}
-}'
+# The API key is pulled from core with HAY_API_URL and HAY_API_TOKEN
+# (a "credentials" entry in the manifest); it is not in the environment.
 
 export HAY_WORKER_SECRET=local-dev-secret
 

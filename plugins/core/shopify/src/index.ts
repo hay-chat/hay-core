@@ -833,7 +833,7 @@ export default defineHayPlugin((globalCtx) => {
       if (mode === "oauth") {
         // Tell the App Store app + theme embed which Hay org this store belongs to.
         // Idempotent and non-blocking: the MCP server must start even if this fails.
-        const serverUrl = process.env.HAY_API_URL || "";
+        const serverUrl = process.env.HAY_PUBLIC_URL || "";
         void writeAppMetafields(shop, accessToken, apiVersion, {
           mode: "managed",
           organization_id: ctx.org.id,

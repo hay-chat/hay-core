@@ -40,7 +40,14 @@ describe("mayParseLargeBody", () => {
     const headers = { "content-length": LARGE, authorization: "Bearer jwt" };
     expect(await mayParseLargeBody(request(headers))).toBe(true);
 
-    mockVerify.mockReturnValueOnce({});
+    mockVerify.mockReturnValueOnce({ capabilities: ["messages"] });
     expect(await mayParseLargeBody(request(headers))).toBe(true);
+  });
+
+  it("refuses a plugin token whose capabilities carry no bulk bodies", async () => {
+    mockVerify.mockReturnValue({ capabilities: ["state", "auth"] });
+    const headers = { "content-length": LARGE, authorization: "Bearer plugin" };
+    expect(await mayParseLargeBody(request(headers))).toBe(false);
+    expect(mockAuthenticate).not.toHaveBeenCalled();
   });
 });

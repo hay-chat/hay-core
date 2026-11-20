@@ -33,6 +33,7 @@ jest.mock("@server/services/webchat/under-attack.service", () => ({
   isUnderAttack: async () => false,
 }));
 
+import { getDatabaseContext } from "@server/database/organization-context";
 import { webchatChallengeHandler, parsePageOrigin } from "@server/routes/webchat-challenge";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
@@ -156,5 +157,38 @@ describe("GET /v1/webchat/challenge", () => {
     ]);
     const res = await load({ org: ORG, c: challenge.id, origin: "https://shop.example.com" });
     expect(res.body).not.toContain("</script><script>alert(1)");
+  });
+
+  it("reads the organization's settings in that organization's database context", async () => {
+    const seen: unknown[] = [];
+    mockIsEnabled.mockImplementation(async () => {
+      seen.push(getDatabaseContext());
+      return true;
+    });
+    mockResolveChallenges.mockImplementation(async () => {
+      seen.push(getDatabaseContext());
+      return [challenge];
+    });
+    const res = await load({ org: ORG, c: challenge.id, origin: "https://shop.example.com" });
+    expect(res.statusCode).toBe(200);
+    expect(seen).toEqual([
+      { kind: "organization", organizationId: ORG },
+      { kind: "organization", organizationId: ORG },
+    ]);
+  });
+
+  it.each([
+    ["missing", null],
+    ["suspended", { id: ORG, suspendedAt: new Date() }],
+  ])("runs nothing under a %s organization", async (_label, organization) => {
+    mockFindOrganization.mockResolvedValue(organization);
+    const seen: unknown[] = [];
+    mockIsEnabled.mockImplementation(async () => {
+      seen.push(getDatabaseContext());
+      return true;
+    });
+    const res = await load({ org: ORG, c: challenge.id, origin: "https://shop.example.com" });
+    expect(res.statusCode).toBe(404);
+    expect(seen).toEqual([]);
   });
 });

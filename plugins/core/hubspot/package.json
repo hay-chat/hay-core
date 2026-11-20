@@ -14,7 +14,8 @@
     "marketplaceCategory": "crm",
     "capabilities": [
       "mcp",
-      "auth"
+      "auth",
+      "credentials"
     ],
     "setup": {
       "businessTypes": [
@@ -33,6 +34,14 @@
     },
     "oauthHosts": [
       "mcp.hubspot.com"
+    ],
+    "credentials": [
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "mcp",
+        "hosts": []
+      }
     ]
   },
   "scripts": {

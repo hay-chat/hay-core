@@ -1,14 +1,11 @@
-/**
- * Minimal client for Resend's receiving API. The `email.received` webhook
- * carries metadata only; body, headers, authentication results and
- * attachment URLs come from these calls.
- *
- * Endpoints (Resend "Receiving" docs, verify during rollout):
- *   GET /emails/receiving/:id              → full received email
- *   GET /emails/receiving/:id/attachments  → attachment list with signed URLs (1 h)
- */
+import { PluginApiError, type PluginApi } from "./plugin-api.js";
 
-export const RESEND_API_BASE = "https://api.resend.com";
+/**
+ * Reads of received mail. The `email.received` webhook carries metadata only;
+ * body, headers, authentication results and attachment URLs come from core
+ * (plugin API `email.receivedMessage` / `email.receivedAttachments`), which
+ * holds the provider key. Signed download URLs are fetched directly.
+ */
 
 export interface ReceivedAttachmentMeta {
   id: string;
@@ -26,8 +23,6 @@ export interface ReceivedEmail {
   from: string;
   to: string[];
   cc?: string[];
-  bcc?: string[];
-  reply_to?: string[];
   subject?: string;
   text?: string | null;
   html?: string | null;
@@ -50,9 +45,8 @@ export class ResendApiError extends Error {
 }
 
 export interface ResendClientOptions {
-  apiKey: string;
+  api: PluginApi;
   fetchImpl?: typeof fetch;
-  baseUrl?: string;
   /** Backoff between retries of a transient API failure (ms). Override for tests. */
   retryDelaysMs?: number[];
   sleep?: (ms: number) => Promise<void>;
@@ -60,42 +54,46 @@ export interface ResendClientOptions {
 
 /**
  * Core acks the webhook to Resend before the worker fetches the email, so a
- * transient API failure here would lose the mail. Retry 429/5xx and network
- * errors a few times before giving up.
+ * transient failure here would lose the mail. Retry 429/5xx (core answers 503
+ * while the provider cannot respond) and network errors a few times before
+ * giving up; a 404 or other 4xx will not change.
  * TODO: persist the event (BullMQ) so a worker restart mid-fetch is recoverable too.
  */
 const DEFAULT_RETRY_DELAYS_MS = [500, 1500, 4000];
 
 function isTransient(error: unknown): boolean {
-  return error instanceof ResendApiError
-    ? error.status === 429 || error.status >= 500
-    : !(error instanceof Error && error.name === "SyntaxError");
+  if (error instanceof ResendApiError || error instanceof PluginApiError) {
+    return error.status === 429 || error.status >= 500;
+  }
+  return !(error instanceof Error && error.name === "SyntaxError");
 }
 
 export class ResendClient {
-  private readonly apiKey: string;
+  private readonly api: PluginApi;
   private readonly fetchImpl: typeof fetch;
-  private readonly baseUrl: string;
   private readonly retryDelaysMs: number[];
   private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(options: ResendClientOptions) {
-    this.apiKey = options.apiKey;
+    this.api = options.api;
     this.fetchImpl = options.fetchImpl ?? fetch;
-    this.baseUrl = (options.baseUrl ?? RESEND_API_BASE).replace(/\/$/, "");
     this.retryDelaysMs = options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
     this.sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   }
 
   async getReceivedEmail(emailId: string): Promise<ReceivedEmail> {
-    return this.getJson<ReceivedEmail>(`/emails/receiving/${encodeURIComponent(emailId)}`);
+    return this.withRetry(() =>
+      this.api.query<ReceivedEmail>("email.receivedMessage", { emailId }),
+    );
   }
 
   async listAttachments(emailId: string): Promise<ReceivedAttachmentMeta[]> {
-    const payload = await this.getJson<
-      ReceivedAttachmentMeta[] | { data?: ReceivedAttachmentMeta[] }
-    >(`/emails/receiving/${encodeURIComponent(emailId)}/attachments`);
-    return Array.isArray(payload) ? payload : (payload.data ?? []);
+    const payload = await this.withRetry(() =>
+      this.api.query<{ attachments?: ReceivedAttachmentMeta[] }>("email.receivedAttachments", {
+        emailId,
+      }),
+    );
+    return payload.attachments ?? [];
   }
 
   /** Download a signed URL (attachment or raw message). */
@@ -108,10 +106,10 @@ export class ResendClient {
     return { buffer, contentType: response.headers.get("content-type") ?? undefined };
   }
 
-  private async getJson<T>(path: string): Promise<T> {
+  private async withRetry<T>(call: () => Promise<T>): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       try {
-        return await this.getJsonOnce<T>(path);
+        return await call();
       } catch (error: unknown) {
         const delay = this.retryDelaysMs[attempt];
         if (delay === undefined || !isTransient(error)) {
@@ -120,19 +118,5 @@ export class ResendClient {
         await this.sleep(delay);
       }
     }
-  }
-
-  private async getJsonOnce<T>(path: string): Promise<T> {
-    const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
-      headers: { Authorization: `Bearer ${this.apiKey}` },
-    });
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new ResendApiError(
-        `Resend ${path} returned ${response.status}: ${text}`,
-        response.status,
-      );
-    }
-    return (await response.json()) as T;
   }
 }

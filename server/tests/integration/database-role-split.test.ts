@@ -10,14 +10,15 @@ import { config } from "../../config/env";
 /** Runs against real Postgres: the guarantees are the database's own permission checks. */
 describe("application database role", () => {
   const role = "hay_app_role_test";
+  const systemRole = "hay_system_role_test";
   const password = "role-test-pass'word";
   let app: DataSource;
 
   beforeAll(async () => {
     if (!AppDataSource.isInitialized) await AppDataSource.initialize();
     await AppDataSource.runMigrations();
-    await provisionAppRole(AppDataSource, role, password);
-    await provisionAppRole(AppDataSource, role, password); // re-running is safe
+    await provisionAppRole(AppDataSource, role, password, systemRole);
+    await provisionAppRole(AppDataSource, role, password, systemRole); // re-running is safe
     app = new DataSource({
       type: "postgres",
       host: config.database.host,
@@ -32,6 +33,29 @@ describe("application database role", () => {
   afterAll(async () => {
     await app?.destroy();
     await AppDataSource.destroy();
+  });
+
+  it("provisions the system role: no login, no bypass, switchable but not inherited", async () => {
+    const [row] = await AppDataSource.query(
+      `SELECT rolcanlogin, rolbypassrls, rolsuper FROM pg_roles WHERE rolname = $1`,
+      [systemRole],
+    );
+    expect(row).toEqual({ rolcanlogin: false, rolbypassrls: false, rolsuper: false });
+    const [grant] = await AppDataSource.query(
+      `SELECT m.inherit_option, m.set_option FROM pg_auth_members m
+       WHERE m.roleid = $1::regrole AND m.member = $2::regrole`,
+      [systemRole, role],
+    );
+    expect(grant).toEqual({ inherit_option: false, set_option: true });
+    const [{ count }] = await AppDataSource.query(
+      `SELECT count(*)::int AS count FROM pg_roles WHERE rolname = $1`,
+      [systemRole],
+    );
+    expect(count).toBe(1); // re-running created no duplicate
+    await expect(
+      app.query(`SELECT has_table_privilege($1, 'organizations', 'SELECT') AS ok`, [systemRole]),
+    ).resolves.toEqual([{ ok: true }]);
+    await app.query(`SET ROLE "${systemRole}"; RESET ROLE`);
   });
 
   it("reads and writes rows", async () => {

@@ -97,9 +97,8 @@ export default defineHayPlugin((globalCtx) => {
         clientId: config.field("clientId"),
         clientSecret: config.field("clientSecret"),
         tokenExchange: {
-          url: `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${encodeURIComponent(
-            process.env[APP_ID_ENV] ?? "",
-          )}`,
+          url: "https://graph.facebook.com/v21.0/oauth/access_token",
+          includeClientId: true,
           grantType: "fb_exchange_token",
           tokenParam: "fb_exchange_token",
           includeClientSecret: true,

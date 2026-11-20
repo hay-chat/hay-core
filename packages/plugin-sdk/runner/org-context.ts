@@ -20,6 +20,7 @@ import { createAuthRuntimeAPI } from "../sdk/auth-runtime.js";
 import { createMcpRuntimeAPI } from "../sdk/mcp-runtime.js";
 import { createProductSourceRuntime } from "../sdk/product-source-runtime.js";
 import { createDisputeSourceRuntime } from "../sdk/dispute-source-runtime.js";
+import { CredentialStore } from "../sdk/credential-store.js";
 import type { HayLogger } from "../types/index.js";
 import type { HayPluginManifest } from "../types/index.js";
 
@@ -214,57 +215,65 @@ export function createDisableContext(
 }
 
 /**
- * Load org runtime data from environment variables.
+ * Load org runtime data: the non-secret settings core put in the environment,
+ * plus every credential the manifest declares, pulled from core.
  *
- * @returns Org runtime data
- * @throws Error if env vars are missing or malformed
+ * @returns Org runtime data and the store that keeps its secrets fresh
+ * @throws Error if the settings are missing or malformed, or core refuses a credential
  *
  * @remarks
- * Expects:
- * - `HAY_ORG_CONFIG`: JSON string with org config
- * - `HAY_ORG_AUTH`: JSON string with org auth state (optional)
+ * Expects `HAY_ORG_SETTINGS`: JSON `{ org: { id }, config, authMethodId }`. It holds
+ * no secret field and no token; those are pulled with `HAY_API_TOKEN`.
  */
-export function loadOrgDataFromEnv(): OrgRuntimeData {
-  // Load org config
-  const orgConfigEnv = process.env.HAY_ORG_CONFIG;
-  if (!orgConfigEnv) {
-    throw new Error("Missing required environment variable: HAY_ORG_CONFIG");
+export async function loadOrgData(
+  manifest: HayPluginManifest,
+  logger: HayLogger,
+): Promise<{ orgData: OrgRuntimeData; credentials: CredentialStore }> {
+  const raw = process.env.HAY_ORG_SETTINGS;
+  if (!raw) {
+    throw new Error("Missing required environment variable: HAY_ORG_SETTINGS");
   }
 
-  let orgConfigData: any;
+  let settings: {
+    org?: { id?: string; name?: string };
+    config?: Record<string, unknown>;
+    authMethodId?: string | null;
+  };
   try {
-    orgConfigData = JSON.parse(orgConfigEnv);
+    settings = JSON.parse(raw);
   } catch (err) {
     throw new Error(
-      `Failed to parse HAY_ORG_CONFIG as JSON: ${err instanceof Error ? err.message : String(err)}`,
+      `Failed to parse HAY_ORG_SETTINGS as JSON: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
-
-  // Validate org config structure
-  if (!orgConfigData.org || !orgConfigData.org.id) {
-    throw new Error("HAY_ORG_CONFIG must include org.id");
+  if (!settings.org?.id) {
+    throw new Error("HAY_ORG_SETTINGS must include org.id");
   }
 
-  // Load org auth (optional)
-  let authState: AuthState | null = null;
-  const orgAuthEnv = process.env.HAY_ORG_AUTH;
-  if (orgAuthEnv) {
-    try {
-      authState = JSON.parse(orgAuthEnv);
-    } catch (err) {
-      throw new Error(
-        `Failed to parse HAY_ORG_AUTH as JSON: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
+  const declarations = manifest.credentials ?? [];
+  const apiUrl = process.env.HAY_API_URL;
+  const apiToken = process.env.HAY_API_TOKEN;
+  if (declarations.length > 0 && (!apiUrl || !apiToken)) {
+    throw new Error("HAY_API_URL and HAY_API_TOKEN are required to pull credentials");
   }
+
+  const credentials = new CredentialStore({
+    declarations,
+    settings: settings.config ?? {},
+    authMethodId: settings.authMethodId ?? null,
+    apiUrl: apiUrl ?? "",
+    apiToken: apiToken ?? "",
+    logger,
+  });
+  await credentials.refreshAll();
 
   return {
-    org: {
-      id: orgConfigData.org.id,
-      name: orgConfigData.org.name,
+    orgData: {
+      org: { id: settings.org.id, name: settings.org.name },
+      config: credentials.config,
+      auth: credentials.authState,
     },
-    config: orgConfigData.config || {},
-    auth: authState,
+    credentials,
   };
 }
 

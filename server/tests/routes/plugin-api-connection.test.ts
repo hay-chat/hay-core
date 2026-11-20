@@ -1,5 +1,4 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
-import * as jwt from "jsonwebtoken";
 
 /**
  * pluginApi connection.revoke — responds first, then revokes on the next tick.
@@ -65,8 +64,10 @@ jest.mock("@server/repositories/plugin-webhook-route.repository", () => ({
 jest.mock("@server/repositories/document.repository", () => ({ documentRepository: {} }));
 jest.mock("@server/services/mcp-registry.service", () => ({ mcpRegistryService: {} }));
 jest.mock("@server/services/product-sync.service", () => ({ productSyncService: {} }));
+import { createFakeRedisClient } from "../helpers/fake-redis";
+const mockRedisClient = createFakeRedisClient();
 jest.mock("@server/services/redis.service", () => ({
-  redisService: { publish: jest.fn(), isConnected: () => true, getClient: () => null },
+  redisService: { publish: jest.fn(), isConnected: () => true, getClient: () => mockRedisClient },
 }));
 
 jest.mock("@server/services/storage.service", () => ({ storageService: { upload: jest.fn() } }));
@@ -83,6 +84,9 @@ jest.mock("@server/services/channel-health.service", () => ({
   channelHealthService: { markFailing: mockMarkFailing },
 }));
 
+import { mintPluginApiToken } from "@server/lib/plugin-api-token";
+jest.mock("@server/services/plugin-credential.service", () => ({ issueCredential: jest.fn() }));
+
 import { pluginApiTrpcRouter } from "@server/routes/v1/plugin-api/trpc";
 import type { PluginAuthContext } from "@server/trpc/middleware/plugin-auth";
 
@@ -90,11 +94,7 @@ const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const PLUGIN_ID = "hay-channel-test";
 
 const ctx = (capabilities = ["messages", "customers"]) => {
-  const token = jwt.sign(
-    { scope: "plugin-api", organizationId: ORG_ID, pluginId: PLUGIN_ID, capabilities },
-    JWT_SECRET,
-    { issuer: "hay-plugin-api", audience: "plugin" },
-  );
+  const token = mintPluginApiToken(ORG_ID, PLUGIN_ID, capabilities);
   return {
     user: null,
     organizationId: null,

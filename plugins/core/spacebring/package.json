@@ -12,7 +12,8 @@
     "marketplaceCategory": "knowledge",
     "capabilities": [
       "mcp",
-      "auth"
+      "auth",
+      "credentials"
     ],
     "network": {
       "egress": [
@@ -27,7 +28,25 @@
       "handles": [
         "bookings"
       ]
-    }
+    },
+    "credentials": [
+      {
+        "name": "apiKeySecret",
+        "source": "config",
+        "capability": "mcp",
+        "hosts": [
+          "api.spacebring.com"
+        ]
+      },
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "mcp",
+        "hosts": [
+          "api.spacebring.com"
+        ]
+      }
+    ]
   },
   "scripts": {
     "build": "tsc",

@@ -3,7 +3,7 @@ import { pluginRegistryRepository } from "../repositories/plugin-registry.reposi
 import { pluginWebhookRouteRepository } from "../repositories/plugin-webhook-route.repository";
 import { pluginManagerService } from "./plugin-manager.service";
 import { oauthStateService } from "./oauth-state.service";
-import { resolveConfigWithEnv, stripServerOnlyFields } from "../lib/config-resolver";
+import { resolveConfigWithEnv, resolveConfigForWorker } from "../lib/config-resolver";
 import { configEnvAllowList } from "../lib/plugin-env";
 import {
   assertOAuthEndpoint,
@@ -23,6 +23,7 @@ import { createLogger } from "@server/lib/logger";
 import { safeFetch } from "@server/utils/ssrf";
 import { TRPCError } from "@trpc/server";
 import { workerFetch } from "@server/lib/worker-client";
+import { runExclusive } from "@server/lib/keyed-mutex";
 
 const logger = createLogger("oauth");
 
@@ -389,8 +390,27 @@ export class OAuthService {
     await this.storeTokens(organizationId, pluginId, tokens, oauth2Method.scopes);
     logger.info({ pluginId, organizationId }, "OAuth code exchange completed, tokens stored");
 
+    await this.stopWorkerForNewCredentials(organizationId, pluginId);
     const onConnected = await this.runOnConnected(organizationId, pluginId, extras);
     return { success: true, onConnected };
+  }
+
+  /**
+   * A running worker was started without these credentials (its onStart saw
+   * "not connected"), and workers only read their auth state when they start.
+   * Stop it so the next start (onConnected) runs onStart with the new token:
+   * e.g. the Shopify plugin writes the App Store app's metafields and starts
+   * its MCP server there.
+   */
+  private async stopWorkerForNewCredentials(
+    organizationId: string,
+    pluginId: string,
+  ): Promise<void> {
+    try {
+      await pluginManagerService.stopPluginWorker(organizationId, pluginId);
+    } catch (err) {
+      logger.warn({ err, organizationId, pluginId }, "Failed to restart worker after OAuth");
+    }
   }
 
   /**
@@ -684,6 +704,7 @@ export class OAuthService {
           exchanged = await this.performTokenOp(
             oauthConfig.tokenExchange,
             tokens.access_token,
+            validCredentials.clientId,
             validCredentials.clientSecret,
             endpointPolicy,
           );
@@ -722,16 +743,7 @@ export class OAuthService {
       await this.storeTokens(organizationId, pluginId, tokens, allScopes);
       logger.info("Tokens stored successfully");
 
-      // A running worker was started without these credentials (its onStart saw
-      // "not connected"), and workers only read config when they start. Stop it
-      // so the next start (onConnected below) runs onStart with the new token:
-      // e.g. the Shopify plugin writes the App Store app's metafields and starts
-      // its MCP server there.
-      try {
-        await pluginManagerService.stopPluginWorker(organizationId, pluginId);
-      } catch (err) {
-        logger.warn({ err, organizationId, pluginId }, "Failed to restart worker after OAuth");
-      }
+      await this.stopWorkerForNewCredentials(organizationId, pluginId);
 
       // Run the plugin's optional onConnected lifecycle hook. The plugin (not
       // core) performs any provider call it needs with the fresh credentials and
@@ -779,8 +791,15 @@ export class OAuthService {
    * ig_refresh_token, which don't fit the OAuth2 refresh_token grant.
    */
   private async performTokenOp(
-    op: { url: string; grantType: string; tokenParam: string; includeClientSecret?: boolean },
+    op: {
+      url: string;
+      grantType: string;
+      tokenParam: string;
+      includeClientSecret?: boolean;
+      includeClientId?: boolean;
+    },
     accessToken: string,
+    clientId: string | null,
     clientSecret: string | null,
     endpointPolicy: OAuthEndpointPolicy,
   ): Promise<{ access_token: string; expires_in?: number; token_type?: string }> {
@@ -788,6 +807,9 @@ export class OAuthService {
     const url = new URL(op.url);
     url.searchParams.set("grant_type", op.grantType);
     url.searchParams.set(op.tokenParam, accessToken);
+    if (op.includeClientId && clientId) {
+      url.searchParams.set("client_id", clientId);
+    }
     if (op.includeClientSecret && clientSecret) {
       url.searchParams.set("client_secret", clientSecret);
     }
@@ -1007,18 +1029,18 @@ export class OAuthService {
         string,
         ConfigFieldDescriptor
       >;
-      const config = stripServerOnlyFields(instance.config ?? {}, configSchema);
+      const config = resolveConfigForWorker(
+        instance.config,
+        configSchema,
+        configEnvAllowList(plugin),
+      );
 
       const worker = await pluginManagerService.startPluginWorker(organizationId, pluginId);
 
       const response = await workerFetch(worker.port, "/on-connected", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          config,
-          authState: instance.authState,
-          extras,
-        }),
+        body: JSON.stringify({ config, extras }),
         signal: AbortSignal.timeout(WORKER_HOOK_TIMEOUT_MS),
       });
 
@@ -1204,9 +1226,40 @@ export class OAuthService {
   /**
    * Refresh OAuth access token
    */
-  async refreshToken(organizationId: string, pluginId: string): Promise<OAuthTokenData | null> {
+  async refreshToken(
+    organizationId: string,
+    pluginId: string,
+    options: { onlyIfExpiringWithinSeconds?: number } = {},
+  ): Promise<OAuthTokenData | null> {
+    // One refresh at a time per account: providers that rotate refresh tokens
+    // reject a second use of the same token.
+    return runExclusive(`${organizationId}:${pluginId}`, () =>
+      this.refreshTokenExclusive(organizationId, pluginId, options),
+    );
+  }
+
+  /**
+   * Runs with the account's refresh lock held, so the instance read here is the
+   * one a refresh that just finished has written. Returns null, without calling
+   * the provider, when the caller asked for a refresh only if the access token
+   * is about to expire and it no longer is.
+   */
+  private async refreshTokenExclusive(
+    organizationId: string,
+    pluginId: string,
+    options: { onlyIfExpiringWithinSeconds?: number },
+  ): Promise<OAuthTokenData | null> {
     const { instance, oauth2Method, clientId, clientSecret, endpointPolicy } =
       await this.resolveOAuthContext(organizationId, pluginId);
+
+    const storedExpiresAt = instance.authState?.credentials?.expiresAt;
+    if (
+      options.onlyIfExpiringWithinSeconds !== undefined &&
+      typeof storedExpiresAt === "number" &&
+      storedExpiresAt - Math.floor(Date.now() / 1000) >= options.onlyIfExpiringWithinSeconds
+    ) {
+      return null;
+    }
 
     // A plugin may declare a custom refresh strategy (e.g. Instagram's
     // ig_refresh_token) for providers that don't issue a standard refresh_token.
@@ -1240,6 +1293,7 @@ export class OAuthService {
       const result = await this.performTokenOp(
         customRefresh,
         currentAccessToken,
+        validCredentials.clientId,
         validCredentials.clientSecret,
         endpointPolicy,
       );

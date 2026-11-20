@@ -248,6 +248,8 @@ export interface OAuthTokenOp {
   tokenParam: string;
   /** Append the client secret as `client_secret` (needed by token exchange). */
   includeClientSecret?: boolean;
+  /** Append the client id as `client_id` (core knows it; the plugin need not read it from its env). */
+  includeClientId?: boolean;
 }
 
 /**

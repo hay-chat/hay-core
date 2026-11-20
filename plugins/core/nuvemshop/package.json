@@ -15,7 +15,8 @@
       "mcp",
       "auth",
       "products",
-      "privacy"
+      "privacy",
+      "credentials"
     ],
     "setup": {
       "businessTypes": [
@@ -40,6 +41,24 @@
     "oauthHosts": [
       "www.nuvemshop.com.br",
       "www.tiendanube.com"
+    ],
+    "credentials": [
+      {
+        "name": "accessToken",
+        "source": "config",
+        "capability": "mcp",
+        "hosts": [
+          "api.nuvemshop.com.br"
+        ]
+      },
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "mcp",
+        "hosts": [
+          "api.nuvemshop.com.br"
+        ]
+      }
     ]
   },
   "scripts": {

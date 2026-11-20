@@ -25,9 +25,38 @@ export interface DeliverResult {
 export interface DeliverOptions {
   /** Fetch used to download attachments from Hay storage. Override for tests. */
   fetchImpl?: typeof fetch;
+  /** Where this worker reaches Hay's API (HAY_API_URL). Override for tests. */
+  apiUrl?: string;
+  /** Hay's public address, as it appears in the attachment URLs (HAY_PUBLIC_URL). Override for tests. */
+  publicUrl?: string;
 }
 
 const MAX_TOTAL_ATTACHMENT_BYTES = 15 * 1024 * 1024;
+
+const MEDIA_PATH = /^\/v1\/media\/[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+/**
+ * Where to download an attachment from. A signed media URL on Hay's own public
+ * address is fetched through the worker's API address instead: an isolated
+ * worker has no route to the public host, only to the plugin API. Any other URL
+ * is returned unchanged.
+ */
+export function attachmentSource(url: string, apiUrl?: string, publicUrl?: string): string {
+  if (!apiUrl || !publicUrl) return url;
+  try {
+    const parsed = new URL(url);
+    if (
+      parsed.origin !== new URL(publicUrl).origin ||
+      !MEDIA_PATH.test(parsed.pathname) ||
+      !parsed.searchParams.has("sig")
+    ) {
+      return url;
+    }
+    return `${apiUrl.replace(/\/$/, "")}${parsed.pathname}${parsed.search}`;
+  } catch {
+    return url;
+  }
+}
 
 interface Attachment {
   name: string;
@@ -187,11 +216,13 @@ export async function deliver(
   }
 
   const fetchImpl = options.fetchImpl ?? fetch;
+  const apiUrl = options.apiUrl ?? process.env.HAY_API_URL;
+  const publicUrl = options.publicUrl ?? process.env.HAY_PUBLIC_URL;
   const attachments: Array<{ filename: string; contentBase64: string; contentType?: string }> = [];
   let totalBytes = 0;
   for (const attachment of parsed.attachments) {
     try {
-      const response = await fetchImpl(attachment.url);
+      const response = await fetchImpl(attachmentSource(attachment.url, apiUrl, publicUrl));
       if (!response.ok) {
         throw new Error(`storage returned ${response.status}`);
       }

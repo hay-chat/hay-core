@@ -65,7 +65,7 @@ endpoints directly.
 **When:** a two-way messaging platform (WhatsApp, Chatwoot, email, SMS) where users talk to the
 agent. Inbound webhooks become Hay messages; Hay replies are delivered back.
 
-**Shape:** `category: "channel"`, `capabilities: ["messages","customers"]`, plus a `channel:`
+**Shape:** `category: "channel"`, `capabilities: ["messages"]`, plus a `channel:`
 key. Optionally declare `inactivity: { warningMinutes?, closeMinutes }`: after `warningMinutes`
 of customer silence the AI checks in (leave it out for no check-in), after `closeMinutes` it
 closes with a sign-off. Without it the channel uses the `CONVERSATION_INACTIVITY_INTERVAL`

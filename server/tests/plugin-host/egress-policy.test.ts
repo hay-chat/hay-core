@@ -28,6 +28,11 @@ describe("egress policy", () => {
       "ff02::1",
       "::ffff:8.8.8.8",
       "::ffff:127.0.0.1",
+      "2002:0808:0808::1",
+      "::2",
+      "64:ff9b:1::1",
+      "fec0::1",
+      "192.88.99.1",
       "not-an-ip",
     ];
     for (const address of blocked)
@@ -35,6 +40,13 @@ describe("egress policy", () => {
     for (const address of ["8.8.8.8", "1.1.1.1", "172.32.0.1", "2606:4700:4700::1111"]) {
       expect([address, isBlockedAddress(address)]).toEqual([address, false]);
     }
+  });
+
+  it("rejects host names that parse as numbers", () => {
+    for (const rule of ["127.1", "0x7f.1", "1.2.3.4", "example.0x1", "example.123"]) {
+      expect([rule, parseAllowRule(rule)]).toEqual([rule, null]);
+    }
+    expect(parseAllowRule("123.example.com")).not.toBeNull();
   });
 
   it("parses static rules and rejects malformed ones", () => {

@@ -4,6 +4,7 @@ import amqplib, {
   type ConfirmChannel,
   type ConsumeMessage,
 } from "amqplib";
+import { runAsSystem } from "@server/database/organization-context";
 import { config } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
 import { metrics } from "@server/lib/metrics";
@@ -302,7 +303,7 @@ export class RabbitMQService extends EventEmitter {
               "messaging.destination": queue,
               "messaging.operation": "process",
             },
-            () => handler(msg),
+            () => runAsSystem(`queue consumer: ${queue}`, () => handler(msg)),
             { parent: extractTraceContext(msg.properties.headers) },
           );
         } catch (error) {

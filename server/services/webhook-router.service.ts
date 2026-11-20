@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { runAsSystem, runInOrganization } from "@server/database/organization-context";
 import { pluginManagerService } from "./plugin-manager.service";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
@@ -64,7 +65,9 @@ export class WebhookRouterService {
    *   caller then falls back to the existing per-org webhook behavior).
    */
   async getRoutingDescriptor(pluginId: string): Promise<WebhookRoutingDescriptor | null> {
-    const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
+    const plugin = await runAsSystem("webhook routing: read the plugin's declared routing", () =>
+      pluginRegistryRepository.findByPluginId(pluginId),
+    );
     if (!plugin) {
       return null;
     }
@@ -75,11 +78,16 @@ export class WebhookRouterService {
     // Metadata is only (re)fetched when a worker starts, and a shared webhook
     // carries no org to start one for. Borrow any org that has the plugin
     // enabled: starting its worker refreshes the plugin-global metadata.
-    const instances = await pluginInstanceRepository.findByPlugin(plugin.id);
+    const instances = await runAsSystem(
+      "webhook routing: list the organizations that installed the plugin",
+      () => pluginInstanceRepository.findByPlugin(plugin.id),
+    );
     const enabled = instances.find((instance) => instance.enabled);
     if (enabled) {
       try {
-        await pluginManagerService.startPluginWorker(enabled.organizationId, pluginId);
+        await runInOrganization(enabled.organizationId, () =>
+          pluginManagerService.startPluginWorker(enabled.organizationId, pluginId),
+        );
       } catch (err) {
         logger.warn({ err, pluginId }, "Metadata refresh for webhook routing failed");
       }
@@ -289,13 +297,15 @@ export class WebhookRouterService {
       return;
     }
 
-    const owner = await pluginWebhookRouteRepository.findByKey(pluginId, String(keyValue));
+    const owner = await findRouteOwner(pluginId, String(keyValue));
     if (owner) {
-      await pluginInstanceRepository.clearAuthState(owner.pluginInstanceId, owner.organizationId);
-      await pluginWebhookRouteRepository.clearForInstance(owner.pluginInstanceId);
-      await pluginManagerService
-        .stopPluginWorker(owner.organizationId, pluginId)
-        .catch((err) => logger.warn({ err, pluginId }, "Failed to stop worker on deauthorize"));
+      await runInOrganization(owner.organizationId, async () => {
+        await pluginInstanceRepository.clearAuthState(owner.pluginInstanceId, owner.organizationId);
+        await pluginWebhookRouteRepository.clearForInstance(owner.pluginInstanceId);
+        await pluginManagerService
+          .stopPluginWorker(owner.organizationId, pluginId)
+          .catch((err) => logger.warn({ err, pluginId }, "Failed to stop worker on deauthorize"));
+      });
       logger.info(
         { pluginId, organizationId: owner.organizationId, kind },
         "Plugin instance disconnected by provider callback",
@@ -310,9 +320,9 @@ export class WebhookRouterService {
       return;
     }
 
-    const confirmationCode = await providerPrivacyService.eraseProviderIdentity(
-      pluginId,
-      String(keyValue),
+    const confirmationCode = await runAsSystem(
+      "provider data deletion: search every organization with this plugin",
+      () => providerPrivacyService.eraseProviderIdentity(pluginId, String(keyValue)),
     );
     res.status(200).json({
       url: `${getApiUrl()}/v1/plugins/${encodeURIComponent(pluginId)}/data-deletion?code=${confirmationCode}`,
@@ -332,7 +342,9 @@ export class WebhookRouterService {
       return;
     }
 
-    const status = await providerPrivacyService.getConfirmationStatus(pluginId, code);
+    const status = await runAsSystem("provider data deletion: status by confirmation code", () =>
+      providerPrivacyService.getConfirmationStatus(pluginId, code),
+    );
     if (!status) {
       res.status(404).send("Unknown confirmation code");
       return;
@@ -405,7 +417,9 @@ export class WebhookRouterService {
     envName: string | undefined,
   ): Promise<string | undefined> {
     if (!envName) return undefined;
-    const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
+    const plugin = await runAsSystem("webhook routing: read the plugin's allowed env names", () =>
+      pluginRegistryRepository.findByPluginId(pluginId),
+    );
     return configEnvAllowList(plugin).has(envName) ? process.env[envName] : undefined;
   }
 
@@ -441,7 +455,7 @@ export class WebhookRouterService {
     const resolveOwner = (routingKey: string): Promise<RouteOwner> => {
       let pending = ownerCache.get(routingKey);
       if (!pending) {
-        pending = pluginWebhookRouteRepository.findByKey(pluginId, routingKey);
+        pending = findRouteOwner(pluginId, routingKey);
         ownerCache.set(routingKey, pending);
       }
       return pending;
@@ -567,7 +581,9 @@ export class WebhookRouterService {
     orgItems: unknown[],
     req: Request,
   ): Promise<void> {
-    const worker = await pluginManagerService.startPluginWorker(organizationId, pluginId);
+    const worker = await runInOrganization(organizationId, () =>
+      pluginManagerService.startPluginWorker(organizationId, pluginId),
+    );
 
     const reconstructedBody =
       itemsPath === "." ? originalBody : setPath({ ...originalBody }, itemsPath, orgItems);
@@ -617,6 +633,17 @@ export class WebhookRouterService {
     }
     return null;
   }
+}
+
+/**
+ * Which organization and instance own a routing key. Routing keys are unique
+ * across organizations and the row is what reveals the organization, so only
+ * this lookup runs in a system context.
+ */
+function findRouteOwner(pluginId: string, routingKey: string): Promise<RouteOwner> {
+  return runAsSystem("webhook routing: find the owner of a routing key", () =>
+    pluginWebhookRouteRepository.findByKey(pluginId, routingKey),
+  );
 }
 
 /** Redis namespace for plugin-declared dedupe keys: one per plugin and org. */

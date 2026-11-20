@@ -1,20 +1,17 @@
 import { spawn } from "child_process";
 import path from "path";
+import { randomBytes } from "crypto";
 import { getPortAllocator } from "./port-allocator.service";
-import type {
-  WorkerInfo,
-  WorkerProcess,
-  AuthState,
-  ConfigFieldDescriptor,
-} from "../types/plugin-sdk.types";
+import type { WorkerInfo, WorkerProcess, ConfigFieldDescriptor } from "../types/plugin-sdk.types";
 import { AppDataSource } from "../database/data-source";
 import { PluginRegistry } from "../entities/plugin-registry.entity";
 import { PluginInstance } from "../entities/plugin-instance.entity";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { fetchAndStoreTools } from "./plugin-tools.service";
 import { resolveConfigForWorker } from "@server/lib/config-resolver";
-import { configEnvAllowList, isDeniedPluginEnv } from "@server/lib/plugin-env";
-import { mintPluginApiToken } from "@server/lib/plugin-api-token";
+import { configEnvAllowList } from "@server/lib/plugin-env";
+import { verifyPackedTree } from "@server/lib/plugin-pack";
+import { mintPluginApiToken, revokePluginApiToken } from "@server/lib/plugin-api-token";
 import { getApiUrl } from "../config/env";
 import { oauthService } from "./oauth.service";
 import { createLogger } from "@server/lib/logger";
@@ -26,7 +23,7 @@ import {
   unregisterWorkerSocket,
   workerFetch,
 } from "@server/lib/worker-client";
-import { pluginIsolationMode } from "@server/lib/plugin-isolation";
+import { ownPluginApiSocketPath, pluginIsolationMode } from "@server/lib/plugin-isolation";
 import { launchInPluginHost } from "./plugin-host.client";
 import { resolveEgressAllow } from "../plugin-host/egress-policy";
 import type { HayPluginManifest } from "../types/plugin.types";
@@ -61,7 +58,7 @@ type RegistryManifest = Omit<HayPluginManifest, "capabilities"> & {
  *
  * Key responsibilities:
  * - Spawn workers using SDK runner
- * - Build SDK environment variables (HAY_ORG_CONFIG, HAY_ORG_AUTH, etc.)
+ * - Build SDK environment variables (identity, settings and API token; no secrets)
  * - Track worker processes per org+plugin
  * - Handle graceful shutdown
  * - Manage org-scoped runtime state transitions
@@ -259,53 +256,58 @@ export class PluginRunnerService {
       lastError: undefined,
     });
 
+    // The worker's plugin API token, revoked whenever the worker is gone or never came up.
+    let apiToken: string | null = null;
+    const revokeApiToken = () => {
+      if (apiToken) void revokePluginApiToken(apiToken);
+    };
+
     try {
+      // Plugin path - if already absolute, use as-is; otherwise join with pluginsDir
+      const pluginPath = path.isAbsolute(plugin.pluginPath)
+        ? plugin.pluginPath
+        : path.join(this.pluginsDir, plugin.pluginPath);
+
+      // Uploaded plugins run only as the pack they were installed from: any
+      // file changed, added or removed since then stops the worker from starting.
+      if (plugin.sourceType !== "core") await verifyPackedTree(pluginPath);
+
       // Allocate port
       const port = await this.portAllocator.allocate();
       const workerSecret = issueWorkerSecret(port);
       const releasePort = () => {
+        revokeApiToken();
         unregisterWorkerSocket(port);
         revokeWorkerSecret(port, workerSecret);
         this.portAllocator.release(port);
       };
 
-      // Build environment variables
-      // SDK expects org config in this format: { org: { id }, config: {...} }
-      // Use config resolver to merge DB config + .env fallback + auth credentials
+      // The worker starts with the organization's non-secret settings only. Its
+      // secrets (secret config fields, the connected account's access token) are
+      // pulled from core with its plugin API token (see plugin-credential.service).
       const configSchema = (plugin.metadata?.configSchema || {}) as Record<
         string,
         ConfigFieldDescriptor
       >;
-      const resolvedConfig = resolveConfigForWorker(
-        instance.config,
-        instance.authState,
-        configSchema,
-        configEnvAllowList(plugin),
-      );
-
-      const orgConfig = {
-        org: {
-          id: orgId,
-        },
-        config: resolvedConfig,
+      const settings = {
+        org: { id: orgId },
+        config: resolveConfigForWorker(instance.config, configSchema, configEnvAllowList(plugin)),
+        authMethodId: instance.authState?.methodId ?? null,
       };
 
       const manifest = plugin.manifest as RegistryManifest;
+      // Host names a plugin declares as coming from its config (a store URL) may
+      // be kept in the auth state; this stays in core and only picks egress hosts.
+      const egressConfig = { ...instance.authState?.credentials, ...settings.config };
       const env = this.buildSDKEnv({
         orgId,
         pluginId,
         port,
         workerSecret,
-        orgConfig,
-        orgAuth: instance.authState || null,
+        settings,
         capabilities: manifest.capabilities || [],
-        allowedEnvVars: manifest.permissions?.env || [],
       });
-
-      // Plugin path - if already absolute, use as-is; otherwise join with pluginsDir
-      const pluginPath = path.isAbsolute(plugin.pluginPath)
-        ? plugin.pluginPath
-        : path.join(this.pluginsDir, plugin.pluginPath);
+      apiToken = env.HAY_API_TOKEN;
 
       // Plugin workers run in the plugin-host container when isolation is on,
       // otherwise as children of this process.
@@ -319,7 +321,7 @@ export class PluginRunnerService {
               pluginId,
               port,
               custom: plugin.sourceType !== "core",
-              egressAllow: resolveEgressAllow(manifest.network?.egress, resolvedConfig),
+              egressAllow: resolveEgressAllow(manifest.network?.egress, egressConfig),
             });
 
       // Track if spawn error occurred to prevent further processing
@@ -404,6 +406,7 @@ export class PluginRunnerService {
 
       return workerInfo;
     } catch (error) {
+      revokeApiToken();
       // Update runtime state to "error"
       await instanceRepo.update(instance.id, {
         runtimeState: "error",
@@ -463,7 +466,12 @@ export class PluginRunnerService {
   }): Promise<WorkerProcess> {
     const { env, pluginPath, orgId, pluginId, port, custom, egressAllow } = params;
     const launch = await launchInPluginHost({
-      id: `w${port}`,
+      id: `w${port}${randomBytes(4).toString("hex")}`,
+      apiSocket:
+        ownPluginApiSocketPath() ??
+        (() => {
+          throw new Error("PLUGIN_API_SOCKET is not set");
+        })(),
       pluginId,
       orgId,
       pluginPath,
@@ -600,21 +608,11 @@ export class PluginRunnerService {
     pluginId: string;
     port: number;
     workerSecret: string;
-    orgConfig: { org: { id: string }; config: Record<string, unknown> };
-    orgAuth: AuthState | null;
+    /** Non-secret organization settings; no secret field, token or host env value. */
+    settings: { org: { id: string }; config: Record<string, unknown>; authMethodId: string | null };
     capabilities: string[];
-    allowedEnvVars: string[];
   }): Record<string, string> {
-    const {
-      orgId,
-      pluginId,
-      port,
-      workerSecret,
-      orgConfig,
-      orgAuth,
-      capabilities,
-      allowedEnvVars,
-    } = params;
+    const { orgId, pluginId, port, workerSecret, settings, capabilities } = params;
 
     // Base environment
     const env: Record<string, string> = {
@@ -627,8 +625,7 @@ export class PluginRunnerService {
       HAY_WORKER_PORT: port.toString(),
       HAY_WORKER_SECRET: workerSecret,
       NODE_OPTIONS: `--max-old-space-size=${WORKER_MAX_OLD_SPACE_MB}`,
-      HAY_ORG_CONFIG: JSON.stringify(orgConfig),
-      HAY_ORG_AUTH: JSON.stringify(orgAuth || {}),
+      HAY_ORG_SETTINGS: JSON.stringify(settings),
     };
 
     // Add API access so the plugin worker can call the main server's plugin-api
@@ -637,17 +634,6 @@ export class PluginRunnerService {
     // the same as HAY_API_URL once the worker talks to core through a socket.
     env.HAY_PUBLIC_URL = getApiUrl();
     env.HAY_API_TOKEN = this.generatePluginJWT(orgId, pluginId, capabilities);
-
-    // Add allowed environment variables from host
-    for (const envVar of allowedEnvVars) {
-      if (isDeniedPluginEnv(envVar)) {
-        logger.warn({ pluginId, envVar }, "Plugin requested denied environment variable");
-        continue;
-      }
-      if (process.env[envVar]) {
-        env[envVar] = process.env[envVar]!;
-      }
-    }
 
     return env;
   }

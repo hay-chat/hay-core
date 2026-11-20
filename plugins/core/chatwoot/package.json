@@ -14,7 +14,7 @@
     "channel": "chatwoot",
     "capabilities": [
       "messages",
-      "customers"
+      "credentials"
     ],
     "env": [],
     "network": {
@@ -23,7 +23,39 @@
           "fromConfig": "baseUrl"
         }
       ]
-    }
+    },
+    "credentials": [
+      {
+        "name": "botAccessToken",
+        "source": "config",
+        "capability": "messages",
+        "hosts": [
+          {
+            "fromConfig": "baseUrl"
+          }
+        ]
+      },
+      {
+        "name": "webhookSecret",
+        "source": "config",
+        "capability": "messages",
+        "hosts": [
+          {
+            "fromConfig": "baseUrl"
+          }
+        ]
+      },
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "messages",
+        "hosts": [
+          {
+            "fromConfig": "baseUrl"
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "build": "npm run build:ui && tsc",

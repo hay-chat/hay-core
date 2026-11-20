@@ -14,6 +14,8 @@ jest.mock("@server/config/env", () => ({
   getApiUrl: () => "https://api.example.test",
 }));
 
+jest.mock("@server/database/data-source", () => ({ AppDataSource: { isInitialized: false } }));
+
 const mockLogger = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
 jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
 
@@ -39,6 +41,7 @@ jest.mock("@server/lib/auth/middleware", () => ({ requireAuth: mockRequireAuth }
 import express from "express";
 import mediaRouter from "@server/routes/v1/media/index";
 import { signMediaUrl } from "@server/services/media-url.service";
+import { getDatabaseContext } from "@server/database/organization-context";
 
 const UPLOAD_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -92,6 +95,33 @@ const staffHeaders = (organizationId = ORG_ID) => ({
 });
 
 describe("GET /v1/media/:id", () => {
+  describe("database context", () => {
+    it("looks the upload up in a system context and serves it in the upload's organization", async () => {
+      const seen: unknown[] = [];
+      mockFindOne.mockImplementationOnce(async () => {
+        seen.push(getDatabaseContext());
+        return upload();
+      });
+      mockDownload.mockImplementationOnce(async () => {
+        seen.push(getDatabaseContext());
+        return Readable.from([BYTES]);
+      });
+      expect((await fetch(`${baseUrl}${signedPath()}`)).status).toBe(200);
+      expect(seen).toEqual([
+        { kind: "system", reason: "media: find the organization of an upload" },
+        { kind: "organization", organizationId: ORG_ID },
+      ]);
+    });
+
+    it("runs nothing under any organization for an unknown upload", async () => {
+      mockFindOne.mockResolvedValue(null);
+      const response = await fetch(`${baseUrl}/v1/media/${UPLOAD_ID}`);
+      expect(response.status).toBe(404);
+      expect(mockRequireAuth).not.toHaveBeenCalled();
+      expect(mockDownload).not.toHaveBeenCalled();
+    });
+  });
+
   describe("virus scan (D8-4)", () => {
     it("serves a document once its pending scan comes back clean", async () => {
       mockFindOne.mockResolvedValue(upload({ mimeType: "application/pdf", scanStatus: "pending" }));

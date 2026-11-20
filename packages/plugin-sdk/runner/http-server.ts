@@ -29,6 +29,7 @@ import {
 import { createConfigRuntimeAPI } from "../sdk/config-runtime.js";
 import { createAuthRuntimeAPI } from "../sdk/auth-runtime.js";
 import { createCronAuthAPI } from "../sdk/cron-runtime.js";
+import type { CredentialStore } from "../sdk/credential-store.js";
 import { withToolRisk } from "../sdk/tool-risk.js";
 
 /**
@@ -114,6 +115,8 @@ export class PluginHttpServer {
     );
 
     // Setup routes
+    this.app.use(this.requireRuntimeData());
+    this.app.use(this.refreshCredentials());
     this.setupHealthEndpoint();
     this.setupMetadataEndpoint();
     this.setupLifecycleEndpoints();
@@ -150,6 +153,55 @@ export class PluginHttpServer {
     this.plugin = plugin;
   }
 
+  /** Where this worker keeps the secrets it pulled from core. */
+  private credentials: CredentialStore | null = null;
+
+  setCredentialStore(store: CredentialStore): void {
+    this.credentials = store;
+  }
+
+  /**
+   * Until the organization's runtime data has been set, the worker has no
+   * config or credentials: answer 503 (core retries) instead of running a
+   * request with an empty configuration. Health and metadata stay available.
+   */
+  private requireRuntimeData() {
+    return (req: Request, res: Response, next: NextFunction): void => {
+      if (this.orgId === null && req.path !== "/health" && req.path !== "/metadata") {
+        res.setHeader("Retry-After", "1");
+        res.status(503).json({ error: "Worker is still starting" });
+        return;
+      }
+      next();
+    };
+  }
+
+  /**
+   * Before a request is handled, pull the credentials that are about to expire. A
+   * request that follows a change core made to the stored credentials (an account
+   * just connected, a scheduled run) pulls all of them.
+   */
+  private refreshCredentials() {
+    return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+      const store = this.credentials;
+      if (store && req.path !== "/health" && req.path !== "/metadata") {
+        const afterCoreChange =
+          req.path === "/on-connected" ||
+          req.path.startsWith("/cron/") ||
+          req.path === "/setup/status";
+        try {
+          if (afterCoreChange) await store.refreshAll();
+          else await store.refreshStale();
+        } catch (error) {
+          this.logger.warn("Could not pull credentials for a request", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+      next();
+    };
+  }
+
   /**
    * Set runtime data (needed for context creation in endpoints).
    *
@@ -160,13 +212,12 @@ export class PluginHttpServer {
     manifest: any;
     mcpRuntime: HayMcpRuntimeAPI;
     orgConfig: Record<string, any>;
-    orgAuth: any;
   }): void {
     this.orgId = data.orgId;
     this.manifest = data.manifest;
     this.orgConfig = data.orgConfig;
-    // Note: orgAuth and mcpRuntime are passed but not stored -
-    // MCP servers are tracked via registerMcpServer() callback instead
+    // Note: mcpRuntime is passed but not stored - MCP servers are tracked via
+    // the registerMcpServer() callback instead
   }
 
   /**
@@ -403,10 +454,12 @@ export class PluginHttpServer {
           return;
         }
 
-        const { config, authState, extras: rawExtras } = req.body ?? {};
+        const { config, extras: rawExtras } = req.body ?? {};
+        // The connected account's credentials are the ones this worker pulled from core.
+        const authState = this.credentials?.authState;
 
-        if (!authState || !authState.methodId || !authState.credentials) {
-          res.status(400).json({ routingKeys: [], error: "Invalid auth state format" });
+        if (!authState || !authState.methodId) {
+          res.status(400).json({ routingKeys: [], error: "No connected account" });
           return;
         }
 
@@ -595,7 +648,8 @@ export class PluginHttpServer {
           return;
         }
 
-        const { config, authState } = req.body ?? {};
+        const { config } = req.body ?? {};
+        const authState = this.credentials?.authState ?? null;
 
         // Merge stored org config with any fresh config Core sent for this run.
         const mergedConfig = {
@@ -611,7 +665,7 @@ export class PluginHttpServer {
         });
 
         const { api: authAPI, getPendingUpdate } = createCronAuthAPI({
-          authState: authState ?? null,
+          authState,
           logger: this.logger,
         });
 
@@ -662,14 +716,15 @@ export class PluginHttpServer {
           return;
         }
 
-        const { config, authState } = req.body ?? {};
+        const { config } = req.body ?? {};
+        const authState = this.credentials?.authState ?? null;
         const configAPI = createConfigRuntimeAPI({
           orgConfig: { ...(this.orgConfig ?? {}), ...(config ?? {}) },
           registry: this.registry,
           manifest: { env: this.manifest.env },
           logger: this.logger,
         });
-        const authAPI = createAuthRuntimeAPI({ authState: authState ?? null, logger: this.logger });
+        const authAPI = createAuthRuntimeAPI({ authState, logger: this.logger });
 
         const result = await handler({
           org: { id: this.orgId },

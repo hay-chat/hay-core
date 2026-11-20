@@ -31,6 +31,7 @@ jest.mock("@server/lib/worker-client", () => ({
 }));
 
 import express from "express";
+import { getDatabaseContext } from "@server/database/organization-context";
 import type { Server } from "http";
 import type { AddressInfo } from "net";
 import proxyRouter, { isDeclaredRoute, takeColdStartSlot } from "../../routes/v1/plugins/proxy";
@@ -80,6 +81,42 @@ describe("plugin proxy allow-list", () => {
       `/webhook?organizationId=${ORG_ID}&x=1`,
       expect.objectContaining({ method: "POST" }),
     );
+  });
+
+  it("handles a validated organization's request in that organization's database context", async () => {
+    const seen: unknown[] = [];
+    mockFindByOrgAndPlugin.mockImplementation(async () => {
+      seen.push(getDatabaseContext());
+      return { enabled: true };
+    });
+    mockStartPluginWorker.mockImplementation(async () => {
+      seen.push(getDatabaseContext());
+      return { port: 40123 };
+    });
+
+    const response = await fetch(`${baseUrl}/webhook?organizationId=${ORG_ID}`, {
+      method: "POST",
+    });
+
+    expect(response.status).toBe(200);
+    const inOrg = { kind: "organization", organizationId: ORG_ID };
+    expect(seen).toEqual([inOrg, inOrg]);
+  });
+
+  it("runs nothing under an organization that does not exist", async () => {
+    const seen: unknown[] = [];
+    mockFindOrgById.mockResolvedValue(null);
+    mockFindByOrgAndPlugin.mockImplementation(async () => {
+      seen.push(getDatabaseContext());
+      return { enabled: true };
+    });
+
+    const response = await fetch(`${baseUrl}/webhook?organizationId=${ORG_ID}`, {
+      method: "POST",
+    });
+
+    expect(response.status).toBe(401);
+    expect(seen).toEqual([]);
   });
 
   it("returns 404 for a route the plugin did not declare, without waking a worker", async () => {

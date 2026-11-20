@@ -1,4 +1,5 @@
 import { WebSocketServer, WebSocket } from "ws";
+import { runAsSystem, runInOrganization } from "@server/database/organization-context";
 import { Server } from "http";
 import { IncomingMessage } from "http";
 import { conversationRepository } from "../repositories/conversation.repository";
@@ -7,6 +8,7 @@ import { TRPCError } from "@trpc/server";
 import { config } from "../config/env";
 import type { JWTPayload } from "../types/auth.types";
 import { MessageType } from "../database/entities/message.entity";
+import type { Conversation } from "../database/entities/conversation.entity";
 import { createLogger } from "@server/lib/logger";
 import { AppDataSource } from "@server/database/data-source";
 import { UserOrganization } from "@server/entities/user-organization.entity";
@@ -243,9 +245,9 @@ export class WebSocketService {
 
     this.heartbeatTimer = setInterval(() => this.checkHeartbeats(), HEARTBEAT_INTERVAL_MS);
     this.revalidateTimer = setInterval(() => {
-      this.revalidateDashboardClients().catch((err) =>
-        logger.warn({ err }, "Dashboard socket re-validation failed"),
-      );
+      runAsSystem("websocket dashboard revalidation", () =>
+        this.revalidateDashboardClients(),
+      ).catch((err) => logger.warn({ err }, "Dashboard socket re-validation failed"));
     }, DASHBOARD_REVALIDATE_INTERVAL_MS);
     this.revalidateTimer.unref();
     this.heartbeatTimer.unref();
@@ -294,6 +296,18 @@ export class WebSocketService {
       return;
     }
 
+    // Events come from core's own publishers, which name the organization they belong to.
+    runInOrganization(organizationId, () =>
+      this.broadcastRedisEvent({ type, organizationId, conversationId, payload }),
+    );
+  }
+
+  private broadcastRedisEvent({
+    type,
+    organizationId,
+    conversationId,
+    payload,
+  }: RedisEvent & { type: string; organizationId: string }): void {
     // For message_received events, broadcast based on message type and delivery state
     if (type === "message_received" && conversationId) {
       const messagePayload = {
@@ -659,33 +673,46 @@ export class WebSocketService {
 
       await client.ready;
 
-      switch (message.type) {
-        case "identify":
-          await this.handleIdentify(clientId, message);
-          break;
+      const dispatch = async (): Promise<void> => {
+        switch (message.type) {
+          case "identify":
+            await this.handleIdentify(clientId, message);
+            break;
 
-        case "message":
-          await this.handleChatMessage(clientId, message);
-          break;
+          case "message":
+            await this.handleChatMessage(clientId, message);
+            break;
 
-        case "typing":
-          await this.handleTypingIndicator(clientId, message);
-          break;
+          case "typing":
+            await this.handleTypingIndicator(clientId, message);
+            break;
 
-        case "subscribe":
-          await this.handleSubscribe(clientId, message);
-          break;
+          case "subscribe":
+            await this.handleSubscribe(clientId, message);
+            break;
 
-        case "register_tools":
-          await this.handleRegisterTools(clientId, message);
-          break;
+          case "register_tools":
+            await this.handleRegisterTools(clientId, message);
+            break;
 
-        case "tool_result":
-          await this.handleToolResult(clientId, message);
-          break;
+          case "tool_result":
+            await this.handleToolResult(clientId, message);
+            break;
 
-        default:
-          logger.debug({ messageType: message.type }, "Unknown message type");
+          default:
+            logger.debug({ messageType: message.type }, "Unknown message type");
+        }
+      };
+
+      // Each frame runs in its own context: the socket's creation context is
+      // not the one a later frame should inherit. A dashboard socket's
+      // organization was confirmed by membership; a webchat client's is not
+      // known until it identifies, so its frames are left undeclared until then.
+      // Identifying only succeeds for a conversation of that organization.
+      if (client.authenticated || client.conversationId) {
+        await runInOrganization(client.organizationId, dispatch);
+      } else {
+        await dispatch();
       }
     } catch (error) {
       logger.error({ err: error, clientId }, "Failed to handle message");
@@ -724,7 +751,12 @@ export class WebSocketService {
       return;
     }
 
-    const conversation = await conversationRepository.findById(conversationId);
+    // The organization in the URL is the client's claim; the row confirms it, so
+    // only this lookup runs in a system context.
+    const conversation = await runAsSystem(
+      "websocket identify: find the conversation a webchat client names",
+      () => conversationRepository.findById(conversationId),
+    );
     if (
       !conversation ||
       conversation.organization_id !== client.organizationId ||
@@ -735,6 +767,27 @@ export class WebSocketService {
       return;
     }
 
+    await runInOrganization(conversation.organization_id, () =>
+      this.attachIdentifiedClient(
+        clientId,
+        client,
+        conversation,
+        proof,
+        message.tools,
+        message.storeCart === true,
+      ),
+    );
+  }
+
+  /** Verify the proof for a conversation found by `handleIdentify` and attach the client. */
+  private async attachIdentifiedClient(
+    clientId: string,
+    client: WebSocketClient,
+    conversation: Conversation,
+    proof: string,
+    tools: unknown,
+    storeCart: boolean,
+  ): Promise<void> {
     // The nonce is left alone: the widget's HTTP calls rotate it concurrently,
     // and the one-time jti plus the iat window already stop replays.
     const verification = await verifyDPoPForRequest(
@@ -762,12 +815,12 @@ export class WebSocketService {
 
     logger.debug({ conversationId: conversation.id }, "Webchat client connected to conversation");
 
-    if (message.tools !== undefined) await this.registerPageTools(client, message.tools);
+    if (tools !== undefined) await this.registerPageTools(client, tools);
     await registerStoreCart(
       conversation.id,
       client.organizationId,
       requestHostname({ origin: client.origin }),
-      message.storeCart === true,
+      storeCart,
     );
 
     client.ws.send(
@@ -790,7 +843,10 @@ export class WebSocketService {
 
   private async registerPageTools(client: WebSocketClient, tools: unknown): Promise<void> {
     if (!client.conversationId || !pageToolService.isEnabled()) return;
-    const settings = await webchatSettingsService.getSettings(client.organizationId);
+    // The client identified against a conversation of this organization, so it is confirmed.
+    const settings = await runInOrganization(client.organizationId, () =>
+      webchatSettingsService.getSettings(client.organizationId),
+    );
     if (!isPageToolsOrigin(settings, requestHostname({ origin: client.origin }))) {
       if (Array.isArray(tools) && tools.length > 0) {
         this.sendError(client, "Page tools are not enabled for this site");

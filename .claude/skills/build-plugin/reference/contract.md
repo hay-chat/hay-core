@@ -37,8 +37,11 @@ A plugin is **not** loaded in-process. Per `(orgId, pluginId)` the platform lazi
 to it over loopback HTTP, authenticated with a per-worker secret: `/health`, `/metadata`, `/validate-auth`, `/config-update`, `/disable`,
 `/mcp/list-tools`, `/mcp/call-tool`, plus any routes you register. Implications:
 
-- Config and auth are injected as env JSON (`HAY_ORG_CONFIG`, `HAY_ORG_AUTH`); you read them
-  via `ctx.config` / `ctx.auth`, never from `process.env` directly in the entry.
+- The worker starts with the org's non-secret settings only (`HAY_ORG_SETTINGS`). Secret config
+  fields (`encrypted: true`) and the connected account's credentials are **pulled from core** at
+  start and before they expire, if the manifest declares them under `credentials` (below). You
+  still read everything via `ctx.config` / `ctx.auth`, never from `process.env`: the worker has
+  no host env, so a host-managed value is a config field with an `env:` fallback.
 - Each worker gets a scoped JWT (`HAY_API_TOKEN` + `HAY_API_URL`) for calling back into core
   (used by channels — see archetypes).
 
@@ -78,15 +81,56 @@ refund tool that just records a request and hands off does not handle `refunds`.
 (`document_importer` appears on the Atlassian plugin and rides a separate `autoActivate` +
 `trpcRouter` path; it is **advanced/legacy** — do not use it for a normal plugin.)
 
-**Capabilities** — SDK set: `routes | mcp | auth | config | ui`. The runner additionally
-accepts the channel/retriever strings `messages | customers | sources`. Capabilities are
-**declarative** — there is no hard enforcement that you implement what you declare; they drive
-marketplace classification and the worker's JWT scope. Declare what you actually use.
+**Capabilities** — `routes | mcp | auth | config | ui | cron | webchat | tickets` describe what the
+plugin offers. These gate what it may ask core for, and **core enforces them**: the worker's API
+token carries exactly the capabilities you declare, and every plugin API call is refused without
+the one it needs.
+
+| Declare | To call |
+| ------- | ------- |
+| `messages` | `messages.*`, `media.upload`, `webhooks.setRoutingKeys`, `channel.reportHealth`, `conversations.*`, `connection.revoke` |
+| `auth` | `connection.revoke` (non-channel plugins) |
+| `email` | `email.sendingDomain`, `POST /v1/plugin-api/send-email` |
+| `privacy` | `privacy.eraseCustomer`, `privacy.exportCustomer` |
+| `products` | `ctx.productSource` (catalog sync) |
+| `disputes` | `ctx.disputes` |
+| `state` | `ctx.state` (key/value store that survives restarts) |
+| `customers`, `sources`, `mcp` | `customers.*`, `sources.register`, `mcp.register*` |
+
+Declare what you use and nothing else; a missing one fails at runtime with FORBIDDEN.
 
 **`env`** — an **allow-list** of host env var names a config field may fall back to via its
 `env:` property. Leave `[]` unless self-hosters set credentials through `process.env`. Note the
-host applies a deny-pattern (SECRET/PASSWORD/TOKEN/…); per-org secrets reach the worker through
-`HAY_ORG_CONFIG`, not raw env.
+host applies a deny-pattern (SECRET/PASSWORD/TOKEN/…). Core resolves the fallback and the worker
+never sees the env var: a non-secret value arrives in its settings, a secret one by pull.
+
+**`credentials`** — every secret the worker reads, each bound to a capability you also declare:
+
+```json
+"capabilities": ["mcp", "auth", "credentials"],
+"credentials": [
+  { "name": "apiKey", "source": "config", "capability": "mcp", "hosts": ["api.example.com"] },
+  { "name": "auth",   "source": "auth",   "capability": "mcp", "hosts": ["api.example.com"] }
+]
+```
+
+`source: "config"` names a secret (`encrypted: true`, not `serverOnly`) config field you read with
+`ctx.config`; `"auth"` (one per plugin that registers an auth method) delivers the connected
+account's credentials (OAuth access token, API keys) for `ctx.auth`. `hosts` must be entries of your
+`network.egress`. Core hands a credential only to a worker holding its capability, refreshes an
+expiring access token when it is pulled, **never delivers a refresh token**, and audits each issue.
+A secret you read but did not declare is simply absent. Declaring any requires the `credentials`
+capability.
+
+## Packaging for upload
+
+Core never installs dependencies for an uploaded or git-installed plugin. Build it, then
+`tools/hay-cli/bin/hay plugin pack <dir>`: it bundles `hay-plugin.entry` (and the `main` of
+`mcp/package.json`) with all dependencies inlined, leaves `@hay/plugin-sdk` external (the host
+provides it), strips install fields from the packaged `package.json` files, and writes
+`hay-pack.json` (sha256 and size of every file). Upload the ZIP; core verifies it on upload and
+before each worker start. Native addons (`.node`) are refused. A git repo needs the same
+`hay-pack.json` and listed files committed.
 
 ## Config & auth descriptors (registered in `onInitialize`)
 

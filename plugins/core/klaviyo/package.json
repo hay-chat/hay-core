@@ -13,7 +13,8 @@
     "marketplaceCategory": "crm",
     "capabilities": [
       "mcp",
-      "auth"
+      "auth",
+      "credentials"
     ],
     "network": {
       "egress": [
@@ -25,7 +26,25 @@
         "store"
       ],
       "group": "marketing"
-    }
+    },
+    "credentials": [
+      {
+        "name": "apiKey",
+        "source": "config",
+        "capability": "mcp",
+        "hosts": [
+          "a.klaviyo.com"
+        ]
+      },
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "mcp",
+        "hosts": [
+          "a.klaviyo.com"
+        ]
+      }
+    ]
   },
   "scripts": {
     "build": "tsc",

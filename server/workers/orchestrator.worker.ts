@@ -1,4 +1,5 @@
 import { Orchestrator } from "../orchestrator";
+import { runAsSystem } from "@server/database/organization-context";
 import { AppDataSource } from "../database/data-source";
 import { createLogger, withLogContext } from "@server/lib/logger";
 import { metrics } from "@server/lib/metrics";
@@ -78,7 +79,7 @@ export class OrchestratorWorker {
     });
 
     // Run inactivity check once at startup
-    this.checkInactivity();
+    void runAsSystem("orchestrator inactivity check", () => this.checkInactivity());
   }
 
   private async startConsuming(): Promise<void> {

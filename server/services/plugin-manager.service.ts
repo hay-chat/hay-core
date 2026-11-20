@@ -1,11 +1,10 @@
-import { promises as fs, readFileSync, writeFileSync, existsSync } from "fs";
+import { promises as fs, readFileSync, existsSync } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { execSync } from "child_process";
-import {
-  CUSTOM_PLUGIN_INSTALL_COMMAND,
-  prepareCustomPluginInstall,
-} from "@server/lib/plugin-dependencies";
+import { parseCredentialDeclarations } from "@server/lib/plugin-credentials";
+import { verifyPackedTree } from "@server/lib/plugin-pack";
+import { TOKEN_LIFETIME_SECONDS } from "@server/lib/plugin-api-token";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { PluginRegistry, PluginStatus } from "@server/entities/plugin-registry.entity";
@@ -28,6 +27,15 @@ import { config } from "@server/config/env";
 import { readSetupHints } from "@server/services/setup/plugin-hints";
 
 const logger = createLogger("plugin-manager");
+
+/** Half the plugin API token lifetime: past this age a worker is replaced once it is idle. */
+const MAX_WORKER_AGE_MS = (TOKEN_LIFETIME_SECONDS * 1000) / 2;
+/** Past this age a worker is replaced even while busy, so it never outlives its token. */
+const HARD_MAX_WORKER_AGE_MS = 20 * 60 * 60 * 1000;
+/** A worker with no request for this long may be replaced without cutting one off. */
+const RECYCLE_IDLE_MS = 5_000;
+/** A worker with no request for this long is stopped. */
+const INACTIVE_TIMEOUT_MS = 5 * 60 * 1000;
 
 type PluginType = HayPluginManifest["type"][number];
 
@@ -58,6 +66,7 @@ interface HayPluginBlock {
   oauthProviderInstall?: boolean;
   /** Outbound destinations the worker may reach. */
   network?: HayPluginManifest["network"];
+  credentials?: unknown;
   /** When in-app setup should suggest this plugin, and what it can do for customers. */
   setup?: unknown;
   /** Marketplace section the plugin is listed under. */
@@ -318,6 +327,7 @@ export class PluginManagerService {
         oauthHosts: hayPlugin.oauthHosts || undefined, // Hosts a managed OAuth secret may reach
         oauthProviderInstall: hayPlugin.oauthProviderInstall === true || undefined, // App store can start the install
         network: hayPlugin.network || undefined, // Hosts the worker may reach through the egress proxy
+        credentials: parseCredentialDeclarations(hayPlugin.credentials), // Secrets the worker may pull
         setup: readSetupHints(hayPlugin.setup), // In-app setup suggestions
         // Plugins can come from organizations: an unknown section is dropped, not trusted.
         marketplaceCategory: MARKETPLACE_CATEGORIES.find(
@@ -445,9 +455,6 @@ export class PluginManagerService {
         "optionalDependencies",
       ]) {
         const deps = { ...packageJson[field] };
-        // installPlugin rewrites this file: path for custom plugins; it is not
-        // a dependency change.
-        if (deps["@hay/plugin-sdk"]?.startsWith("file:")) deps["@hay/plugin-sdk"] = "file:";
         const entries = Object.entries(deps).sort(([a], [b]) => a.localeCompare(b));
         hash.update(JSON.stringify([file, field, entries]));
       }
@@ -603,6 +610,15 @@ export class PluginManagerService {
           }
         } catch (error) {
           logger.error({ err: error, pluginName: plugin.name }, "Failed to restore plugin");
+          // Shown on the plugin: a plugin uploaded before packs existed lands here
+          // and has to be uploaded again as a pack.
+          await pluginRegistryRepository
+            .updateInstallStatus(
+              plugin.id,
+              false,
+              `Could not restore the plugin: ${error instanceof Error ? error.message : String(error)}`,
+            )
+            .catch(() => undefined);
         }
       }
     } catch (error) {
@@ -611,7 +627,13 @@ export class PluginManagerService {
   }
 
   /**
-   * Install a plugin (run npm install)
+   * Install a plugin.
+   *
+   * Core plugins get their dependencies from the image build (in a development
+   * checkout, from the workspace install below). Uploaded and git plugins are
+   * installed as packs: their dependencies are already bundled, so installing
+   * only checks the files against `hay-pack.json`. No package manager and no
+   * lifecycle script runs for them.
    */
   async installPlugin(pluginId: string): Promise<void> {
     const plugin = this.registry.get(pluginId);
@@ -626,83 +648,51 @@ export class PluginManagerService {
     }
 
     const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
-    const isWorkspacePlugin = plugin.pluginPath.startsWith("core/");
 
-    // Production images carry core plugins' dependencies from the image build.
-    if (isWorkspacePlugin && config.isProduction) {
+    if (plugin.sourceType !== "core") {
+      try {
+        await verifyPackedTree(pluginPath);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        await pluginRegistryRepository.updateInstallStatus(plugin.id, false, errorMessage);
+        plugin.installed = false;
+        logger.error({ pluginName: plugin.name }, "Plugin pack check failed");
+        throw new Error(`Failed to install plugin ${plugin.name}: ${errorMessage}`);
+      }
       await pluginRegistryRepository.updateInstallStatus(plugin.id, true);
       plugin.installed = true;
       return;
     }
 
-    // Check for npm install in package.json
-    let installCommand: string | undefined;
-    try {
-      const packageJsonPath = path.join(pluginPath, "package.json");
-      const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as PluginPackageJson;
-
-      // For custom/git plugins, fix @hay/plugin-sdk dependency path.
-      // External plugins reference the SDK with a file: path relative to their
-      // own repo, which breaks when extracted inside the monorepo.
-      if (!isWorkspacePlugin) {
-        this.fixPluginSdkPath(pluginPath, packageJson);
-      }
-
-      // Only run npm install if there are dependencies
-      if (packageJson.dependencies || packageJson.devDependencies) {
-        if (isWorkspacePlugin) {
-          // For workspace plugins, run npm install from root to properly resolve workspace links
-          // The plugin is part of plugins/core/* workspace, so we need workspace-aware install
-          installCommand = `npm install --ignore-scripts --workspace=plugins/${plugin.pluginPath}`;
-        } else {
-          installCommand = CUSTOM_PLUGIN_INSTALL_COMMAND;
-        }
-      }
-    } catch (error) {
-      // Ignore - package.json might not exist
+    // Production images carry core plugins' dependencies from the image build.
+    if (config.isProduction) {
+      await pluginRegistryRepository.updateInstallStatus(plugin.id, true);
+      plugin.installed = true;
+      return;
     }
 
+    // Development checkout only: install a core plugin's workspace dependencies.
     try {
-      if (!isWorkspacePlugin) {
-        const sdkPath = path.join(this.pluginsDir, "..", "packages", "plugin-sdk");
-        await prepareCustomPluginInstall(pluginPath, sdkPath);
-        await prepareCustomPluginInstall(path.join(pluginPath, "mcp"), sdkPath);
-      }
-
-      // Install the plugin's own (root) dependencies, if it declares any. A
-      // plugin may have none at the root and still ship a bundled mcp/ server
-      // with its own deps, so this must NOT short-circuit the MCP install below.
-      if (installCommand) {
+      const packageJson = JSON.parse(
+        readFileSync(path.join(pluginPath, "package.json"), "utf-8"),
+      ) as PluginPackageJson;
+      if (packageJson.dependencies || packageJson.devDependencies) {
         logger.info({ pluginName: plugin.name }, "Installing plugin");
-
-        // For workspace plugins, run from root directory; otherwise run from plugin directory
-        const rootDir = path.join(this.pluginsDir, "..");
-        const execDir = isWorkspacePlugin ? rootDir : pluginPath;
-
-        execSync(installCommand, {
-          cwd: execDir,
+        execSync(`npm install --ignore-scripts --workspace=plugins/${plugin.pluginPath}`, {
+          cwd: path.join(this.pluginsDir, ".."),
           stdio: "inherit",
           env: this.buildMinimalEnv(),
         });
-      } else {
-        logger.debug({ pluginName: plugin.name }, "No root install command for plugin");
       }
 
-      // Install bundled MCP server dependencies, if any. The mcp/ server is plain
-      // runtime JS spawned over stdio and is NOT part of the npm workspace, so its
-      // declared deps must be installed separately or the stdio server fails to
-      // resolve modules at spawn time (it otherwise relies on monorepo hoisting).
-      const mcpPackageJson = path.join(pluginPath, "mcp", "package.json");
-      if (existsSync(mcpPackageJson)) {
+      // The bundled mcp/ server is not part of the workspace.
+      if (existsSync(path.join(pluginPath, "mcp", "package.json"))) {
         logger.info({ pluginName: plugin.name }, "Installing MCP server dependencies");
-        execSync(
-          isWorkspacePlugin ? "npm install --ignore-scripts" : CUSTOM_PLUGIN_INSTALL_COMMAND,
-          {
-            cwd: path.join(pluginPath, "mcp"),
-            stdio: "inherit",
-            env: this.buildMinimalEnv(),
-          },
-        );
+        execSync("npm install --ignore-scripts", {
+          cwd: path.join(pluginPath, "mcp"),
+          stdio: "inherit",
+          env: this.buildMinimalEnv(),
+        });
       }
 
       await pluginRegistryRepository.updateInstallStatus(plugin.id, true);
@@ -1226,39 +1216,6 @@ export class PluginManagerService {
   }
 
   /**
-   * Fix @hay/plugin-sdk file: dependency path for custom/git plugins.
-   * External plugins reference the SDK with a relative path that only works
-   * in their own repo. We rewrite it to the correct path within the monorepo.
-   */
-  private fixPluginSdkPath(pluginPath: string, packageJson: PluginPackageJson): void {
-    const sdkAbsPath = path.join(this.pluginsDir, "..", "packages", "plugin-sdk");
-    const sdkRelPath = path.relative(pluginPath, sdkAbsPath);
-    let modified = false;
-
-    for (const depKey of ["dependencies", "devDependencies"] as const) {
-      const deps = packageJson[depKey];
-      if (deps?.["@hay/plugin-sdk"] && deps["@hay/plugin-sdk"].startsWith("file:")) {
-        const currentTarget = deps["@hay/plugin-sdk"].replace("file:", "");
-        const resolvedCurrent = path.resolve(pluginPath, currentTarget);
-        // Only rewrite if the current path doesn't resolve to the actual SDK
-        if (resolvedCurrent !== sdkAbsPath) {
-          deps["@hay/plugin-sdk"] = `file:${sdkRelPath}`;
-          modified = true;
-        }
-      }
-    }
-
-    if (modified) {
-      const packageJsonPath = path.join(pluginPath, "package.json");
-      writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + "\n");
-      logger.info(
-        { pluginPath: path.basename(pluginPath) },
-        "Fixed @hay/plugin-sdk dependency path",
-      );
-    }
-  }
-
-  /**
    * Build minimal environment for build/install operations
    */
   private isPrebuiltCorePlugin(plugin: PluginRegistry): boolean {
@@ -1282,16 +1239,39 @@ export class PluginManagerService {
     const allWorkers = this.runnerService.getAllWorkers();
 
     for (const worker of allWorkers) {
-      const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
-      const inactiveTime = now.getTime() - worker.lastActivity.getTime();
+      try {
+        // A worker's plugin API token is not renewed, so a worker is replaced
+        // (restarted on demand) well before its token expires. It is replaced
+        // when it has a quiet moment; the hard cap stops a worker that is never
+        // quiet from outliving its token.
+        const age = now.getTime() - worker.startedAt.getTime();
+        const inactiveTime = now.getTime() - worker.lastActivity.getTime();
+        const recycle =
+          age > HARD_MAX_WORKER_AGE_MS ||
+          (age > MAX_WORKER_AGE_MS && inactiveTime > RECYCLE_IDLE_MS);
+        if (recycle) {
+          logger.info(
+            { pluginId: worker.pluginId, ageHours: Math.round(age / 3_600_000) },
+            "Recycling long-running worker",
+          );
+          await this.stopPluginWorker(worker.organizationId, worker.pluginId);
+          continue;
+        }
 
-      if (inactiveTime > TIMEOUT_MS) {
-        const key = `${worker.organizationId}:${worker.pluginId}`;
-        logger.info(
-          { key, inactiveSeconds: Math.round(inactiveTime / 1000) },
-          "Cleaning up inactive worker",
+        if (inactiveTime > INACTIVE_TIMEOUT_MS) {
+          const key = `${worker.organizationId}:${worker.pluginId}`;
+          logger.info(
+            { key, inactiveSeconds: Math.round(inactiveTime / 1000) },
+            "Cleaning up inactive worker",
+          );
+          await this.stopPluginWorker(worker.organizationId, worker.pluginId);
+        }
+      } catch (error) {
+        // One worker that will not stop must not keep the others running.
+        logger.warn(
+          { err: error, organizationId: worker.organizationId, pluginId: worker.pluginId },
+          "Could not stop worker during cleanup",
         );
-        await this.stopPluginWorker(worker.organizationId, worker.pluginId);
       }
     }
   }

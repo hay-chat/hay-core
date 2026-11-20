@@ -29,8 +29,14 @@ export interface AllowRule {
   port: number;
 }
 
-function validHost(host: string): boolean {
-  return host.length <= 253 && HOST_PATTERN.test(host) && isIP(host) === 0;
+/** A last label that is a number ("127.1", "0x7f.1") makes URL parsers read the host as an IPv4 address. */
+const NUMERIC_LABEL = /^(\d+|0x[0-9a-f]*)$/;
+
+/** Whether `host` is a lower-case DNS name: no IP literal and no numeric ending a resolver might read as an address. */
+export function validHost(host: string): boolean {
+  if (host.length > 253 || !HOST_PATTERN.test(host) || isIP(host) !== 0) return false;
+  const labels = host.split(".");
+  return !NUMERIC_LABEL.test(labels[labels.length - 1]);
 }
 
 /** Parse a "host", "host:port" or "*.parent[:port]" rule. Null when malformed. */
@@ -123,12 +129,15 @@ for (const [net, bits] of [
   ["203.0.113.0", 24],
   ["224.0.0.0", 4],
   ["240.0.0.0", 4],
+  ["192.88.99.0", 24], // 6to4 relay anycast
 ] as const) {
   blocked.addSubnet(net, bits, "ipv4");
 }
 for (const [net, bits] of [
-  ["::", 128],
-  ["::1", 128],
+  ["::", 96], // IPv4-compatible, includes :: and ::1
+  ["64:ff9b:1::", 48], // local-use NAT64
+  ["2002::", 16], // 6to4
+  ["fec0::", 10], // site-local
   ["64:ff9b::", 96], // NAT64
   ["100::", 64],
   ["2001:db8::", 32],

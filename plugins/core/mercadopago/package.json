@@ -12,7 +12,8 @@
     "marketplaceCategory": "payments",
     "capabilities": [
       "mcp",
-      "auth"
+      "auth",
+      "credentials"
     ],
     "setup": {
       "businessTypes": [
@@ -37,6 +38,16 @@
     "oauthHosts": [
       "auth.mercadopago.com",
       "api.mercadopago.com"
+    ],
+    "credentials": [
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "mcp",
+        "hosts": [
+          "api.mercadopago.com"
+        ]
+      }
     ]
   },
   "scripts": {

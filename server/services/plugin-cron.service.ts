@@ -18,6 +18,7 @@
  * also runs on an interval and brings this process in line with the database.
  */
 
+import { runAsSystem } from "@server/database/organization-context";
 import { schedulerService } from "./scheduler.service";
 import { getPluginRunnerService } from "./plugin-runner.service";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
@@ -55,7 +56,7 @@ export class PluginCronService {
   /** Register cron jobs at boot, after the plugin manager has populated metadata. */
   async initialize(): Promise<void> {
     try {
-      await this.reconcile();
+      await runAsSystem("plugin cron startup", () => this.reconcile());
       logger.info({ registered: this.registered.size }, "Plugin cron jobs initialized");
     } catch (error) {
       logger.error({ err: error }, "Failed to initialize plugin cron jobs");
@@ -175,7 +176,6 @@ export class PluginCronService {
     >;
     const resolvedConfig = resolveConfigForWorker(
       instance.config,
-      instance.authState,
       configSchema,
       configEnvAllowList(instance.plugin),
     );
@@ -189,10 +189,7 @@ export class PluginCronService {
     const response = await workerFetch(worker.port, `/cron/${encodeURIComponent(cronName)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        config: resolvedConfig,
-        authState: instance.authState ?? null,
-      }),
+      body: JSON.stringify({ config: resolvedConfig }),
       signal: AbortSignal.any([signal, AbortSignal.timeout(60_000)]),
     });
 
@@ -212,7 +209,17 @@ export class PluginCronService {
     }
 
     if (result.credentialsUpdated) {
-      await pluginInstanceRepository.updateAuthState(instance.id, orgId, result.credentialsUpdated);
+      // The worker never holds the refresh token or core-only keys, so what it
+      // staged is laid over the stored credentials rather than replacing them.
+      const stored =
+        (await pluginInstanceRepository.findByOrgAndPlugin(orgId, pluginId)) ?? instance;
+      await pluginInstanceRepository.updateAuthState(instance.id, orgId, {
+        ...result.credentialsUpdated,
+        credentials: {
+          ...stored.authState?.credentials,
+          ...result.credentialsUpdated.credentials,
+        },
+      });
       logger.info(
         { pluginId, orgId, cronName },
         "Cron staged credential update — persisting and restarting worker",

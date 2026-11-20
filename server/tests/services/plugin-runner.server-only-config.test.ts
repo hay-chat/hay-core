@@ -1,7 +1,7 @@
 /**
  * Config fields flagged `serverOnly` (e.g. OAuth client secrets used by core
  * for token exchange) must never reach a plugin worker. `resolveConfigForWorker`
- * is what plugin-runner and plugin-cron feed into HAY_ORG_CONFIG / cron
+ * is what plugin-runner and plugin-cron feed into HAY_ORG_SETTINGS / cron
  * payloads, and `stripServerOnlyFields` is what the OAuth service applies to
  * the /on-connected body.
  */
@@ -41,7 +41,7 @@ describe("serverOnly config fields never reach the worker", () => {
   });
 
   it("omits env-backed serverOnly fields from the worker config", () => {
-    const result = resolveConfigForWorker({}, null, schema, allowedEnv);
+    const result = resolveConfigForWorker({}, schema, allowedEnv);
 
     expect(result.clientId).toBe("env-app-id");
     expect(result).not.toHaveProperty("clientSecret");
@@ -49,14 +49,9 @@ describe("serverOnly config fields never reach the worker", () => {
   });
 
   it("omits DB-stored serverOnly fields from the worker config", () => {
-    const result = resolveConfigForWorker(
-      { clientSecret: "db-secret", region: "eu" },
-      { credentials: { accessToken: "tok" } },
-      schema,
-    );
+    const result = resolveConfigForWorker({ clientSecret: "db-secret", region: "eu" }, schema);
 
     expect(result.region).toBe("eu");
-    expect(result.accessToken).toBe("tok");
     expect(result).not.toHaveProperty("clientSecret");
   });
 

@@ -3,6 +3,7 @@ import { pipeline } from "stream/promises";
 import { TRPCError } from "@trpc/server";
 import { requireAuth } from "@server/lib/auth/middleware";
 import { createLogger } from "@server/lib/logger";
+import { runAsSystem, runInOrganization } from "@server/database/organization-context";
 import { Upload } from "@server/entities/upload.entity";
 import { storageService } from "@server/services/storage.service";
 import {
@@ -117,69 +118,17 @@ router.get("/:id", async (req: Request, res: Response) => {
   }
 
   try {
-    const upload = await Upload.findOne({ where: { id } });
+    // The row is what reveals the organization, so only this lookup runs in a
+    // system context; access check and streaming continue in the row's organization.
+    const upload = await runAsSystem("media: find the organization of an upload", () =>
+      Upload.findOne({ where: { id } }),
+    );
     if (!upload) {
       res.status(404).json({ error: "Not found" });
       return;
     }
 
-    const access = await checkAccess(req, upload);
-    if (access === "unauthenticated") {
-      res.status(401).json({ error: "Authentication required" });
-      return;
-    }
-    if (access === "denied") {
-      res.status(404).json({ error: "Not found" });
-      return;
-    }
-
-    let scanStatus = upload.scanStatus;
-    if (scanStatus === "pending") {
-      scanStatus = (await waitForScans([upload.id], SCAN_HOLD_MS)).get(upload.id) ?? null;
-    }
-    if (scanStatus === "pending") {
-      res.status(423).set("Retry-After", "5").json({ error: "File is being scanned" });
-      return;
-    }
-    if (!isScanCleared(scanStatus)) {
-      res.status(403).json({ error: "File blocked by the virus scan" });
-      return;
-    }
-
-    const size = Number(upload.size);
-    const range = parseRange(req.headers.range, size);
-    const unsatisfiable = !!req.headers.range && !range;
-    const body = unsatisfiable
-      ? null
-      : await storageService.openReadStream(upload, range ?? undefined);
-
-    res.set({
-      "Content-Type": upload.mimeType,
-      "Content-Disposition": contentDisposition(upload.mimeType, upload.originalName),
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy":
-        "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox",
-      "Cross-Origin-Resource-Policy": "cross-origin",
-      "Cache-Control": "private, max-age=300",
-      Vary: "Authorization, x-organization-id",
-      "Accept-Ranges": "bytes",
-    });
-
-    if (!body) {
-      res.status(416).set("Content-Range", `bytes */${size}`).end();
-      return;
-    }
-    if (range) {
-      const [start, end] = range;
-      res
-        .status(206)
-        .set("Content-Range", `bytes ${start}-${end}/${size}`)
-        .set("Content-Length", String(end - start + 1));
-    } else {
-      res.status(200).set("Content-Length", String(size));
-    }
-
-    await pipeline(body, res);
+    await runInOrganization(upload.organizationId, () => serveUpload(req, res, upload));
   } catch (error) {
     // Players cancel a request on every seek.
     if ((error as NodeJS.ErrnoException).code === "ERR_STREAM_PREMATURE_CLOSE") return;
@@ -189,5 +138,65 @@ router.get("/:id", async (req: Request, res: Response) => {
     }
   }
 });
+
+async function serveUpload(req: Request, res: Response, upload: Upload): Promise<void> {
+  const access = await checkAccess(req, upload);
+  if (access === "unauthenticated") {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  if (access === "denied") {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  let scanStatus = upload.scanStatus;
+  if (scanStatus === "pending") {
+    scanStatus = (await waitForScans([upload.id], SCAN_HOLD_MS)).get(upload.id) ?? null;
+  }
+  if (scanStatus === "pending") {
+    res.status(423).set("Retry-After", "5").json({ error: "File is being scanned" });
+    return;
+  }
+  if (!isScanCleared(scanStatus)) {
+    res.status(403).json({ error: "File blocked by the virus scan" });
+    return;
+  }
+
+  const size = Number(upload.size);
+  const range = parseRange(req.headers.range, size);
+  const unsatisfiable = !!req.headers.range && !range;
+  const body = unsatisfiable
+    ? null
+    : await storageService.openReadStream(upload, range ?? undefined);
+
+  res.set({
+    "Content-Type": upload.mimeType,
+    "Content-Disposition": contentDisposition(upload.mimeType, upload.originalName),
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy":
+      "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox",
+    "Cross-Origin-Resource-Policy": "cross-origin",
+    "Cache-Control": "private, max-age=300",
+    Vary: "Authorization, x-organization-id",
+    "Accept-Ranges": "bytes",
+  });
+
+  if (!body) {
+    res.status(416).set("Content-Range", `bytes */${size}`).end();
+    return;
+  }
+  if (range) {
+    const [start, end] = range;
+    res
+      .status(206)
+      .set("Content-Range", `bytes ${start}-${end}/${size}`)
+      .set("Content-Length", String(end - start + 1));
+  } else {
+    res.status(200).set("Content-Length", String(size));
+  }
+
+  await pipeline(body, res);
+}
 
 export default router;

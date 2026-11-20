@@ -9,6 +9,9 @@
  *   `degraded` runs them anyway. Bundled plugins run in both, with an error log.
  */
 
+import path from "path";
+import { randomBytes } from "crypto";
+
 export type PluginIsolationMode = "off" | "strict" | "degraded";
 
 export function pluginIsolationMode(env: NodeJS.ProcessEnv = process.env): PluginIsolationMode {
@@ -18,9 +21,27 @@ export function pluginIsolationMode(env: NodeJS.ProcessEnv = process.env): Plugi
   throw new Error(`PLUGIN_ISOLATION must be "strict" or "degraded" (or unset), got "${value}"`);
 }
 
-/** Unix socket core serves the plugin API on, for workers that have no network. */
-export function pluginApiSocketPath(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  return env.PLUGIN_API_SOCKET?.trim() || undefined;
+/**
+ * `PLUGIN_API_SOCKET` names the shared directory (and the plugin host's idea of
+ * it): `<dir>/core.sock`. Each core process serves the plugin API on a socket
+ * of its own in that directory, so a second core started during a deploy does
+ * not take the socket away from the workers of the first.
+ */
+export function pluginApiSocketDir(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const base = env.PLUGIN_API_SOCKET?.trim();
+  return base ? path.dirname(base) : undefined;
+}
+
+let ownSocket: { dir: string; path: string } | undefined;
+
+/** Unix socket this core process serves the plugin API on, for workers that have no network. */
+export function ownPluginApiSocketPath(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const dir = pluginApiSocketDir(env);
+  if (!dir) return undefined;
+  if (ownSocket?.dir !== dir) {
+    ownSocket = { dir, path: path.join(dir, `core-${randomBytes(6).toString("hex")}.sock`) };
+  }
+  return ownSocket.path;
 }
 
 /** Unix socket of the plugin-host supervisor's control API. */

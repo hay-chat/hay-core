@@ -13,7 +13,8 @@
     "marketplaceCategory": "knowledge",
     "capabilities": [
       "mcp",
-      "auth"
+      "auth",
+      "credentials"
     ],
     "network": {
       "egress": [
@@ -28,7 +29,25 @@
       "handles": [
         "bookings"
       ]
-    }
+    },
+    "credentials": [
+      {
+        "name": "apiKey",
+        "source": "config",
+        "capability": "mcp",
+        "hosts": [
+          "api.cal.com"
+        ]
+      },
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "mcp",
+        "hosts": [
+          "api.cal.com"
+        ]
+      }
+    ]
   },
   "scripts": {
     "build": "tsc",

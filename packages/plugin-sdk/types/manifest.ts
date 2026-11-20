@@ -40,6 +40,10 @@ export type PluginMarketplaceCategory =
  * - `privacy`: plugin relays a provider's data-subject requests (e.g. a store's
  *   customers/redact and customers/data_request webhooks) to core's
  *   `privacy.eraseCustomer` / `privacy.exportCustomer` plugin-api calls.
+ * - `credentials`: plugin pulls the secrets its manifest declares (`credentials`
+ *   below) from core; required whenever any are declared.
+ * - `state`: plugin keeps a small key/value store in core (`ctx.state`) that
+ *   survives restarts.
  * - `tickets`: plugin raises helpdesk tickets when a hand-off finds nobody
  *   available. It answers core's `POST /tickets/form` and `POST /tickets/create`.
  */
@@ -56,6 +60,8 @@ export type PluginCapability =
   | "disputes"
   | "tickets"
   | "privacy"
+  | "state"
+  | "credentials"
   | "cron"
   | "email"
   | "webchat";
@@ -154,6 +160,27 @@ export interface HayPluginManifest {
    * @example ["SHOPIFY_API_KEY", "SHOPIFY_SECRET"]
    */
   env?: string[];
+
+  /**
+   * Secrets core delivers to the worker on request, not at spawn.
+   *
+   * @remarks
+   * Declare every secret config field (`encrypted: true`) the plugin reads, and
+   * `"auth"` when it has a connected account (OAuth tokens, API keys kept in the
+   * auth state). Each is bound to a capability the plugin also declares; core hands
+   * it out only to a worker holding that capability, never a refresh token. `hosts`
+   * names where the credential is sent. Read them as usual with `ctx.config` and
+   * `ctx.auth`.
+   *
+   * @example
+   * [{ "name": "apiKey", "source": "config", "capability": "mcp", "hosts": ["api.example.com"] }]
+   */
+  credentials?: Array<{
+    name: string;
+    source: "config" | "auth";
+    capability: PluginCapability;
+    hosts?: Array<string | { fromConfig: string; suffix?: string }>;
+  }>;
 
   /**
    * Outbound network destinations the worker may reach. Everything else is

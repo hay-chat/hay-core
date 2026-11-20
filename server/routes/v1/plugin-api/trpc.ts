@@ -1,5 +1,5 @@
 import { router } from "@server/trpc";
-import { pluginProcedure, requireCapability } from "@server/trpc/middleware/plugin-auth";
+import { pluginApiProcedure } from "@server/trpc/middleware/plugin-auth";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { toClientError } from "@server/trpc/client-error";
@@ -38,8 +38,10 @@ import { createLogger } from "@server/lib/logger";
 import { fitsInBytes } from "@server/lib/validation/json-record";
 import { validateUrlForSSRF } from "@server/utils/ssrf";
 import { emailDomainService } from "@server/services/email-domains.service";
+import { ReceivedEmailError, receivedEmailService } from "@server/services/received-email.service";
 import { channelHealthService } from "@server/services/channel-health.service";
 import type { Conversation } from "@server/database/entities/conversation.entity";
+import { issueCredential } from "@server/services/plugin-credential.service";
 import { providerPrivacyService } from "@server/services/provider-privacy.service";
 
 // Channel names become keys of conversation.metadata, so they are kept
@@ -124,6 +126,26 @@ function recipientMetadata(
   return customer.external_id !== identity ? { customerExternalId: identity } : {};
 }
 
+function receivedEmailTrpcError(error: unknown): unknown {
+  if (!(error instanceof ReceivedEmailError)) return error;
+  switch (error.kind) {
+    case "not_found":
+      return new TRPCError({ code: "NOT_FOUND", message: "Email not found" });
+    case "unavailable":
+      return new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Email provider unavailable" });
+    case "not_configured":
+      return new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "Receiving email is not available",
+      });
+    default:
+      return new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "Email provider refused the request",
+      });
+  }
+}
+
 /**
  * Plugin API Router (tRPC)
  *
@@ -143,7 +165,7 @@ export const pluginApiTrpcRouter = router({
    *
    * NOTE: Simplified implementation - full conversation management coming in Phase 4
    */
-  "messages.receive": pluginProcedure
+  "messages.receive": pluginApiProcedure("messages.receive")
     .input(
       z.object({
         from: z.string().min(1, "from is required"),
@@ -193,8 +215,6 @@ export const pluginApiTrpcRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "messages");
-
       const { from, content, channel, metadata, externalConversationId, title } = input;
       const attachments: MessageAttachment[] | undefined = input.attachments?.map((attachment) => ({
         ...attachment,
@@ -452,7 +472,7 @@ export const pluginApiTrpcRouter = router({
    *
    * NOTE: Simplified implementation - full conversation management coming in Phase 4
    */
-  "messages.send": pluginProcedure
+  "messages.send": pluginApiProcedure("messages.send")
     .input(
       z.object({
         to: z.string().min(1, "to is required"),
@@ -463,8 +483,6 @@ export const pluginApiTrpcRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "messages");
-
       const { to, content, channel, conversationId, metadata } = input;
       const organizationId = ctx.pluginAuth.organizationId;
 
@@ -552,7 +570,7 @@ export const pluginApiTrpcRouter = router({
    * Not-found is a soft result, not an error: the provider's `sent` status can
    * race the /deliver response that stores the provider id.
    */
-  "messages.updateStatus": pluginProcedure
+  "messages.updateStatus": pluginApiProcedure("messages.updateStatus")
     .input(
       z.object({
         providerMessageId: z.string().min(1),
@@ -567,8 +585,6 @@ export const pluginApiTrpcRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "messages");
-
       const organizationId = ctx.pluginAuth.organizationId;
       const message = await messageRepository.findByProviderMessageIdAndOrganization(
         input.providerMessageId,
@@ -611,6 +627,8 @@ export const pluginApiTrpcRouter = router({
       // Status-only event: never `message_received`, which channel-delivery
       // would treat as a new outbound message and re-deliver.
       try {
+        // Skipped while Redis is down: a queued publish would stall the worker's call.
+        if (!redisService.isConnected()) throw new Error("Redis unavailable");
         await redisService.publish("websocket:events", {
           type: "message_status_updated",
           organizationId,
@@ -638,7 +656,7 @@ export const pluginApiTrpcRouter = router({
    * With `transcribe` on audio, also returns `transcript` (speech-to-text).
    * Transcription is best effort: absent when unavailable, never fails the upload.
    */
-  "media.upload": pluginProcedure
+  "media.upload": pluginApiProcedure("media.upload")
     .input(
       z.object({
         data: z.string().min(1),
@@ -648,8 +666,6 @@ export const pluginApiTrpcRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "messages");
-
       const buffer = decodeBase64(input.data);
       if (!buffer) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid base64 payload" });
@@ -705,11 +721,10 @@ export const pluginApiTrpcRouter = router({
    * disconnects the instance after responding, because the revoke stops the
    * calling worker. Only channels raise a channel-health alert.
    */
-  "connection.revoke": pluginProcedure
+  "connection.revoke": pluginApiProcedure("connection.revoke")
     .input(z.object({ reason: z.string().min(1).max(200) }))
     .mutation(({ input, ctx }) => {
       const isChannel = ctx.pluginAuth.capabilities.includes("messages");
-      if (!isChannel) requireCapability(ctx, "auth");
 
       const { organizationId, pluginId } = ctx.pluginAuth;
       logger.warn(
@@ -733,7 +748,7 @@ export const pluginApiTrpcRouter = router({
    * (throttled); "ok" clears a failure the plugin reported. Core-detected
    * failures (failed deliveries, revoked connection) are cleared by core.
    */
-  "channel.reportHealth": pluginProcedure
+  "channel.reportHealth": pluginApiProcedure("channel.reportHealth")
     .input(
       z.object({
         status: z.enum(["ok", "failing"]),
@@ -741,7 +756,6 @@ export const pluginApiTrpcRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "messages");
       const { organizationId, pluginId } = ctx.pluginAuth;
       if (input.status === "failing") {
         await channelHealthService.markFailing(
@@ -761,10 +775,45 @@ export const pluginApiTrpcRouter = router({
    * plugins send From the merchant's own address only when its domain matches;
    * the platform address stays the default.
    */
-  "email.sendingDomain": pluginProcedure.query(async ({ ctx }) => {
-    requireCapability(ctx, "email");
+  "email.sendingDomain": pluginApiProcedure("email.sendingDomain").query(async ({ ctx }) => {
     return { domain: await emailDomainService.verifiedDomain(ctx.pluginAuth.organizationId) };
   }),
+
+  /**
+   * A received email (body, headers, attachment metadata) fetched from the
+   * email provider with the platform key, which workers never hold. Only the
+   * organization the email was addressed to can read it.
+   * NOT_FOUND is final; SERVICE_UNAVAILABLE means the provider could not
+   * answer yet and the call is worth retrying.
+   */
+  "email.receivedMessage": pluginApiProcedure("email.receivedMessage")
+    .input(z.object({ emailId: z.string().min(1).max(128) }))
+    .query(async ({ input, ctx }) => {
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      try {
+        return await receivedEmailService.get(input.emailId, pluginId, organizationId);
+      } catch (error) {
+        throw receivedEmailTrpcError(error);
+      }
+    }),
+
+  /** Attachment list (signed download URLs) of a received email; same scope as email.receivedMessage. */
+  "email.receivedAttachments": pluginApiProcedure("email.receivedAttachments")
+    .input(z.object({ emailId: z.string().min(1).max(128) }))
+    .query(async ({ input, ctx }) => {
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      try {
+        return {
+          attachments: await receivedEmailService.listAttachments(
+            input.emailId,
+            pluginId,
+            organizationId,
+          ),
+        };
+      } catch (error) {
+        throw receivedEmailTrpcError(error);
+      }
+    }),
 
   /**
    * Replace the shared-webhook routing keys owned by the calling plugin instance.
@@ -775,11 +824,9 @@ export const pluginApiTrpcRouter = router({
    * accounts. An empty list removes the instance's keys. A key another
    * organization holds while its instance is enabled is refused with CONFLICT.
    */
-  "webhooks.setRoutingKeys": pluginProcedure
+  "webhooks.setRoutingKeys": pluginApiProcedure("webhooks.setRoutingKeys")
     .input(z.object({ routingKeys: z.array(z.string().min(1).max(256)).max(20) }))
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "messages");
-
       const { organizationId, pluginId } = ctx.pluginAuth;
       const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
       if (!instance) {
@@ -818,7 +865,9 @@ export const pluginApiTrpcRouter = router({
    * external system (e.g. a Chatwoot agent resolves / reopens a ticket) back
    * into Hay. Looks up the Hay conversation via metadata[channel].conversationId.
    */
-  "conversations.updateStatusByExternalId": pluginProcedure
+  "conversations.updateStatusByExternalId": pluginApiProcedure(
+    "conversations.updateStatusByExternalId",
+  )
     .input(
       z.object({
         channel: channelNameSchema,
@@ -828,8 +877,6 @@ export const pluginApiTrpcRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "messages");
-
       const organizationId = ctx.pluginAuth.organizationId;
       const conversation = await conversationRepository.findByExternalConversationId(
         input.channel,
@@ -856,11 +903,9 @@ export const pluginApiTrpcRouter = router({
   /**
    * Messages Capability - Get messages by conversation
    */
-  "messages.getByConversation": pluginProcedure
+  "messages.getByConversation": pluginApiProcedure("messages.getByConversation")
     .input(z.object({ conversationId: z.string().uuid() }))
     .query(async ({ input, ctx }) => {
-      requireCapability(ctx, "messages");
-
       const organizationId = ctx.pluginAuth.organizationId;
 
       const conversation = await conversationRepository.findByIdAndOrganization(
@@ -881,11 +926,9 @@ export const pluginApiTrpcRouter = router({
   /**
    * Customers Capability - Get customer by ID
    */
-  "customers.get": pluginProcedure
+  "customers.get": pluginApiProcedure("customers.get")
     .input(z.object({ customerId: z.string().uuid() }))
     .query(async ({ input, ctx }) => {
-      requireCapability(ctx, "customers");
-
       const organizationId = ctx.pluginAuth.organizationId;
 
       const customer = await customerRepository.findByIdAndOrganization(
@@ -899,15 +942,13 @@ export const pluginApiTrpcRouter = router({
   /**
    * Customers Capability - Find customer by external ID
    */
-  "customers.findByExternalId": pluginProcedure
+  "customers.findByExternalId": pluginApiProcedure("customers.findByExternalId")
     .input(
       z.object({
         externalId: z.string(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "customers");
-
       const organizationId = ctx.pluginAuth.organizationId;
 
       const customer = await customerRepository.findByExternalId(input.externalId, organizationId);
@@ -918,7 +959,7 @@ export const pluginApiTrpcRouter = router({
   /**
    * Customers Capability - Create or update customer
    */
-  "customers.upsert": pluginProcedure
+  "customers.upsert": pluginApiProcedure("customers.upsert")
     .input(
       z.object({
         externalId: z.string().min(1).max(255),
@@ -935,8 +976,6 @@ export const pluginApiTrpcRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "customers");
-
       const { externalId, channel, email, phone, name, metadata } = input;
       const organizationId = ctx.pluginAuth.organizationId;
 
@@ -983,10 +1022,9 @@ export const pluginApiTrpcRouter = router({
    * organization matching an identifier gets the same erasure a verified
    * deletion request runs, as a background job. Idempotent while in flight.
    */
-  "privacy.eraseCustomer": pluginProcedure
+  "privacy.eraseCustomer": pluginApiProcedure("privacy.eraseCustomer")
     .input(privacySubjectSchema)
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "privacy");
       const { organizationId, pluginId } = ctx.pluginAuth;
       const { reference, ...identifiers } = input;
       const result = await providerPrivacyService.queueForSubject(
@@ -1005,10 +1043,9 @@ export const pluginApiTrpcRouter = router({
    * and admins (the controller) to forward, never to the shopper. With no
    * owner/admin email the matches are reported as `undeliverable`.
    */
-  "privacy.exportCustomer": pluginProcedure
+  "privacy.exportCustomer": pluginApiProcedure("privacy.exportCustomer")
     .input(privacySubjectSchema)
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "privacy");
       const { organizationId, pluginId } = ctx.pluginAuth;
       const { reference, ...identifiers } = input;
       return providerPrivacyService.queueForSubject("export", organizationId, identifiers, {
@@ -1025,7 +1062,7 @@ export const pluginApiTrpcRouter = router({
    *
    * TODO: Implement actual source registration in database
    */
-  "sources.register": pluginProcedure
+  "sources.register": pluginApiProcedure("sources.register")
     .input(
       z.object({
         id: z.string(),
@@ -1036,8 +1073,6 @@ export const pluginApiTrpcRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "sources");
-
       const pluginId = ctx.pluginAuth.pluginId;
 
       logger.debug({ sourceId: input.id, pluginId, input }, "Registering source for plugin");
@@ -1056,7 +1091,7 @@ export const pluginApiTrpcRouter = router({
    *
    * Registers an MCP server that runs locally with the plugin worker.
    */
-  "mcp.registerLocal": pluginProcedure
+  "mcp.registerLocal": pluginApiProcedure("mcp.registerLocal")
     .input(
       z.object({
         serverId: z.string().optional(), // Auto-generate if not provided
@@ -1071,8 +1106,6 @@ export const pluginApiTrpcRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "mcp");
-
       const { organizationId, pluginId } = ctx.pluginAuth;
       const serverId = input.serverId || `mcp-${Date.now()}`;
 
@@ -1139,7 +1172,7 @@ export const pluginApiTrpcRouter = router({
    *
    * Registers an MCP server that runs remotely and is accessed via HTTP/SSE/WebSocket.
    */
-  "mcp.registerRemote": pluginProcedure
+  "mcp.registerRemote": pluginApiProcedure("mcp.registerRemote")
     .input(
       z.object({
         serverId: z.string().optional(), // Auto-generate if not provided
@@ -1180,8 +1213,6 @@ export const pluginApiTrpcRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "mcp");
-
       const { organizationId, pluginId } = ctx.pluginAuth;
       const serverId = input.serverId || `mcp-remote-${Date.now()}`;
 
@@ -1266,14 +1297,26 @@ export const pluginApiTrpcRouter = router({
    * Plugin state (H4) - a worker's own key/value store that survives restarts.
    * Scoped to the token's organization and plugin id; no capability needed.
    */
-  "state.get": pluginProcedure
+  /**
+   * Credentials - a worker pulls a secret its manifest declares. Core checks the
+   * capability the manifest binds the credential to, refreshes an expiring access
+   * token, audits the issue and never returns a refresh token.
+   */
+  "credentials.get": pluginApiProcedure("credentials.get")
+    .input(z.object({ name: z.string().min(1).max(64) }))
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, pluginId, capabilities } = ctx.pluginAuth;
+      return issueCredential({ organizationId, pluginId, capabilities, name: input.name });
+    }),
+
+  "state.get": pluginApiProcedure("state.get")
     .input(z.object({ key: z.string().min(1).max(255) }))
     .mutation(async ({ input, ctx }) => {
       const { organizationId, pluginId } = ctx.pluginAuth;
       return { value: await pluginStateService.get(organizationId, pluginId, input.key) };
     }),
 
-  "state.set": pluginProcedure
+  "state.set": pluginApiProcedure("state.set")
     .input(
       z.object({
         key: z.string().min(1).max(255),
@@ -1299,7 +1342,7 @@ export const pluginApiTrpcRouter = router({
       return { ok: true };
     }),
 
-  "state.delete": pluginProcedure
+  "state.delete": pluginApiProcedure("state.delete")
     .input(z.object({ key: z.string().min(1).max(255) }))
     .mutation(async ({ input, ctx }) => {
       const { organizationId, pluginId } = ctx.pluginAuth;
@@ -1314,7 +1357,7 @@ export const pluginApiTrpcRouter = router({
    * webhook handlers via `ctx.productSource.upsert(...)`. Idempotent on
    * (source, externalId). Returns counts so the worker can log progress.
    */
-  "products.upsertMany": pluginProcedure
+  "products.upsertMany": pluginApiProcedure("products.upsertMany")
     .input(
       z.object({
         products: z
@@ -1366,7 +1409,6 @@ export const pluginApiTrpcRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "products");
       const { organizationId, pluginId } = ctx.pluginAuth;
       // Core stamps the source from the authenticated plugin identity — the
       // adapter never names itself, so it can't impersonate another source.
@@ -1384,14 +1426,13 @@ export const pluginApiTrpcRouter = router({
    * Called from a plugin webhook handler when the upstream platform reports
    * a deletion. Cascades to variants and product_embeddings via FK.
    */
-  "products.delete": pluginProcedure
+  "products.delete": pluginApiProcedure("products.delete")
     .input(
       z.object({
         externalId: z.string().min(1),
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "products");
       const { organizationId, pluginId } = ctx.pluginAuth;
       // Source is the authenticated plugin id — a plugin can only delete its own
       // products.
@@ -1410,14 +1451,13 @@ export const pluginApiTrpcRouter = router({
    * returned; this plugin's products not in the list are deleted (variants
    * and embeddings go with them).
    */
-  "products.prune": pluginProcedure
+  "products.prune": pluginApiProcedure("products.prune")
     .input(
       z.object({
         keepExternalIds: z.array(z.string().min(1)).min(1).max(200_000),
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "products");
       const { organizationId, pluginId } = ctx.pluginAuth;
       return productSyncService.pruneProducts(organizationId, pluginId, input.keepExternalIds);
     }),
@@ -1430,7 +1470,7 @@ export const pluginApiTrpcRouter = router({
    * the source from the authenticated plugin id, matches the order and alerts
    * owners and admins once.
    */
-  "disputes.report": pluginProcedure
+  "disputes.report": pluginApiProcedure("disputes.report")
     .input(
       z.object({
         externalId: z.string().trim().min(1).max(255),
@@ -1447,7 +1487,6 @@ export const pluginApiTrpcRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      requireCapability(ctx, "disputes");
       const { organizationId, pluginId } = ctx.pluginAuth;
       // Imported lazily: the disputes service pulls in the audit log and mailer.
       const { disputesService } = await import("@server/services/disputes/disputes.service");
@@ -1481,6 +1520,9 @@ function decodeBase64(data: string): Buffer | null {
 /** TTL for inbound message dedupe keys — long enough to cover provider retries. */
 const INBOUND_DEDUPE_TTL_SECONDS = 24 * 60 * 60; // 24h
 
+/** Longest the dedupe claim may wait on Redis before the message is processed anyway. */
+const DEDUPE_TIMEOUT_MS = 250;
+
 /**
  * Helper: Atomically claim a provider message id for dedupe.
  *
@@ -1497,7 +1539,8 @@ async function claimProviderMessage(
   channel: string,
   mid: string,
 ): Promise<boolean> {
-  const client = redisService.getClient();
+  // ioredis queues commands while reconnecting; do not wait on that.
+  const client = redisService.isConnected() ? redisService.getClient() : null;
   if (!client) {
     return true;
   }
@@ -1505,8 +1548,12 @@ async function claimProviderMessage(
   const key = `dedupe:msg:${organizationId}:${channel}:${mid}`;
 
   try {
-    const result = await client.set(key, "1", "EX", INBOUND_DEDUPE_TTL_SECONDS, "NX");
-    return result === "OK";
+    const result = await Promise.race([
+      client.set(key, "1", "EX", INBOUND_DEDUPE_TTL_SECONDS, "NX"),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), DEDUPE_TIMEOUT_MS).unref()),
+    ]);
+    // A timeout counts as unavailable: process the message.
+    return result === "OK" || result === null;
   } catch (error) {
     logger.error({ err: error, organizationId, channel, mid }, "Inbound dedupe check failed");
     return true;

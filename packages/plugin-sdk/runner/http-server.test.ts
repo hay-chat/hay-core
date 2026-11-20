@@ -30,6 +30,12 @@ describe("PluginHttpServer body handling", () => {
       },
     });
     server = new PluginHttpServer(0, registry, silentLogger);
+    server.setRuntimeData({
+      orgId: "org-1",
+      manifest: { env: [] },
+      mcpRuntime: {} as never,
+      orgConfig: {},
+    });
     await server.start();
     const address = (server as unknown as { server: { address(): AddressInfo } }).server.address();
     baseUrl = `http://127.0.0.1:${address.port}`;
@@ -125,6 +131,12 @@ describe("PluginHttpServer /mcp/list-tools tool risk", () => {
     const remotePort = (remote.address() as AddressInfo).port;
 
     server = new PluginHttpServer(0, new PluginRegistry(), silentLogger);
+    server.setRuntimeData({
+      orgId: "org-1",
+      manifest: { env: [] },
+      mcpRuntime: {} as never,
+      orgConfig: {},
+    });
     server.registerMcpServer({
       id: "local-mcp",
       type: "local",
@@ -194,7 +206,6 @@ describe("PluginHttpServer webchat gate endpoint", () => {
       manifest: { env: [] },
       mcpRuntime: {} as never,
       orgConfig: {},
-      orgAuth: null,
     });
     await server.start();
     const address = (server as unknown as { server: { address(): AddressInfo } }).server.address();
@@ -236,14 +247,18 @@ describe("PluginHttpServer webchat gate endpoint", () => {
 });
 
 describe("PluginHttpServer setup status endpoint", () => {
-  const start = async (registry: PluginRegistry) => {
+  const start = async (registry: PluginRegistry, authState: unknown = null) => {
     const server = new PluginHttpServer(0, registry, silentLogger);
+    server.setCredentialStore({
+      authState,
+      refreshAll: async () => undefined,
+      refreshStale: async () => undefined,
+    } as never);
     server.setRuntimeData({
       orgId: "org-1",
       manifest: { env: [] },
       mcpRuntime: {} as never,
       orgConfig: { shopDomain: "stored.example" },
-      orgAuth: null,
     });
     await server.start();
     const address = (server as unknown as { server: { address(): AddressInfo } }).server.address();
@@ -256,7 +271,7 @@ describe("PluginHttpServer setup status endpoint", () => {
       body: JSON.stringify(body),
     });
 
-  it("runs the status handler with the config and auth Core sent", async () => {
+  it("runs the status handler with the config Core sent and the credentials the worker pulled", async () => {
     const registry = new PluginRegistry();
     registry.registerConfig({ shopDomain: { type: "string" } });
     registry.registerSetup({
@@ -267,12 +282,14 @@ describe("PluginHttpServer setup status endpoint", () => {
         steps: { connect: { done: !!auth.get(), message: "x".repeat(300) }, bad: {} as never },
       }),
     });
-    const { server, baseUrl } = await start(registry);
+    const { server, baseUrl } = await start(registry, {
+      methodId: "oauth",
+      credentials: { accessToken: "t" },
+    });
     try {
-      const response = await post(baseUrl, {
-        config: { shopDomain: "sent.example" },
-        authState: { methodId: "oauth", credentials: { accessToken: "t" } },
-      });
+      // Core sends settings only; the connected account's credentials are the ones
+      // the worker pulled.
+      const response = await post(baseUrl, { config: { shopDomain: "sent.example" } });
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body.state).toBe("connected");
@@ -322,6 +339,12 @@ describe("PluginHttpServer worker secret", () => {
       },
     });
     server = new PluginHttpServer(0, registry, silentLogger, { secret });
+    server.setRuntimeData({
+      orgId: "org-1",
+      manifest: { env: [] },
+      mcpRuntime: {} as never,
+      orgConfig: {},
+    });
     await server.start();
     const address = (server as unknown as { server: { address(): AddressInfo } }).server.address();
     expect(address.address).toBe("127.0.0.1");
@@ -390,6 +413,39 @@ describe("PluginHttpServer on a unix socket", () => {
     } finally {
       await server.stop();
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("PluginHttpServer before runtime data is set", () => {
+  it("answers 503 to everything but health and metadata until the organization's data is set", async () => {
+    const registry = new PluginRegistry();
+    registry.registerRoute({
+      method: "POST",
+      path: "/webhook",
+      handler: async (_req, res) => {
+        res.json({ ok: true });
+      },
+    });
+    const server = new PluginHttpServer(0, registry, silentLogger);
+    await server.start();
+    const address = (server as unknown as { server: { address(): AddressInfo } }).server.address();
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    try {
+      expect((await fetch(`${baseUrl}/health`)).status).toBe(200);
+      expect((await fetch(`${baseUrl}/metadata`)).status).toBe(200);
+      expect((await fetch(`${baseUrl}/webhook`, { method: "POST" })).status).toBe(503);
+      expect((await fetch(`${baseUrl}/cron/job`, { method: "POST" })).status).toBe(503);
+
+      server.setRuntimeData({
+        orgId: "org-1",
+        manifest: { env: [] },
+        mcpRuntime: {} as never,
+        orgConfig: {},
+      });
+      expect((await fetch(`${baseUrl}/webhook`, { method: "POST" })).status).toBe(200);
+    } finally {
+      await server.stop();
     }
   });
 });

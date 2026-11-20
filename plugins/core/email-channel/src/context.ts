@@ -34,7 +34,7 @@ export function emptyState(): ChannelState {
 export interface ChannelContext {
   /** Null until the env and the support address are configured. */
   getSettings: () => ChannelSettings | null;
-  /** Null when RESEND_API_KEY is not configured. */
+  /** Reads received mail through core; null while the plugin is not applied. */
   getResend: () => ResendClient | null;
   api: PluginApi;
   logger: HayLogger;

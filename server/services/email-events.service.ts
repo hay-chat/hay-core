@@ -2,6 +2,7 @@ import type {
   MessageProviderError,
   MessageProviderStatus,
 } from "@server/database/entities/message.entity";
+import { runAsSystem, runInOrganization } from "@server/database/organization-context";
 import { messageRepository } from "@server/repositories/message.repository";
 import { createLogger } from "@server/lib/logger";
 
@@ -85,7 +86,11 @@ export async function applyEmailEvent(event: ResendEmailEvent): Promise<EmailEve
   const ids = messageIdCandidates(event);
   if (ids.length === 0) return { handled: false, reason: "no_message_id" };
 
-  const found = await messageRepository.findOutboundByProviderMessageIds(ids);
+  // The message row is what reveals the organization, so only this lookup runs
+  // in a system context; the update continues in the message's organization.
+  const found = await runAsSystem("email events: find the organization of a sent message", () =>
+    messageRepository.findOutboundByProviderMessageIds(ids),
+  );
   if (!found) return { handled: false, reason: "message_not_found" };
   const { message, organizationId, channel } = found;
 
@@ -103,7 +108,9 @@ export async function applyEmailEvent(event: ResendEmailEvent): Promise<EmailEve
     providerStatus = "delivered";
   }
 
-  await messageRepository.update(message.id, { providerStatus, providerError });
+  await runInOrganization(organizationId, () =>
+    messageRepository.update(message.id, { providerStatus, providerError }),
+  );
 
   try {
     const { redisService } = await import("./redis.service");

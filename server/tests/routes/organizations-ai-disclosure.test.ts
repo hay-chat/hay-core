@@ -27,9 +27,13 @@ jest.mock("@server/repositories/organization.repository", () => {
   );
   return { ...actual, organizationRepository: { findById: (id: string) => mockFindById(id) } };
 });
+const mockSettingsContexts: unknown[] = [];
 jest.mock("@server/services/webchat/webchat-settings.service", () => ({
   webchatSettingsService: {
-    isEnabled: async () => true,
+    isEnabled: async () => {
+      mockSettingsContexts.push(getDatabaseContext());
+      return true;
+    },
     getPublicConfig: async () => ({ widgetTitle: "Chat" }),
   },
 }));
@@ -40,6 +44,7 @@ jest.mock("@server/services/webchat/under-attack.service", () => ({
   stateOf: jest.fn(),
 }));
 
+import { getDatabaseContext } from "@server/database/organization-context";
 import { organizationsRouter } from "@server/routes/v1/organizations";
 import { webchatRouter } from "@server/routes/v1/webchat";
 import { isAiLabelShown, isEuOrganization } from "@server/services/ai-disclosure";
@@ -176,5 +181,18 @@ describe("AI disclosure label", () => {
     await expect(publicCaller().getPublicConfig({ organizationId: ORG_ID })).resolves.toMatchObject(
       { aiLabelShown: false, aiLabelText: null },
     );
+  });
+
+  it("reads widget settings in the validated organization's context, and never for an unknown one", async () => {
+    mockSettingsContexts.length = 0;
+    mockFindById.mockResolvedValue(null);
+    await expect(publicCaller().getPublicConfig({ organizationId: ORG_ID })).resolves.toEqual({
+      enabled: false,
+    });
+    expect(mockSettingsContexts).toEqual([]);
+
+    mockFindById.mockResolvedValue(US_ORG);
+    await publicCaller().getPublicConfig({ organizationId: ORG_ID });
+    expect(mockSettingsContexts).toEqual([{ kind: "organization", organizationId: ORG_ID }]);
   });
 });

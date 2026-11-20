@@ -1,5 +1,4 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
-import * as jwt from "jsonwebtoken";
 
 /**
  * pluginApi media.upload — base64 → storage, attachment-shaped result.
@@ -45,8 +44,10 @@ jest.mock("@server/repositories/plugin-instance.repository", () => ({
 jest.mock("@server/repositories/document.repository", () => ({ documentRepository: {} }));
 jest.mock("@server/services/mcp-registry.service", () => ({ mcpRegistryService: {} }));
 jest.mock("@server/services/product-sync.service", () => ({ productSyncService: {} }));
+import { createFakeRedisClient } from "../helpers/fake-redis";
+const mockRedisClient = createFakeRedisClient();
 jest.mock("@server/services/redis.service", () => ({
-  redisService: { publish: jest.fn(), isConnected: () => true, getClient: () => null },
+  redisService: { publish: jest.fn(), isConnected: () => true, getClient: () => mockRedisClient },
 }));
 
 interface StoredUpload {
@@ -85,6 +86,9 @@ jest.mock("@server/services/transcription.service", () => ({
 }));
 jest.mock("@server/services/oauth.service", () => ({ oauthService: {} }));
 
+import { mintPluginApiToken } from "@server/lib/plugin-api-token";
+jest.mock("@server/services/plugin-credential.service", () => ({ issueCredential: jest.fn() }));
+
 import { pluginApiTrpcRouter } from "@server/routes/v1/plugin-api/trpc";
 import { UploadRejectedError } from "@server/services/storage.service";
 import type { PluginAuthContext } from "@server/trpc/middleware/plugin-auth";
@@ -92,11 +96,7 @@ import type { PluginAuthContext } from "@server/trpc/middleware/plugin-auth";
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 
 const ctx = (capabilities = ["messages"]) => {
-  const token = jwt.sign(
-    { scope: "plugin-api", organizationId: ORG_ID, pluginId: "hay-channel-test", capabilities },
-    JWT_SECRET,
-    { issuer: "hay-plugin-api", audience: "plugin" },
-  );
+  const token = mintPluginApiToken(ORG_ID, "hay-channel-test", capabilities);
   return {
     user: null,
     organizationId: null,

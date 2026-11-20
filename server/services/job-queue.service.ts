@@ -1,4 +1,5 @@
 import { redisService } from "./redis.service";
+import { runAsSystem } from "@server/database/organization-context";
 import { jobRepository } from "../repositories/job.repository";
 import { Job, JobStatus } from "../entities/job.entity";
 import { createLogger } from "@server/lib/logger";
@@ -150,11 +151,13 @@ export class JobQueueService {
 
   private async runNextJob(): Promise<void> {
     try {
-      const claimed = await this.claimNextBackgroundJob();
-      if (!claimed) {
-        return;
-      }
-      await this.dispatchBackgroundJob(claimed);
+      await runAsSystem("job queue", async () => {
+        const claimed = await this.claimNextBackgroundJob();
+        if (!claimed) {
+          return;
+        }
+        await this.dispatchBackgroundJob(claimed);
+      });
     } catch (err) {
       logger.error({ err }, "Background job processing error");
     }

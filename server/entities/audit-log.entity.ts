@@ -110,6 +110,7 @@ export type AuditAction =
   | "plugin.disable"
   | "plugin.configure"
   | "plugin.credentials.update"
+  | "plugin.credential.issue"
   | "customer.delete"
   | "customer.merge"
   | "conversation.delete"

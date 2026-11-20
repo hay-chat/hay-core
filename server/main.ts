@@ -8,7 +8,9 @@ import { webchatStatic } from "@server/lib/webchat-static";
 import { createServer } from "http";
 import { config, validateProductionConfig } from "@server/config/env";
 import { createContext } from "@server/trpc/context";
+import { runAsSystem } from "@server/database/organization-context";
 import { AppDataSource, initializeDatabase } from "@server/database/data-source";
+import { installOrganizationContextHook } from "@server/database/organization-context-hook";
 import { createLogger } from "@server/lib/logger";
 import { initTelemetry, captureException, shutdownTelemetry } from "@server/lib/telemetry";
 import { initTracing, shutdownTracing } from "@server/lib/tracing";
@@ -22,7 +24,7 @@ import {
   UPLOAD_BODY_LIMIT,
 } from "@server/lib/body-limits";
 import { mayParseLargeBody } from "@server/lib/large-body-auth";
-import { pluginApiSocketPath } from "@server/lib/plugin-isolation";
+import { ownPluginApiSocketPath, pluginIsolationMode } from "@server/lib/plugin-isolation";
 import { httpIpRateLimit, trpcRetryAfterMeta } from "@server/lib/http-rate-limit";
 import "reflect-metadata";
 import dotenv from "dotenv";
@@ -68,6 +70,7 @@ async function startServer() {
   await initTracing();
 
   // Initialize database connection (required - will retry 3 times with 2s delay)
+  installOrganizationContextHook();
   await initializeDatabase();
 
   // Initialize Redis service
@@ -515,7 +518,7 @@ async function startServer() {
 
   // Initialize plugin system BEFORE creating the router
   try {
-    await pluginManagerService.initialize();
+    await runAsSystem("plugin manager startup", () => pluginManagerService.initialize());
     logger.info("Plugin manager initialized");
 
     // Register plugin-declared cron jobs for enabled orgs (depends on plugin
@@ -642,11 +645,17 @@ async function startServer() {
   registerRuntimeMetrics();
   const metricsServer = startMetricsServer();
 
-  const pluginApiSocket = pluginApiSocketPath();
+  // Throws on an invalid PLUGIN_ISOLATION, so a typo stops the boot instead of the first worker start.
+  pluginIsolationMode();
+  const pluginApiSocket = ownPluginApiSocketPath();
   if (pluginApiSocket) {
-    const { listenPluginApiSocket } = await import("@server/lib/plugin-api-socket");
+    const { listenPluginApiSocket, removeStaleApiSockets } =
+      await import("@server/lib/plugin-api-socket");
+    await removeStaleApiSockets(path.dirname(pluginApiSocket));
     await listenPluginApiSocket(server, pluginApiSocket);
     logger.info({ socket: pluginApiSocket }, "Plugin API socket listening");
+    const { reconcilePluginHost } = await import("@server/services/plugin-isolation.service");
+    await reconcilePluginHost();
   }
 
   httpServer.listen(config.server.port, async () => {
@@ -664,7 +673,7 @@ async function startServer() {
     try {
       // Initialize plugin pages management
       const { pluginPagesService } = await import("./services/plugin-pages.service");
-      await pluginPagesService.initialize();
+      await runAsSystem("plugin pages startup", () => pluginPagesService.initialize());
       logger.info("Plugin pages synced with dashboard");
 
       const { initPluginIsolation } = await import("@server/services/plugin-isolation.service");

@@ -1,6 +1,7 @@
 import type { ChannelRendering } from "@server/lib/channel-rendering";
 import type { EgressEntry } from "../plugin-host/egress-policy";
 import type { InactivityTiming } from "@server/lib/inactivity-timing";
+import type { CredentialDeclaration } from "@server/lib/plugin-credentials";
 import type { PluginSetupHints } from "@server/types/setup.types";
 
 export interface PluginNetwork {
@@ -75,6 +76,8 @@ export interface HayPluginManifest {
   oauthProviderInstall?: boolean;
   /** Outbound destinations the plugin's worker may reach (package.json hay-plugin.network). */
   network?: PluginNetwork;
+  /** Secrets the worker pulls from core, each bound to a capability (package.json hay-plugin.credentials). */
+  credentials?: CredentialDeclaration[];
   services?: Array<{
     name: string;
     path: string;

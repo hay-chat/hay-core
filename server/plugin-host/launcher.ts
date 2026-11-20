@@ -20,6 +20,7 @@ import {
 import os from "os";
 import path from "path";
 import { buildSeccompFilter } from "./seccomp";
+import { log } from "./log";
 import type { IsolationTier } from "./protocol";
 
 export interface LaunchSpec {
@@ -125,7 +126,12 @@ export function removeWorkerDir(dir: string): void {
   try {
     rmdirSync(dir);
   } catch {
-    rmSync(dir, { recursive: true, force: true });
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch (error) {
+      // A directory that cannot be removed must not fail the request or the exit handler.
+      log.warn("Worker directory could not be removed", { dir, err: String(error) });
+    }
   }
 }
 

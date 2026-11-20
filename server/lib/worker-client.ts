@@ -16,6 +16,7 @@ export const WORKER_HOST = "127.0.0.1";
 const secretsByPort = new Map<number, string>();
 const socketsByPort = new Map<number, string>();
 const agentsBySocket = new Map<string, Agent>();
+const streamAgentsBySocket = new Map<string, Agent>();
 
 /** Route calls for the worker identified by `port` to a unix socket instead of loopback TCP. */
 export function registerWorkerSocket(port: number, socketPath: string): void {
@@ -29,6 +30,8 @@ export function unregisterWorkerSocket(port: number): void {
   if (socketPath && ![...socketsByPort.values()].includes(socketPath)) {
     void agentsBySocket.get(socketPath)?.close();
     agentsBySocket.delete(socketPath);
+    void streamAgentsBySocket.get(socketPath)?.close();
+    streamAgentsBySocket.delete(socketPath);
   }
 }
 
@@ -41,19 +44,26 @@ export function socketFetch(
   socketPath: string,
   url: string,
   init: RequestInit = {},
+  options: { stream?: boolean } = {},
 ): Promise<Response> {
   return undiciFetch(url, {
     ...(init as Parameters<typeof undiciFetch>[1]),
     headers: Object.fromEntries(new Headers(init.headers).entries()),
-    dispatcher: agentFor(socketPath),
+    dispatcher: agentFor(socketPath, options.stream === true),
   }) as unknown as Promise<Response>;
 }
 
-function agentFor(socketPath: string): Agent {
-  let agent = agentsBySocket.get(socketPath);
+/**
+ * `stream` is for a response that stays open and is quiet for long stretches
+ * (a worker's event stream): the default body timeout of five minutes would
+ * cut it off while the worker is still running.
+ */
+function agentFor(socketPath: string, stream: boolean): Agent {
+  const agents = stream ? streamAgentsBySocket : agentsBySocket;
+  let agent = agents.get(socketPath);
   if (!agent) {
-    agent = new Agent({ connect: { socketPath } });
-    agentsBySocket.set(socketPath, agent);
+    agent = new Agent({ connect: { socketPath }, ...(stream ? { bodyTimeout: 0 } : {}) });
+    agents.set(socketPath, agent);
   }
   return agent;
 }

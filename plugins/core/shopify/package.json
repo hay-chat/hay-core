@@ -17,7 +17,8 @@
       "cron",
       "products",
       "disputes",
-      "privacy"
+      "privacy",
+      "credentials"
     ],
     "setup": {
       "businessTypes": [
@@ -44,6 +45,31 @@
     },
     "oauthHosts": [
       "*.myshopify.com"
+    ],
+    "credentials": [
+      {
+        "name": "clientSecret",
+        "source": "config",
+        "capability": "cron",
+        "allowEnv": false,
+        "hosts": [
+          {
+            "fromConfig": "shopDomain",
+            "suffix": ".myshopify.com"
+          }
+        ]
+      },
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "mcp",
+        "hosts": [
+          {
+            "fromConfig": "shopDomain",
+            "suffix": ".myshopify.com"
+          }
+        ]
+      }
     ]
   },
   "scripts": {

@@ -9,6 +9,7 @@ import { isDeniedPluginEnv } from "@server/lib/plugin-env";
 describe("isDeniedPluginEnv", () => {
   it("blocks secrets and infrastructure settings by pattern", () => {
     for (const name of [
+      "RESEND_API_KEY",
       "RESEND_WEBHOOK_SECRET",
       "SMTP_AUTH_PASS",
       "SMTP_HOST",
@@ -24,12 +25,7 @@ describe("isDeniedPluginEnv", () => {
   });
 
   it("allows ordinary host settings", () => {
-    for (const name of [
-      "RESEND_API_KEY",
-      "EMAIL_INBOUND_DOMAIN",
-      "API_DOMAIN",
-      "VAPID_PUBLIC_KEY",
-    ]) {
+    for (const name of ["EMAIL_INBOUND_DOMAIN", "API_DOMAIN", "VAPID_PUBLIC_KEY"]) {
       expect(isDeniedPluginEnv(name)).toBe(false);
     }
   });

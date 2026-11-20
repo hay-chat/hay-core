@@ -34,6 +34,17 @@ export interface PluginApi {
   sendEmail(request: SendEmailRequest): Promise<SendEmailResult>;
 }
 
+/** A plugin API call core answered with a non-2xx status. */
+export class PluginApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "PluginApiError";
+  }
+}
+
 export class PluginApiClient implements PluginApi {
   private readonly apiUrl: string;
   private readonly apiToken: string;
@@ -92,7 +103,10 @@ export class PluginApiClient implements PluginApi {
   private async unwrap<T>(response: Response, procedure: string): Promise<T> {
     if (!response.ok) {
       const text = await response.text().catch(() => "");
-      throw new Error(`Plugin API ${procedure} failed: ${response.status} ${text}`);
+      throw new PluginApiError(
+        `Plugin API ${procedure} failed: ${response.status} ${text}`,
+        response.status,
+      );
     }
     const data = (await response.json()) as { result?: { data?: T } };
     return (data?.result?.data ?? data) as T;
