@@ -230,62 +230,36 @@ describe("config-resolver", () => {
       delete process.env.TEST_CLIENT_ID;
     });
 
-    it("should merge DB config with auth credentials", () => {
-      const dbConfig = {
-        clientId: "db-client-id",
-      };
-      const authState = {
-        credentials: {
-          apiKey: "auth-api-key",
-        },
-      };
+    it("leaves secret fields out: a worker pulls those", () => {
+      const result = resolveConfigForWorker(
+        { clientId: "db-client-id", apiKey: "db-api-key" },
+        schema,
+        allowedEnv,
+      );
 
-      const result = resolveConfigForWorker(dbConfig, authState, schema, allowedEnv);
-
-      expect(result.clientId).toBe("db-client-id");
-      expect(result.apiKey).toBe("auth-api-key");
+      expect(result).toEqual({ clientId: "db-client-id" });
+      expect(JSON.stringify(result)).not.toContain("api-key");
     });
 
-    it("should use env fallback for missing fields", () => {
-      const dbConfig = {};
-      const authState = null;
+    it("uses env fallbacks for non-secret fields only", () => {
+      const result = resolveConfigForWorker({}, schema, allowedEnv);
 
-      const result = resolveConfigForWorker(dbConfig, authState, schema, allowedEnv);
-
-      expect(result.apiKey).toBe("env-api-key-123");
       expect(result.clientId).toBe("env-client-id-456");
+      expect(result).not.toHaveProperty("apiKey");
+      expect(JSON.stringify(result)).not.toContain("env-api-key-123");
     });
 
-    it("should not mask values for worker", () => {
-      const dbConfig = {
-        apiKey: "db-api-key",
-      };
-      const authState = null;
+    it("leaves serverOnly fields out", () => {
+      const result = resolveConfigForWorker(
+        { region: "eu", appSecret: "s" },
+        {
+          region: { type: "string", label: "Region" },
+          appSecret: { type: "string", label: "S", serverOnly: true },
+        },
+        allowedEnv,
+      );
 
-      const result = resolveConfigForWorker(dbConfig, authState, schema, allowedEnv);
-
-      expect(result.apiKey).toBe("db-api-key");
-      // Should return actual value, not "********"
-    });
-
-    it("should handle null authState", () => {
-      const dbConfig = {
-        clientId: "db-client-id",
-      };
-
-      const result = resolveConfigForWorker(dbConfig, null, schema, allowedEnv);
-
-      expect(result.clientId).toBe("db-client-id");
-    });
-
-    it("should handle authState without credentials", () => {
-      const dbConfig = {
-        clientId: "db-client-id",
-      };
-
-      const result = resolveConfigForWorker(dbConfig, {}, schema, allowedEnv);
-
-      expect(result.clientId).toBe("db-client-id");
+      expect(result).toEqual({ region: "eu" });
     });
   });
 

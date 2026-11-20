@@ -10,7 +10,13 @@
 import http, { type IncomingMessage, type ServerResponse } from "http";
 import net, { isIP, type Socket } from "net";
 import dns from "dns";
-import { parseAllowRule, isAllowed, isBlockedAddress, type AllowRule } from "./egress-policy";
+import {
+  parseAllowRule,
+  isAllowed,
+  isBlockedAddress,
+  validHost,
+  type AllowRule,
+} from "./egress-policy";
 import { log } from "./log";
 
 export interface WorkerGrant {
@@ -107,6 +113,7 @@ export class EgressProxy {
     if (!grant) return deny("unknown worker");
     if (isIP(host.replace(/^\[|\]$/g, "")) !== 0) return deny("ip literal");
     const name = host.toLowerCase().replace(/\.$/, "");
+    if (!validHost(name)) return deny("not a valid host name");
     if (!isAllowed(grant.rules, name, port)) return deny("host not declared by the plugin");
     let addresses: string[];
     try {
@@ -191,6 +198,9 @@ export class EgressProxy {
     delete headers["proxy-connection"];
     const upstream = http.request(
       {
+        // No `agent` on purpose: with createConnection and no agent, Node dials through
+        // createConnection only, so no pooled keep-alive socket opened for another worker's
+        // checked address can carry this request (agent: false would ignore createConnection).
         createConnection: () => this.connect(result.address, port),
         method: req.method,
         path: `${url.pathname}${url.search}`,

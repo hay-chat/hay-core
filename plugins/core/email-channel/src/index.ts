@@ -35,16 +35,23 @@ import {
  *      (configured notification addresses, else the support address) — see
  *      notify.ts. It replaced the standalone "Email" plugin.
  *
- * Env (host allowlist): RESEND_API_KEY, EMAIL_INBOUND_DOMAIN, SMTP_FROM_EMAIL
+ * Host settings (env fallbacks of config fields): EMAIL_INBOUND_DOMAIN, SMTP_FROM_EMAIL
  * (its domain is the From domain). RESEND_WEBHOOK_SECRET is read by core only.
  */
 
 // RESEND_WEBHOOK_SECRET stays on the host: core verifies the svix signature
 // before routing, and secrets are never handed to plugin workers.
-const REQUIRED_ENV = ["RESEND_API_KEY", "EMAIL_INBOUND_DOMAIN", "SMTP_FROM_EMAIL"];
+// Host-managed settings, read as config fields (core resolves their env fallbacks);
+// the env names are what an operator sets.
+const HOST_SETTINGS = [
+  { field: "inboundDomain", env: "EMAIL_INBOUND_DOMAIN" },
+  { field: "fromEmail", env: "SMTP_FROM_EMAIL" },
+];
 
-function missingEnv(): string[] {
-  return REQUIRED_ENV.filter((name) => !process.env[name]);
+function missingEnv(config: HayConfigRuntimeAPI | null): string[] {
+  return HOST_SETTINGS.filter(({ field }) => !config?.getOptional<string>(field)).map(
+    ({ env }) => env,
+  );
 }
 
 function errorMessage(error: unknown): string {
@@ -53,8 +60,10 @@ function errorMessage(error: unknown): string {
 
 /** Resolve settings from env + config; null while the channel cannot operate. */
 export function resolveSettings(config: HayConfigRuntimeAPI, org: HayOrg): ChannelSettings | null {
-  const inboundDomain = process.env.EMAIL_INBOUND_DOMAIN?.trim().toLowerCase();
-  const fromDomain = splitAddress(process.env.SMTP_FROM_EMAIL?.trim().toLowerCase() ?? "").domain;
+  const inboundDomain = config.getOptional<string>("inboundDomain")?.trim().toLowerCase();
+  const fromDomain = splitAddress(
+    config.getOptional<string>("fromEmail")?.trim().toLowerCase() ?? "",
+  ).domain;
   if (!inboundDomain || !fromDomain) {
     return null;
   }
@@ -78,6 +87,7 @@ export default defineHayPlugin((globalCtx) => {
   let settings: ChannelSettings | null = null;
   let resend: ResendClient | null = null;
   let notificationRecipients: string[] = [];
+  let hostConfig: HayConfigRuntimeAPI | null = null;
   const state = emptyState();
 
   const channelContext = (): ChannelContext => ({
@@ -110,8 +120,8 @@ export default defineHayPlugin((globalCtx) => {
     org: HayOrg;
     logger: HayLogger;
   }): Promise<void> => {
-    const apiKey = process.env.RESEND_API_KEY;
-    resend = apiKey ? new ResendClient({ apiKey }) : null;
+    hostConfig = ctx.config;
+    resend = new ResendClient({ api: new PluginApiClient(ctx.logger) });
     settings = resolveSettings(ctx.config, ctx.org);
     // Team notifications work without the inbound env (only the relay is needed).
     const notify = resolveNotificationRecipients(
@@ -122,7 +132,7 @@ export default defineHayPlugin((globalCtx) => {
     if (notify.invalid.length) {
       ctx.logger.warn("Ignoring invalid notification addresses", { invalid: notify.invalid });
     }
-    const missing = missingEnv();
+    const missing = missingEnv(ctx.config);
     if (!settings || missing.length) {
       ctx.logger.info("Email channel not ready — missing host configuration", {
         orgId: ctx.org.id,
@@ -148,6 +158,25 @@ export default defineHayPlugin((globalCtx) => {
       const { register } = ctx;
 
       register.config({
+        // Managed by the host (env fallbacks); shown only on the Advanced tab.
+        inboundDomain: {
+          type: "string",
+          label: "Inbound email domain",
+          description: "Managed by the platform.",
+          required: false,
+          encrypted: false,
+          advanced: true,
+          env: "EMAIL_INBOUND_DOMAIN",
+        },
+        fromEmail: {
+          type: "string",
+          label: "Sender address",
+          description: "Managed by the platform.",
+          required: false,
+          encrypted: false,
+          advanced: true,
+          env: "SMTP_FROM_EMAIL",
+        },
         supportAddress: {
           type: "string",
           label: "Your support address",
@@ -227,7 +256,7 @@ export default defineHayPlugin((globalCtx) => {
       });
 
       register.route("GET", "/ui/status", async (_req, res) => {
-        res.status(200).json(getChannelStatus(channelContext(), missingEnv()));
+        res.status(200).json(getChannelStatus(channelContext(), missingEnv(hostConfig)));
       });
 
       logger.info("Email channel config, webhook routing, routes and UI registered");

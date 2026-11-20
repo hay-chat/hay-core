@@ -22,7 +22,7 @@
     },
     "capabilities": [
       "messages",
-      "customers"
+      "credentials"
     ],
     "env": [
       "META_WHATSAPP_APP_ID",
@@ -39,6 +39,40 @@
     "oauthHosts": [
       "www.facebook.com",
       "graph.facebook.com"
+    ],
+    "credentials": [
+      {
+        "name": "manualAccessToken",
+        "source": "config",
+        "capability": "messages",
+        "hosts": [
+          "graph.facebook.com"
+        ]
+      },
+      {
+        "name": "manualAppSecret",
+        "source": "config",
+        "capability": "messages",
+        "hosts": [
+          "graph.facebook.com"
+        ]
+      },
+      {
+        "name": "manualVerifyToken",
+        "source": "config",
+        "capability": "messages",
+        "hosts": [
+          "graph.facebook.com"
+        ]
+      },
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "messages",
+        "hosts": [
+          "graph.facebook.com"
+        ]
+      }
     ]
   },
   "scripts": {

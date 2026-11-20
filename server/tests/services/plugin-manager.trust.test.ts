@@ -35,6 +35,7 @@ jest.mock("../../services/plugin-router-registry.service", () => ({
 import { pluginManagerService } from "@server/services/plugin-manager.service";
 import type { PluginRegistry } from "@server/entities/plugin-registry.entity";
 import { config } from "@server/config/env";
+import { PACK_MANIFEST_FILE, sha256Hex } from "@server/lib/plugin-pack";
 
 const pluginsDir = path.join(process.cwd(), "..", "plugins");
 let pluginDir: string;
@@ -212,17 +213,6 @@ describe("registerPlugin checksum", () => {
     expect(after.slice(0, 32)).toBe(before.slice(0, 32));
     expect(after.slice(32)).not.toBe(before.slice(32));
   });
-
-  it("ignores the plugin-sdk file: path that installPlugin rewrites", async () => {
-    await writePlugin({}, { dependencies: { "@hay/plugin-sdk": "file:../sdk" } });
-    const before = await registeredChecksum();
-    await writePlugin(
-      {},
-      { dependencies: { "@hay/plugin-sdk": "file:../../packages/plugin-sdk" } },
-    );
-
-    expect(await registeredChecksum()).toBe(before);
-  });
 });
 
 describe("buildPlugin reloads an in-process plugin router", () => {
@@ -263,6 +253,67 @@ describe("buildPlugin reloads an in-process plugin router", () => {
     await pluginManagerService.buildPlugin("tenant-plugin");
 
     expect(registerRouter).not.toHaveBeenCalled();
+  });
+});
+
+describe("installPlugin for organization-supplied plugins", () => {
+  async function writePack(extra: Record<string, string> = {}) {
+    const files: Record<string, string> = {
+      "package.json": JSON.stringify({
+        name: "tenant-plugin",
+        "hay-plugin": { entry: "dist/index.js" },
+      }),
+      "dist/index.js": "module.exports = {};",
+      ...extra,
+    };
+    const listed: Record<string, { sha256: string; size: number }> = {};
+    for (const [name, content] of Object.entries(files)) {
+      await fs.mkdir(path.dirname(path.join(pluginDir, name)), { recursive: true });
+      await fs.writeFile(path.join(pluginDir, name), content);
+      listed[name] = { sha256: sha256Hex(content), size: Buffer.byteLength(content) };
+    }
+    await fs.writeFile(
+      path.join(pluginDir, PACK_MANIFEST_FILE),
+      JSON.stringify({ format: 1, name: "tenant-plugin", version: "1.0.0", files: listed }),
+    );
+  }
+
+  const register = (sourceType: "custom" | "git") =>
+    pluginManagerService.registry.set("tenant-plugin", registryEntry(sourceType, {}));
+
+  it.each(["custom", "git"] as const)(
+    "checks a %s plugin against its pack and runs no package manager",
+    async (sourceType) => {
+      await writePack();
+      register(sourceType);
+
+      await pluginManagerService.installPlugin("tenant-plugin");
+
+      expect(execSync).not.toHaveBeenCalled();
+      expect(updateInstallStatus).toHaveBeenCalledWith("row-1", true);
+    },
+  );
+
+  it("refuses a plugin that was not packed, without running npm", async () => {
+    await writePlugin({}, { dependencies: { zod: "^3.0.0" }, scripts: { postinstall: "x" } });
+    register("custom");
+
+    await expect(pluginManagerService.installPlugin("tenant-plugin")).rejects.toThrow(
+      /hay plugin pack/,
+    );
+    expect(execSync).not.toHaveBeenCalled();
+    expect(updateInstallStatus).toHaveBeenCalledWith("row-1", false, expect.any(String));
+  });
+
+  it("refuses a plugin whose files changed after packing", async () => {
+    await writePack();
+    await fs.writeFile(path.join(pluginDir, "dist", "index.js"), "process.exit(1);");
+    register("custom");
+
+    await expect(pluginManagerService.installPlugin("tenant-plugin")).rejects.toThrow(
+      /does not match its checksum/,
+    );
+    expect(execSync).not.toHaveBeenCalled();
   });
 });
 

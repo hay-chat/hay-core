@@ -15,7 +15,8 @@
       "mcp",
       "auth",
       "cron",
-      "disputes"
+      "disputes",
+      "credentials"
     ],
     "network": {
       "egress": [
@@ -36,7 +37,25 @@
         "billing",
         "subscriptions"
       ]
-    }
+    },
+    "credentials": [
+      {
+        "name": "apiKey",
+        "source": "config",
+        "capability": "mcp",
+        "hosts": [
+          "api.stripe.com"
+        ]
+      },
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "mcp",
+        "hosts": [
+          "api.stripe.com"
+        ]
+      }
+    ]
   },
   "scripts": {
     "build": "tsc",

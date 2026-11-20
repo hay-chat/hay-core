@@ -164,3 +164,82 @@ describe("egress proxy", () => {
     expect(await connect("other.test:443", OTHER_TOKEN)).toBe(403);
   });
 });
+
+describe("egress proxy connection reuse", () => {
+  it("sends each request to the address checked for its own host and worker", async () => {
+    const upstream = http.createServer((_req, res) => res.end("ok"));
+    await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve));
+    const upstreamPort = (upstream.address() as AddressInfo).port;
+    const dialed: string[] = [];
+    const proxy = new EgressProxy(
+      { maxConnectionsPerWorker: 4, idleTimeoutMs: 5000, maxDurationMs: 10_000 },
+      async (host) => [host === "one.test" ? "93.184.216.34" : "93.184.216.35"],
+      (address) => {
+        dialed.push(address);
+        return net.connect({ host: "127.0.0.1", port: upstreamPort });
+      },
+    );
+    proxy.grant("1".repeat(32), { pluginId: "p1", orgId: "o1", allow: ["one.test:80"] });
+    proxy.grant("2".repeat(32), { pluginId: "p2", orgId: "o2", allow: ["two.test:80"] });
+    const server = proxy.createServer();
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const proxyPort = (server.address() as AddressInfo).port;
+    const fetchVia = (token: string, url: string): Promise<number> =>
+      new Promise((resolve, reject) => {
+        const req = http.request(
+          {
+            host: "127.0.0.1",
+            port: proxyPort,
+            path: url,
+            headers: {
+              "proxy-authorization": `Basic ${Buffer.from(`hay:${token}`).toString("base64")}`,
+            },
+          },
+          (res) => {
+            res.resume();
+            res.on("end", () => resolve(res.statusCode ?? 0));
+          },
+        );
+        req.on("error", reject);
+        req.end();
+      });
+    try {
+      expect(await fetchVia("1".repeat(32), "http://one.test/")).toBe(200);
+      expect(await fetchVia("2".repeat(32), "http://two.test/")).toBe(200);
+      expect(dialed).toEqual(["93.184.216.34", "93.184.216.35"]);
+    } finally {
+      server.close();
+      upstream.close();
+    }
+  });
+
+  it("refuses a host name that is only digits or a number", async () => {
+    const proxy = new EgressProxy(undefined, async () => ["93.184.216.34"]);
+    proxy.grant("3".repeat(32), { pluginId: "p3", orgId: "o3", allow: ["127.1", "0x7f.1"] });
+    const server = proxy.createServer();
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const proxyPort = (server.address() as AddressInfo).port;
+    try {
+      for (const target of ["127.1:443", "0x7f.1:443"]) {
+        const status = await new Promise<number>((resolve, reject) => {
+          const req = http.request({
+            host: "127.0.0.1",
+            port: proxyPort,
+            method: "CONNECT",
+            path: target,
+            headers: {
+              "proxy-authorization": `Basic ${Buffer.from(`hay:${"3".repeat(32)}`).toString("base64")}`,
+            },
+          });
+          req.on("connect", (res, socket) => (socket.destroy(), resolve(res.statusCode ?? 0)));
+          req.on("response", (res) => (res.resume(), resolve(res.statusCode ?? 0)));
+          req.on("error", reject);
+          req.end();
+        });
+        expect([target, status]).toEqual([target, 403]);
+      }
+    } finally {
+      server.close();
+    }
+  });
+});

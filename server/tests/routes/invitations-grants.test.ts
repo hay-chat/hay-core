@@ -48,6 +48,7 @@ jest.mock("@server/database/data-source", () => ({
   },
 }));
 
+import { getDatabaseContext } from "@server/database/organization-context";
 import { invitationsRouter, renewedInvitationExpiry } from "@server/routes/v1/invitations";
 import type { Context } from "@server/trpc/context";
 
@@ -142,6 +143,63 @@ describe("invitations", () => {
 
     expect(await codeOf(caller.acceptInvitation({ token: "t" }))).toBe("FORBIDDEN");
     expect(membershipSave).not.toHaveBeenCalled();
+  });
+
+  it("looks the invitation up in a system context and joins in the invitation's organization", async () => {
+    const seen: Record<string, unknown> = {};
+    invitationFindOne.mockImplementation(async () => {
+      seen.lookup = getDatabaseContext();
+      return pendingInvitation();
+    });
+    membershipSave.mockImplementation(async (row: Row) => {
+      seen.join = getDatabaseContext();
+      return row;
+    });
+    invitationSave.mockImplementation(async (row: Row) => {
+      seen.save = getDatabaseContext();
+      return row;
+    });
+    givenInviter(membership(true));
+
+    await caller.acceptInvitation({ token: "t" });
+
+    expect(seen.lookup).toEqual({ kind: "system", reason: "invitation lookup by token hash" });
+    expect(seen.join).toEqual({ kind: "organization", organizationId: ORG });
+    expect(seen.save).toEqual({ kind: "organization", organizationId: ORG });
+  });
+
+  it("declines in the invitation's organization after a system lookup", async () => {
+    const seen: Record<string, unknown> = {};
+    invitationFindOne.mockImplementation(async () => {
+      seen.lookup = getDatabaseContext();
+      return pendingInvitation();
+    });
+    invitationSave.mockImplementation(async (row: Row) => {
+      seen.save = getDatabaseContext();
+      return row;
+    });
+
+    await caller.declineInvitation({ token: "t" });
+
+    expect(seen.lookup).toEqual({ kind: "system", reason: "invitation lookup by token hash" });
+    expect(seen.save).toEqual({ kind: "organization", organizationId: ORG });
+  });
+
+  it("runs nothing under an organization for an unknown token", async () => {
+    const seen: unknown[] = [];
+    invitationFindOne.mockImplementation(async () => {
+      seen.push(getDatabaseContext());
+      return null;
+    });
+
+    expect(await codeOf(caller.acceptInvitation({ token: "nope" }))).toBe("NOT_FOUND");
+    expect(await codeOf(caller.declineInvitation({ token: "nope" }))).toBe("NOT_FOUND");
+
+    expect(seen).toHaveLength(2);
+    expect(seen.every((scope) => (scope as { kind: string }).kind === "system")).toBe(true);
+    expect(userFindOne).not.toHaveBeenCalled();
+    expect(membershipSave).not.toHaveBeenCalled();
+    expect(invitationSave).not.toHaveBeenCalled();
   });
 
   it("answers declining a used invitation with a client error", async () => {

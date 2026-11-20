@@ -116,6 +116,43 @@ describe("deliver", () => {
     ]);
   });
 
+  it("downloads a signed Hay media URL through the worker's API address", async () => {
+    const api = fakeApi({ messages });
+    const ctx = fakeContext({ api });
+    const requested: string[] = [];
+    const fetchImpl = vi.fn(async (url: string) => {
+      requested.push(url);
+      return new Response("hello", { status: 200 });
+    }) as unknown as typeof fetch;
+    const id = "0b1c2d3e-4f50-4a61-8b72-93a4b5c6d7e8";
+
+    await deliver(
+      payload({
+        attachments: [
+          {
+            name: "a.txt",
+            url: `https://app.hay.test/v1/media/${id}?expires=1893456000&sig=abc`,
+            type: "text/plain",
+          },
+          { name: "b.txt", url: "https://cdn.example.com/b.txt", type: "text/plain" },
+          {
+            name: "c.txt",
+            url: `https://elsewhere.test/v1/media/${id}?expires=1893456000&sig=abc`,
+            type: "text/plain",
+          },
+        ],
+      }),
+      ctx,
+      { fetchImpl, apiUrl: "http://127.0.0.1:41000", publicUrl: "https://app.hay.test" },
+    );
+
+    expect(requested).toEqual([
+      `http://127.0.0.1:41000/v1/media/${id}?expires=1893456000&sig=abc`,
+      "https://cdn.example.com/b.txt",
+      `https://elsewhere.test/v1/media/${id}?expires=1893456000&sig=abc`,
+    ]);
+  });
+
   it("reports a refused send as a failure, a failed history load as 503, and never retries a send that threw", async () => {
     const refused = fakeContext({
       api: fakeApi({ messages, sendResult: { success: false, error: "550 no" } }),
@@ -126,7 +163,9 @@ describe("deliver", () => {
     });
 
     // The mail may have gone out before the call failed: a retry could send it twice.
-    const down = fakeContext({ api: fakeApi({ messages, sendThrows: new Error("socket hang up") }) });
+    const down = fakeContext({
+      api: fakeApi({ messages, sendThrows: new Error("socket hang up") }),
+    });
     expect(await deliver(payload(), down)).toEqual({
       status: 200,
       body: { success: false, error: "send_uncertain" },

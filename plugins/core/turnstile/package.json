@@ -12,7 +12,8 @@
     "marketplaceCategory": "security",
     "capabilities": [
       "config",
-      "webchat"
+      "webchat",
+      "credentials"
     ],
     "env": [
       "TURNSTILE_SITE_KEY",
@@ -23,7 +24,17 @@
         "challenges.cloudflare.com"
       ]
     },
-    "defaultEnabled": true
+    "defaultEnabled": true,
+    "credentials": [
+      {
+        "name": "secretKey",
+        "source": "config",
+        "capability": "webchat",
+        "hosts": [
+          "challenges.cloudflare.com"
+        ]
+      }
+    ]
   },
   "scripts": {
     "build": "tsc",

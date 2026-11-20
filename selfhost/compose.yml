@@ -176,6 +176,8 @@ services:
   plugin-host:
     profiles: [plugin-isolation]
     image: hay:local
+    # Clears exited sandbox processes, which otherwise count against pids_limit.
+    init: true
     restart: unless-stopped
     command: ["node", "dist/plugin-host/main.js"]
     network_mode: none

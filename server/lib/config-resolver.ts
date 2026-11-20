@@ -1,6 +1,7 @@
 import type { ConfigFieldDescriptor } from "@server/types/plugin-sdk.types";
 import { decryptConfig } from "@server/lib/auth/utils/encryption";
 import { createLogger } from "@server/lib/logger";
+import { isSecretField } from "@server/lib/plugin-credentials";
 
 const logger = createLogger("config-resolver");
 
@@ -194,35 +195,32 @@ export function resolveConfigWithEnv(
 }
 
 /**
- * Resolve configuration for worker runtime (includes actual values)
- * This merges DB config, auth state credentials, and .env fallback
+ * The configuration a plugin worker receives at spawn and in core's requests: the
+ * non-secret fields, resolved from the database, the allowed env fallbacks and
+ * the schema defaults. Secret (encrypted) fields and `serverOnly` fields are
+ * left out; a worker gets the secrets by pulling them (see plugin-credentials).
  */
 export function resolveConfigForWorker(
   dbConfig: Record<string, unknown> | undefined,
-  authState: { credentials?: Record<string, unknown> } | null | undefined,
   configSchema: Record<string, ConfigFieldDescriptor>,
   allowedEnv: ConfigEnvAllowList = NO_ENV,
 ): Record<string, unknown> {
   const resolved = resolveConfigWithEnv(dbConfig, configSchema, {
     decrypt: true,
-    maskSecrets: false, // Worker needs real values
+    maskSecrets: false,
     allowedEnv,
   });
-  resolved.values = stripServerOnlyFields(resolved.values, configSchema);
-
-  // Merge with auth credentials (from authState). The PluginInstance entity
-  // transformer has already decrypted them, so they are merged as-is.
-  if (authState?.credentials) {
-    Object.assign(resolved.values, authState.credentials);
-  }
-
-  return resolved.values;
+  return Object.fromEntries(
+    Object.entries(stripServerOnlyFields(resolved.values, configSchema)).filter(
+      ([key]) => !isSecretField(configSchema[key]),
+    ),
+  );
 }
 
 /**
  * Drop config fields flagged `serverOnly` in the schema (e.g. OAuth client
  * secrets core uses for token exchange). Applied to every payload that leaves
- * core for a plugin worker: HAY_ORG_CONFIG, cron config and /on-connected.
+ * core for a plugin worker.
  */
 export function stripServerOnlyFields(
   config: Record<string, unknown>,

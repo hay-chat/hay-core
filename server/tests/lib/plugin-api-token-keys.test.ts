@@ -1,6 +1,13 @@
-import { describe, it, expect } from "@jest/globals";
+import { describe, it, expect, jest } from "@jest/globals";
 import * as jwt from "jsonwebtoken";
+import { createFakeRedisClient } from "../helpers/fake-redis";
+
+const mockRedisClient = createFakeRedisClient();
+jest.mock("@server/services/redis.service", () => ({
+  redisService: { getClient: () => mockRedisClient, isConnected: () => true },
+}));
 import { config } from "@server/config/env";
+import { deriveServiceKey } from "@server/lib/auth/utils/service-keys";
 import {
   mintPluginApiToken,
   PLUGIN_API_TOKEN_AUDIENCE,
@@ -10,28 +17,34 @@ import {
 } from "@server/lib/plugin-api-token";
 
 describe("plugin API token signing key", () => {
-  it("does not sign with the session secret", () => {
+  it("does not sign with the session secret", async () => {
     const token = mintPluginApiToken("org", "plugin", []);
     expect(() => jwt.verify(token, config.jwt.secret)).toThrow("invalid signature");
-    expect(verifyPluginApiToken(token).pluginId).toBe("plugin");
+    expect((await verifyPluginApiToken(token)).pluginId).toBe("plugin");
   });
 
-  it("still accepts tokens issued before the key was separated", () => {
+  it("refuses a token signed with the session secret", async () => {
     const token = jwt.sign(
       { organizationId: "org", pluginId: "old", scope: PLUGIN_API_TOKEN_SCOPE, capabilities: [] },
       config.jwt.secret,
       { expiresIn: "1h", issuer: PLUGIN_API_TOKEN_ISSUER, audience: PLUGIN_API_TOKEN_AUDIENCE },
     );
-    expect(verifyPluginApiToken(token).pluginId).toBe("old");
+    await expect(verifyPluginApiToken(token)).rejects.toThrow("invalid signature");
   });
 
-  it("does not fall back for expired or foreign tokens", () => {
-    const expired = jwt.sign({ scope: PLUGIN_API_TOKEN_SCOPE }, config.jwt.secret, {
-      expiresIn: -10,
-      issuer: PLUGIN_API_TOKEN_ISSUER,
-      audience: PLUGIN_API_TOKEN_AUDIENCE,
-    });
-    expect(() => verifyPluginApiToken(expired)).toThrow("jwt expired");
-    expect(() => verifyPluginApiToken(jwt.sign({}, "another-secret"))).toThrow("invalid signature");
+  it("rejects expired and foreign tokens", async () => {
+    const expired = jwt.sign(
+      { scope: PLUGIN_API_TOKEN_SCOPE },
+      deriveServiceKey("hay:plugin-api-token:v1"),
+      {
+        expiresIn: -10,
+        issuer: PLUGIN_API_TOKEN_ISSUER,
+        audience: PLUGIN_API_TOKEN_AUDIENCE,
+      },
+    );
+    await expect(verifyPluginApiToken(expired)).rejects.toThrow("jwt expired");
+    await expect(verifyPluginApiToken(jwt.sign({}, "another-secret"))).rejects.toThrow(
+      "invalid signature",
+    );
   });
 });

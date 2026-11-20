@@ -26,7 +26,7 @@ async function main(): Promise<void> {
   });
   await owner.initialize();
   try {
-    await provisionAppRole(owner, username, password);
+    await provisionAppRole(owner, username, password, config.database.systemRole);
     console.log(`Database role ${username} is up to date`);
   } finally {
     await owner.destroy();

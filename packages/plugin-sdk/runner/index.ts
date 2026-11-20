@@ -20,7 +20,7 @@ import { executeOnInitialize, executeOnStart, executeOnDisable } from "./hook-ex
 import { PluginHttpServer } from "./http-server.js";
 import { startSandboxBridges } from "./loopback-bridge.js";
 import {
-  loadOrgDataFromEnv,
+  loadOrgData,
   createMockOrgData,
   createStartContext,
   createDisableContext,
@@ -58,7 +58,7 @@ interface RunnerState {
  * Exit codes:
  * - 0: Success
  * - 1: Initialization failure (args, manifest, plugin load, onInitialize)
- * - 2: Runtime failure (HTTP server, onStart)
+ * - 2: Runtime failure (HTTP server, org runtime data, onStart)
  */
 async function main(): Promise<void> {
   const state: RunnerState = {
@@ -179,8 +179,10 @@ async function main(): Promise<void> {
   try {
     // Load org data based on mode
     if (mode === "production") {
-      logger.info("Loading org runtime data from environment");
-      state.orgData = loadOrgDataFromEnv();
+      logger.info("Loading org runtime data");
+      const loaded = await loadOrgData(manifest, logger);
+      state.orgData = loaded.orgData;
+      state.httpServer?.setCredentialStore(loaded.credentials);
     } else {
       logger.info("Using mock org runtime data (test mode)");
       state.orgData = createMockOrgData(orgId);
@@ -209,7 +211,6 @@ async function main(): Promise<void> {
       manifest,
       mcpRuntime: startCtx.mcp,
       orgConfig: state.orgData.config,
-      orgAuth: state.orgData.auth,
     });
 
     if (!startSuccess) {
@@ -222,8 +223,9 @@ async function main(): Promise<void> {
     logger.error("Failed to initialize org runtime", {
       error: err instanceof Error ? err.message : String(err),
     });
-    logger.warn("Plugin is running but org runtime failed to initialize");
-    // Continue running - HTTP server is still available
+    // Without its organization's data the worker would answer every request
+    // with an empty configuration. Exit so core starts it again.
+    process.exit(2);
   }
 
   // ============================================================================

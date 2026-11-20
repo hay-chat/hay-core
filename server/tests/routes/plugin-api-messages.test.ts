@@ -1,5 +1,4 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
-import * as jwt from "jsonwebtoken";
 
 /**
  * pluginApi messages.receive (attachments) + messages.updateStatus.
@@ -80,13 +79,18 @@ jest.mock("@server/services/orchestrator-queue.service", () => ({
 }));
 
 const mockPublish = jest.fn<(channel: string, data: unknown) => Promise<void>>();
+import { createFakeRedisClient } from "../helpers/fake-redis";
+const mockRedisClient = createFakeRedisClient();
 jest.mock("@server/services/redis.service", () => ({
   redisService: {
     publish: mockPublish,
     isConnected: () => true,
-    getClient: () => null,
+    getClient: () => mockRedisClient,
   },
 }));
+
+import { mintPluginApiToken } from "@server/lib/plugin-api-token";
+jest.mock("@server/services/plugin-credential.service", () => ({ issueCredential: jest.fn() }));
 
 import { pluginApiTrpcRouter } from "@server/routes/v1/plugin-api/trpc";
 import { Conversation } from "@server/database/entities/conversation.entity";
@@ -97,11 +101,7 @@ const OTHER_ORG_ID = "22222222-2222-4222-8222-222222222222";
 const CONVERSATION_ID = "33333333-3333-4333-8333-333333333333";
 
 const ctx = (organizationId = ORG_ID, capabilities = ["messages"]) => {
-  const token = jwt.sign(
-    { scope: "plugin-api", organizationId, pluginId: "hay-channel-test", capabilities },
-    JWT_SECRET,
-    { issuer: "hay-plugin-api", audience: "plugin" },
-  );
+  const token = mintPluginApiToken(organizationId, "hay-channel-test", capabilities);
   return {
     user: null,
     organizationId: null,

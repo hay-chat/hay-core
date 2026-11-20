@@ -10,7 +10,7 @@ import { navigateWithAuth } from "./helpers/login";
  *
  * Host prerequisites (otherwise the setup page shows the "not available on
  * this installation" notice and the forwarding address is hidden):
- *   EMAIL_INBOUND_DOMAIN, SMTP_FROM_EMAIL, RESEND_API_KEY, RESEND_WEBHOOK_SECRET
+ *   EMAIL_INBOUND_DOMAIN, SMTP_FROM_EMAIL, RESEND_WEBHOOK_SECRET
  * set in the server environment (.env.test for the Playwright webServer).
  */
 

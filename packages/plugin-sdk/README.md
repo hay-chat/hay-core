@@ -697,12 +697,19 @@ does not send it in the `x-hay-worker-secret` header. Test mode runs without it.
 #### Production Mode
 
 ```bash
-# Organization configuration (JSON)
-HAY_ORG_CONFIG='{"apiKey":"sk_test_123","maxRetries":5}'
+# Non-secret organization settings (JSON)
+HAY_ORG_SETTINGS='{"org":{"id":"org_1"},"config":{"maxRetries":5},"authMethodId":"apiKey"}'
 
-# Organization authentication (JSON)
-HAY_ORG_AUTH='{"methodId":"oauth","credentials":{"access_token":"..."}}'
+# Core's plugin API, used to pull the credentials the manifest declares
+HAY_API_URL=http://127.0.0.1:3001
+HAY_API_TOKEN=<plugin API token>
 ```
+
+Secrets are never in the environment. A secret config field and the connected account's
+credentials are listed in the manifest under `credentials`, each bound to a capability (which
+must also be declared, together with `credentials`); the runner pulls them from core at start
+and again before an access token expires, and `ctx.config` / `ctx.auth` read them as usual.
+Core never delivers a refresh token.
 
 #### Test Mode
 

@@ -1,4 +1,5 @@
 import { AppDataSource } from "@server/database/data-source";
+import { runAsSystem } from "@server/database/organization-context";
 import { PrivacyRequest } from "@server/entities/privacy-request.entity";
 import type {
   PrivacyRequestType,
@@ -95,6 +96,17 @@ export function erasedEmail(email: string): string {
  * Handles GDPR Data Subject Access Requests (DSAR)
  */
 /** A refusal whose message is written for the person making the request. */
+interface PrivacyRequestStatus {
+  id: string;
+  type: PrivacyRequestType;
+  status: string;
+  createdAt: Date;
+  completedAt?: Date;
+  jobId?: string;
+  jobStatus?: string;
+  downloadAvailable: boolean;
+}
+
 export class PrivacyRequestError extends Error {}
 
 export class PrivacyService {
@@ -148,7 +160,18 @@ export class PrivacyService {
    * account uses this email: a request row is always created, but the
    * verification email only goes to an address that has an account.
    */
-  private async requestForUser(
+  private requestForUser(
+    type: "export" | "deletion",
+    email: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<{ requestId: string; expiresAt: Date }> {
+    return runAsSystem("privacy: public staff-user request", () =>
+      this.createUserRequest(type, email, ipAddress, userAgent),
+    );
+  }
+
+  private async createUserRequest(
     type: "export" | "deletion",
     email: string,
     ipAddress?: string,
@@ -219,7 +242,16 @@ export class PrivacyService {
    * Verify the token and queue the background job. The verification link in
    * both the staff and the customer emails lands here.
    */
-  private async confirmRequest(
+  private confirmRequest(
+    token: string,
+    type: "export" | "deletion",
+  ): Promise<{ requestId: string; jobId: string }> {
+    return runAsSystem("privacy: confirm request by verification token", () =>
+      this.confirmRequestInSystem(token, type),
+    );
+  }
+
+  private async confirmRequestInSystem(
     token: string,
     type: "export" | "deletion",
   ): Promise<{ requestId: string; jobId: string }> {
@@ -434,16 +466,11 @@ export class PrivacyService {
   /**
    * Get status of a privacy request
    */
-  async getStatus(requestId: string): Promise<{
-    id: string;
-    type: PrivacyRequestType;
-    status: string;
-    createdAt: Date;
-    completedAt?: Date;
-    jobId?: string;
-    jobStatus?: string;
-    downloadAvailable: boolean;
-  }> {
+  getStatus(requestId: string): Promise<PrivacyRequestStatus> {
+    return runAsSystem("privacy: public request status lookup", () => this.findStatus(requestId));
+  }
+
+  private async findStatus(requestId: string): Promise<PrivacyRequestStatus> {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
     const request = await requestRepository.findOne({
       where: { id: requestId },
@@ -482,7 +509,13 @@ export class PrivacyService {
    * Cancel a privacy request
    * Only pending_verification, verified or processing requests can be cancelled
    */
-  async cancelRequest(requestId: string, token: string, ipAddress?: string): Promise<void> {
+  cancelRequest(requestId: string, token: string, ipAddress?: string): Promise<void> {
+    return runAsSystem("privacy: cancel request by verification token", () =>
+      this.cancelByToken(requestId, token, ipAddress),
+    );
+  }
+
+  private async cancelByToken(requestId: string, token: string, ipAddress?: string): Promise<void> {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
     const jobRepository = AppDataSource.getRepository(Job);
 
@@ -529,7 +562,17 @@ export class PrivacyService {
    * Download an export ZIP. Each successful call uses one of the request's
    * allowed downloads; the file is deleted after the last one.
    */
-  async downloadExport(
+  downloadExport(
+    requestId: string,
+    downloadToken: string,
+    ipAddress?: string,
+  ): Promise<{ buffer: Buffer; fileName: string }> {
+    return runAsSystem("privacy: export download by token", () =>
+      this.claimDownload(requestId, downloadToken, ipAddress),
+    );
+  }
+
+  private async claimDownload(
     requestId: string,
     downloadToken: string,
     ipAddress?: string,

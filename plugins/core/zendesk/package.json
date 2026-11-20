@@ -13,7 +13,8 @@
     "marketplaceCategory": "crm",
     "capabilities": [
       "mcp",
-      "tickets"
+      "tickets",
+      "credentials"
     ],
     "setup": {
       "businessTypes": [
@@ -36,7 +37,31 @@
           "suffix": ".zendesk.com"
         }
       ]
-    }
+    },
+    "credentials": [
+      {
+        "name": "apiToken",
+        "source": "config",
+        "capability": "mcp",
+        "hosts": [
+          {
+            "fromConfig": "subdomain",
+            "suffix": ".zendesk.com"
+          }
+        ]
+      },
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "mcp",
+        "hosts": [
+          {
+            "fromConfig": "subdomain",
+            "suffix": ".zendesk.com"
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "build": "npm run build:ui && npm run build:mcp",

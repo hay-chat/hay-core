@@ -9,6 +9,14 @@
     }
   },
   "config": {
+    "inboundDomain": {
+      "label": "Domínio de e-mail de entrada",
+      "description": "Gerenciado pela plataforma."
+    },
+    "fromEmail": {
+      "label": "Endereço de envio",
+      "description": "Gerenciado pela plataforma."
+    },
     "supportAddress": {
       "label": "Seu endereço de suporte",
       "description": "O endereço para onde seus clientes já escrevem, por exemplo suporte{'@'}sualoja.com. Você vai encaminhar essa caixa para o endereço do Hay.chat mostrado abaixo."

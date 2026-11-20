@@ -20,7 +20,7 @@ email, threaded like a normal conversation.
    one key: its alias. The support address is never a routing key — it is
    unverified config, and routing on it would let one org claim another's
    mail.
-3. **Inbound.** The worker fetches the full email from Resend, classifies it
+3. **Inbound.** The worker fetches the full email through core (plugin API `email.receivedMessage`; core holds the Resend key and only serves emails addressed to the org's routing key), classifies it
    (echo of our own mail, Gmail confirmation, bounce, auto-reply, list mail,
    customer), strips quoted history and signatures, uploads real attachments
    and calls `messages.receive` with:
@@ -45,7 +45,6 @@ domain>>` with `In-Reply-To` (shopper's last message), `References` (thread
 
 | Env                     | Purpose                                                                |
 | ----------------------- | ---------------------------------------------------------------------- |
-| `RESEND_API_KEY`        | Fetch received emails and attachments                                  |
 | `RESEND_WEBHOOK_SECRET` | svix signing secret of the `email.received` webhook (verified by core) |
 | `EMAIL_INBOUND_DOMAIN`  | Receiving domain whose MX points at Resend, e.g. `inbound.hay.chat`    |
 | `SMTP_FROM_EMAIL`       | Platform sender; its domain is the From domain of replies              |

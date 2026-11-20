@@ -8,6 +8,8 @@ import type {
 } from "../../../types/plugin-api.types";
 import { createLogger } from "@server/lib/logger";
 import { isOrganizationOpenToPlugins } from "@server/lib/plugin-api-token";
+import { PLUGIN_API_ROUTE_CAPABILITIES } from "@server/lib/plugin-capabilities";
+import { runInOrganization } from "@server/database/organization-context";
 import { organizationRepository } from "../../../repositories/organization.repository";
 
 const logger = createLogger("plugin-api");
@@ -39,7 +41,13 @@ const authenticatePlugin = async (
   }
 
   const token = authHeader.substring(7); // Remove "Bearer " prefix
-  const payload = pluginAPIService.validateToken(token);
+  let payload;
+  try {
+    payload = await pluginAPIService.validateToken(token);
+  } catch (error) {
+    next(error);
+    return;
+  }
 
   if (!payload) {
     res.status(401).json({
@@ -68,8 +76,27 @@ const authenticatePlugin = async (
     { pluginId: payload.pluginId, organizationId: payload.organizationId },
     "Plugin API auth token validated",
   );
-  next();
+  // Declares the token's organization for the rest of the request's handlers.
+  runInOrganization(payload.organizationId, next);
 };
+
+/**
+ * Refuse a request whose token lacks one of the capabilities the route needs.
+ */
+const requireRouteCapability =
+  (route: keyof typeof PLUGIN_API_ROUTE_CAPABILITIES) =>
+  (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    const needed: readonly string[] = PLUGIN_API_ROUTE_CAPABILITIES[route];
+    const granted = req.pluginAuth?.capabilities ?? [];
+    if (!needed.some((capability) => granted.includes(capability))) {
+      res.status(403).json({
+        success: false,
+        error: `Plugin does not have the '${needed.join("' or '")}' capability`,
+      } as PluginAPIHttpResponse);
+      return;
+    }
+    next();
+  };
 
 /**
  * POST /v1/plugin-api/send-email
@@ -79,88 +106,93 @@ const authenticatePlugin = async (
  * - Valid JWT token in Authorization header
  * - Plugin must have "email" capability
  */
-router.post("/send-email", authenticatePlugin, async (req: AuthenticatedRequest, res: Response) => {
-  const pluginAuth = req.pluginAuth!; // Safe because authenticatePlugin middleware guarantees this
-  const emailRequest = req.body as SendEmailHttpRequest;
+router.post(
+  "/send-email",
+  authenticatePlugin,
+  requireRouteCapability("/send-email"),
+  async (req: AuthenticatedRequest, res: Response) => {
+    const pluginAuth = req.pluginAuth!; // Safe because authenticatePlugin middleware guarantees this
+    const emailRequest = req.body as SendEmailHttpRequest;
 
-  // Validate request body
-  if (!emailRequest.subject) {
-    return res.status(400).json({
-      success: false,
-      error: "Missing required field: subject",
-    } as PluginAPIHttpResponse);
-  }
-
-  if (!emailRequest.body && !emailRequest.html) {
-    return res.status(400).json({
-      success: false,
-      error: "Must provide either body (text) or html",
-    } as PluginAPIHttpResponse);
-  }
-
-  try {
-    logger.debug(
-      {
-        pluginId: pluginAuth.pluginId,
-        organizationId: pluginAuth.organizationId,
-        subject: emailRequest.subject,
-        hasTo: !!emailRequest.to,
-        hasText: !!emailRequest.body,
-        hasHtml: !!emailRequest.html,
-      },
-      "Received send-email request",
-    );
-
-    // Call service to send email
-    const result = await pluginAPIService.sendEmail(pluginAuth, {
-      to: emailRequest.to,
-      subject: emailRequest.subject,
-      text: emailRequest.body,
-      html: emailRequest.html,
-      cc: emailRequest.cc,
-      bcc: emailRequest.bcc,
-      from: emailRequest.from,
-      replyTo: emailRequest.replyTo,
-      headers: emailRequest.headers,
-      messageId: emailRequest.messageId,
-      attachments: emailRequest.attachments,
-      retry: emailRequest.retry,
-    });
-
-    if (!result.success) {
-      return res.status(500).json({
+    // Validate request body
+    if (!emailRequest.subject) {
+      return res.status(400).json({
         success: false,
-        error: result.error || "Failed to send email",
+        error: "Missing required field: subject",
       } as PluginAPIHttpResponse);
     }
 
-    return res.status(200).json({
-      success: true,
-      data: {
-        messageId: result.messageId,
-        recipients: Array.isArray(emailRequest.to)
-          ? emailRequest.to
-          : emailRequest.to
-            ? [emailRequest.to]
-            : [],
-      } as SendEmailHttpResponse,
-    } as PluginAPIHttpResponse<SendEmailHttpResponse>);
-  } catch (error) {
-    logger.error(
-      {
-        err: error,
-        pluginId: pluginAuth.pluginId,
-        organizationId: pluginAuth.organizationId,
-      },
-      "Error in send-email endpoint",
-    );
+    if (!emailRequest.body && !emailRequest.html) {
+      return res.status(400).json({
+        success: false,
+        error: "Must provide either body (text) or html",
+      } as PluginAPIHttpResponse);
+    }
 
-    return res.status(500).json({
-      success: false,
-      error: "Internal server error",
-    } as PluginAPIHttpResponse);
-  }
-});
+    try {
+      logger.debug(
+        {
+          pluginId: pluginAuth.pluginId,
+          organizationId: pluginAuth.organizationId,
+          subject: emailRequest.subject,
+          hasTo: !!emailRequest.to,
+          hasText: !!emailRequest.body,
+          hasHtml: !!emailRequest.html,
+        },
+        "Received send-email request",
+      );
+
+      // Call service to send email
+      const result = await pluginAPIService.sendEmail(pluginAuth, {
+        to: emailRequest.to,
+        subject: emailRequest.subject,
+        text: emailRequest.body,
+        html: emailRequest.html,
+        cc: emailRequest.cc,
+        bcc: emailRequest.bcc,
+        from: emailRequest.from,
+        replyTo: emailRequest.replyTo,
+        headers: emailRequest.headers,
+        messageId: emailRequest.messageId,
+        attachments: emailRequest.attachments,
+        retry: emailRequest.retry,
+      });
+
+      if (!result.success) {
+        return res.status(500).json({
+          success: false,
+          error: result.error || "Failed to send email",
+        } as PluginAPIHttpResponse);
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          messageId: result.messageId,
+          recipients: Array.isArray(emailRequest.to)
+            ? emailRequest.to
+            : emailRequest.to
+              ? [emailRequest.to]
+              : [],
+        } as SendEmailHttpResponse,
+      } as PluginAPIHttpResponse<SendEmailHttpResponse>);
+    } catch (error) {
+      logger.error(
+        {
+          err: error,
+          pluginId: pluginAuth.pluginId,
+          organizationId: pluginAuth.organizationId,
+        },
+        "Error in send-email endpoint",
+      );
+
+      return res.status(500).json({
+        success: false,
+        error: "Internal server error",
+      } as PluginAPIHttpResponse);
+    }
+  },
+);
 
 /**
  * GET /v1/plugin-api/health

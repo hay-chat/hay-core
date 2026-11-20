@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { runInOrganization } from "@server/database/organization-context";
 import { t } from "@server/trpc/init";
 import * as jwt from "jsonwebtoken";
 import type { Context } from "@server/trpc/context";
@@ -7,6 +8,10 @@ import {
   PluginApiTokenClaimsError,
   verifyPluginApiToken,
 } from "@server/lib/plugin-api-token";
+import {
+  PLUGIN_API_PROCEDURE_CAPABILITIES,
+  type PluginApiProcedureName,
+} from "@server/lib/plugin-capabilities";
 import { organizationRepository } from "@server/repositories/organization.repository";
 
 /**
@@ -55,7 +60,7 @@ export const verifyPluginAuth = t.middleware(async ({ ctx, next }) => {
 
   let decoded;
   try {
-    decoded = verifyPluginApiToken(token);
+    decoded = await verifyPluginApiToken(token);
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
       throw new TRPCError({
@@ -92,32 +97,37 @@ export const verifyPluginAuth = t.middleware(async ({ ctx, next }) => {
     });
   }
 
-  // Add plugin auth to context
-  return next({
-    ctx: {
-      ...ctx,
-      pluginAuth: {
-        organizationId: decoded.organizationId,
-        pluginId: decoded.pluginId,
-        capabilities: decoded.capabilities,
-      },
-    } as PluginAuthContext,
-  });
+  // Declares the token's organization for database work in this request.
+  return runInOrganization(decoded.organizationId, () =>
+    next({
+      ctx: {
+        ...ctx,
+        pluginAuth: {
+          organizationId: decoded.organizationId,
+          pluginId: decoded.pluginId,
+          capabilities: decoded.capabilities,
+        },
+      } as PluginAuthContext,
+    }),
+  );
 });
 
 /**
- * Plugin procedure with authentication
+ * The only way to define a plugin API procedure: authenticated as a plugin
+ * worker, and limited to the capability {@link PLUGIN_API_PROCEDURE_CAPABILITIES}
+ * lists for `procedure`. The check runs before the input is parsed, so a plugin
+ * without the capability learns nothing about the procedure's shape.
  */
-export const pluginProcedure = t.procedure.use(verifyPluginAuth);
-
-/**
- * Helper to check if a capability is present
- */
-export function requireCapability(ctx: PluginAuthContext, capability: string): void {
-  if (!ctx.pluginAuth.capabilities.includes(capability)) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: `Plugin does not have '${capability}' capability`,
-    });
-  }
+export function pluginApiProcedure(procedure: PluginApiProcedureName) {
+  const needed: readonly string[] = PLUGIN_API_PROCEDURE_CAPABILITIES[procedure];
+  return t.procedure.use(verifyPluginAuth).use(({ ctx, next }) => {
+    const { capabilities } = (ctx as PluginAuthContext).pluginAuth;
+    if (!needed.some((capability) => capabilities.includes(capability))) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: `Plugin does not have the '${needed.join("' or '")}' capability`,
+      });
+    }
+    return next();
+  });
 }

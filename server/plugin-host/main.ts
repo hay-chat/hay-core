@@ -3,6 +3,7 @@
  * command): `node dist/plugin-host/main.js`.
  */
 import path from "path";
+import { pluginIsolationMode } from "../lib/plugin-isolation";
 import { log } from "./log";
 import { Supervisor } from "./supervisor";
 import { detectLauncher } from "./tiers";
@@ -14,7 +15,8 @@ function envPath(name: string, fallback: string): string {
 }
 
 async function main(): Promise<void> {
-  const mode = process.env.PLUGIN_ISOLATION === "degraded" ? "degraded" : "strict";
+  // An invalid value stops the host at boot; the host runs strict unless told otherwise.
+  const mode = pluginIsolationMode() === "degraded" ? "degraded" : "strict";
   // Resolved like core resolves it: the server runs with cwd=<root>/server.
   const rootDir = process.cwd().endsWith("/server")
     ? path.join(process.cwd(), "..")

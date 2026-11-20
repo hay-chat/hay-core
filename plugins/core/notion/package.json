@@ -15,7 +15,8 @@
     "autoActivate": true,
     "trpcRouter": "./dist/router.cjs",
     "capabilities": [
-      "auth"
+      "auth",
+      "credentials"
     ],
     "network": {
       "egress": [
@@ -46,7 +47,25 @@
         "default": "2022-06-28",
         "helpText": "The Notion-Version header sent with every request. Leave the default unless Notion deprecates it."
       }
-    }
+    },
+    "credentials": [
+      {
+        "name": "apiToken",
+        "source": "config",
+        "capability": "auth",
+        "hosts": [
+          "api.notion.com"
+        ]
+      },
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "auth",
+        "hosts": [
+          "api.notion.com"
+        ]
+      }
+    ]
   },
   "scripts": {
     "build": "tsc && esbuild src/router.ts --bundle --platform=node --target=es2022 --format=cjs --external:@server/* --external:@hay/* --external:zod --external:fs --external:path --external:crypto --external:http --external:https --external:url --outfile=dist/router.cjs",

@@ -8,6 +8,7 @@ import { createLogger } from "@server/lib/logger";
 import { assertOrganizationNotSuspended } from "./suspension";
 import { isMfaEnrolmentExempt } from "./mfa";
 import { mfaService } from "@server/services/mfa.service";
+import { runInOrganization } from "@server/database/organization-context";
 
 const logger = createLogger("trpc-auth");
 
@@ -62,12 +63,15 @@ export const isAuthed = t.middleware<{ ctx: Context }>(async ({ ctx, path, next 
     await mfaService.assertEnrolledIfRequired(ctx.user);
   }
 
-  return next({
-    ctx: {
-      ...ctx,
-      user: ctx.user as AuthUser,
-    },
-  });
+  // Declares the organization for database work in this request; opens no transaction.
+  return runInOrganization(ctx.organizationId, () =>
+    next({
+      ctx: {
+        ...ctx,
+        user: ctx.user as AuthUser,
+      },
+    }),
+  );
 });
 
 /**

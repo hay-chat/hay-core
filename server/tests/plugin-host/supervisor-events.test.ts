@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "@jest/globals";
 import { spawn } from "child_process";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "fs";
 import { request } from "http";
+import { createServer } from "net";
 import { tmpdir } from "os";
 import { join } from "path";
 import type { Launcher } from "../../plugin-host/launcher";
@@ -38,7 +39,7 @@ describe("supervisor worker events", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  async function events(script: string): Promise<Array<Record<string, unknown>>> {
+  async function startWorker(script: string): Promise<string> {
     dir = realpathSync(mkdtempSync(join(tmpdir(), "sup-")));
     mkdirSync(join(dir, "plugins/demo"), { recursive: true });
     const controlSocket = join(dir, "control.sock");
@@ -48,21 +49,28 @@ describe("supervisor worker events", () => {
       mode: "degraded",
       rootDir: dir,
       workersDir: join(dir, "workers"),
-      apiSocket: join(dir, "api.sock"),
+      apiSocket: join(dir, "core.sock"),
       egress: null,
       controlSocket,
       coreGid: process.getgid?.() ?? 0,
+      probeRecheckMs: 20,
     });
     await supervisor.listen();
     await call(controlSocket, "POST", "/workers", {
       id: "worker1",
+      apiSocket: join(dir, "core-0123456789ab.sock"),
       custom: false,
       pluginId: "demo",
       orgId: "org",
       pluginPath: join(dir, "plugins/demo"),
-      env: {},
+      env: { HAY_API_TOKEN: "worker-token" },
       egressAllow: [],
     });
+    return controlSocket;
+  }
+
+  async function events(script: string): Promise<Array<Record<string, unknown>>> {
+    const controlSocket = await startWorker(script);
     const stream = await call(controlSocket, "GET", "/workers/worker1/events");
     return stream
       .split("\n")
@@ -86,4 +94,85 @@ describe("supervisor worker events", () => {
     expect(lines.length).toBeGreaterThan(0);
     for (const event of lines) expect((event.line as string).length).toBeLessThanOrEqual(65536);
   });
+
+  it("stops the workers of a core that is gone and keeps those of one that is running", async () => {
+    const controlSocket = await startWorker("setInterval(()=>{},1000)");
+    const status = () => call(controlSocket, "GET", "/status").then(JSON.parse);
+    const core = createServer();
+    await new Promise<void>((resolve) => core.listen(join(dir, "core-0123456789ab.sock"), resolve));
+
+    expect(JSON.parse(await call(controlSocket, "POST", "/reap"))).toEqual({
+      stopped: 0,
+      apiTokens: [],
+    });
+    expect((await status()).workers).toBe(1);
+
+    await new Promise((resolve) => core.close(resolve));
+    expect(JSON.parse(await call(controlSocket, "POST", "/reap"))).toEqual({
+      stopped: 1,
+      apiTokens: ["worker-token"],
+    });
+    expect((await status()).workers).toBe(0);
+  });
+
+  it("releases the worker's resources when the process cannot be started", async () => {
+    dir = realpathSync(mkdtempSync(join(tmpdir(), "sup-")));
+    mkdirSync(join(dir, "plugins/demo"), { recursive: true });
+    const controlSocket = join(dir, "control.sock");
+    const cleaned: string[] = [];
+    supervisor = new Supervisor({
+      launcher: {
+        ...scripted(""),
+        spawn: () => {
+          throw new Error("spawn failed");
+        },
+        cleanup: async (spec) => void cleaned.push(spec.id),
+      },
+      tierReason: null,
+      mode: "degraded",
+      rootDir: dir,
+      workersDir: join(dir, "workers"),
+      apiSocket: join(dir, "core.sock"),
+      egress: null,
+      controlSocket,
+      coreGid: process.getgid?.() ?? 0,
+    });
+    await supervisor.listen();
+
+    const reply = JSON.parse(
+      await call(controlSocket, "POST", "/workers", {
+        id: "worker3",
+        apiSocket: join(dir, "core-0123456789ab.sock"),
+        custom: false,
+        pluginId: "demo",
+        orgId: "org",
+        pluginPath: join(dir, "plugins/demo"),
+        env: {},
+        egressAllow: [],
+      }),
+    );
+
+    expect(reply.error).toMatch(/spawn failed/);
+    expect(cleaned).toEqual(["worker3"]);
+  });
+
+  it.each(["/tmp/core-0123456789ab.sock", "core-xyz.sock", "api.sock", ""])(
+    "refuses a worker whose plugin API socket is %j",
+    async (apiSocket) => {
+      const controlSocket = await startWorker("setInterval(()=>{},1000)");
+      const reply = JSON.parse(
+        await call(controlSocket, "POST", "/workers", {
+          id: "worker2",
+          apiSocket: apiSocket && join(dir, apiSocket),
+          custom: false,
+          pluginId: "demo",
+          orgId: "org",
+          pluginPath: join(dir, "plugins/demo"),
+          env: {},
+          egressAllow: [],
+        }),
+      );
+      expect(reply).toEqual({ error: "Invalid plugin API socket" });
+    },
+  );
 });

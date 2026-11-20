@@ -1,3 +1,4 @@
+import type { Repository } from "typeorm";
 import { User } from "@server/entities/user.entity";
 import { ApiKey } from "@server/entities/apikey.entity";
 import { Organization } from "@server/entities/organization.entity";
@@ -5,6 +6,7 @@ import { AuthUser } from "@server/lib/auth/AuthUser";
 import { extractApiKeyFromHeader, hashApiKey } from "@server/lib/auth/utils/hashing";
 import { AppDataSource } from "@server/database/data-source";
 import { apiTokenUserId } from "@server/lib/auth/api-token-actor";
+import { runAsSystem, runInOrganization } from "@server/database/organization-context";
 
 /**
  * Authenticate using Organization API Token
@@ -23,15 +25,28 @@ export async function authenticateApiKeyAuth(authHeader?: string): Promise<AuthU
 
   // Keys are 256-bit random values stored as SHA-256, so look them up directly by hash.
   const apiKeyRepository = AppDataSource.getRepository(ApiKey);
-  const matchedApiKey = await apiKeyRepository.findOne({
-    where: { keyHash: await hashApiKey(apiKey), isActive: true },
-    relations: { organization: true },
-  });
+  const keyHash = await hashApiKey(apiKey);
+  // The key is what reveals the organization, so only this lookup runs without one.
+  const matchedApiKey = await runAsSystem("api key lookup by key hash", () =>
+    apiKeyRepository.findOne({
+      where: { keyHash, isActive: true },
+      relations: { organization: true },
+    }),
+  );
 
   if (!matchedApiKey) {
     throw new Error("Invalid API key");
   }
 
+  return runInOrganization(matchedApiKey.organizationId, () =>
+    authenticateMatchedKey(matchedApiKey, apiKeyRepository),
+  );
+}
+
+async function authenticateMatchedKey(
+  matchedApiKey: ApiKey,
+  apiKeyRepository: Repository<ApiKey>,
+): Promise<AuthUser> {
   // Check if API key is expired
   if (matchedApiKey.isExpired()) {
     throw new Error("API key has expired");

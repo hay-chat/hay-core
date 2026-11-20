@@ -50,6 +50,8 @@ export interface OAuthTokenOpConfig {
   grantType: string;
   tokenParam: string;
   includeClientSecret?: boolean;
+  /** Append the client id as `client_id`. */
+  includeClientId?: boolean;
 }
 
 export interface OAuthConnectionStatus {

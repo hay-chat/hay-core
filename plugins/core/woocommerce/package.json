@@ -13,7 +13,8 @@
     "marketplaceCategory": "commerce",
     "capabilities": [
       "mcp",
-      "products"
+      "products",
+      "credentials"
     ],
     "setup": {
       "businessTypes": [
@@ -33,7 +34,39 @@
           "fromConfig": "siteUrl"
         }
       ]
-    }
+    },
+    "credentials": [
+      {
+        "name": "consumerKey",
+        "source": "config",
+        "capability": "mcp",
+        "hosts": [
+          {
+            "fromConfig": "siteUrl"
+          }
+        ]
+      },
+      {
+        "name": "consumerSecret",
+        "source": "config",
+        "capability": "mcp",
+        "hosts": [
+          {
+            "fromConfig": "siteUrl"
+          }
+        ]
+      },
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "mcp",
+        "hosts": [
+          {
+            "fromConfig": "siteUrl"
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "build": "npm run build:ui && tsc",

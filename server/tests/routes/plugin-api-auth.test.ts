@@ -1,4 +1,13 @@
-import { describe, it, expect, jest, beforeEach, beforeAll, afterAll } from "@jest/globals";
+import {
+  describe,
+  it,
+  expect,
+  jest,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  afterAll,
+} from "@jest/globals";
 import * as jwt from "jsonwebtoken";
 import express from "express";
 import type { Server } from "http";
@@ -64,8 +73,10 @@ jest.mock("@server/services/mcp-registry.service", () => ({
   mcpRegistryService: { registerTools: mockRegisterTools },
 }));
 jest.mock("@server/services/product-sync.service", () => ({ productSyncService: {} }));
+import { createFakeRedisClient } from "../helpers/fake-redis";
+const mockRedisClient = createFakeRedisClient();
 jest.mock("@server/services/redis.service", () => ({
-  redisService: { publish: jest.fn(), isConnected: () => true, getClient: () => null },
+  redisService: { publish: jest.fn(), isConnected: () => true, getClient: () => mockRedisClient },
 }));
 jest.mock("@server/services/storage.service", () => ({ storageService: { upload: jest.fn() } }));
 jest.mock("@server/services/transcription.service", () => ({ transcriptionService: {} }));
@@ -77,10 +88,17 @@ jest.mock("@server/services/email-domains.service", () => ({
   addressDomain: (address: string) => address.split("@").pop(),
 }));
 
+import { mintPluginApiToken, revokePluginApiToken } from "@server/lib/plugin-api-token";
+import { getDatabaseContext } from "@server/database/organization-context";
+import { PluginAPIService } from "@server/services/plugin-api/plugin-api.service";
+import { deriveServiceKey } from "@server/lib/auth/utils/service-keys";
+jest.mock("@server/services/plugin-credential.service", () => ({ issueCredential: jest.fn() }));
+
 import { pluginApiTrpcRouter } from "@server/routes/v1/plugin-api/trpc";
 import pluginApiRestRouter from "@server/routes/v1/plugin-api";
 import type { PluginAuthContext } from "@server/trpc/middleware/plugin-auth";
 
+const signingKey = deriveServiceKey("hay:plugin-api-token:v1");
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const PLUGIN_ID = "hay-mcp-test";
 const ACTIVE_ORG = { isActive: true, suspendedAt: null };
@@ -91,8 +109,7 @@ const claims = (capabilities: string[]) => ({
   pluginId: PLUGIN_ID,
   capabilities,
 });
-const pluginToken = (capabilities = ["mcp"]) =>
-  jwt.sign(claims(capabilities), JWT_SECRET, { issuer: "hay-plugin-api", audience: "plugin" });
+const pluginToken = (capabilities = ["mcp"]) => mintPluginApiToken(ORG_ID, PLUGIN_ID, capabilities);
 
 const callerWith = (token: string) =>
   pluginApiTrpcRouter.createCaller({
@@ -128,7 +145,7 @@ describe("plugin API tRPC authentication", () => {
   });
 
   it("rejects a token with another scope", async () => {
-    const token = jwt.sign({ ...claims(["mcp"]), scope: "access" }, JWT_SECRET, {
+    const token = jwt.sign({ ...claims(["mcp"]), scope: "access" }, signingKey, {
       issuer: "hay-plugin-api",
       audience: "plugin",
     });
@@ -143,6 +160,32 @@ describe("plugin API tRPC authentication", () => {
     mockFindOrg.mockResolvedValue(org);
     await expect(register(pluginToken())).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(mockUpdateConfig).not.toHaveBeenCalled();
+  });
+});
+
+describe("plugin API tRPC database context", () => {
+  const register = (token: string) =>
+    callerWith(token)["mcp.registerLocal"]({ serverPath: "mcp", tools: [tool] });
+
+  it("runs the procedure in the token's organization", async () => {
+    let seen: unknown;
+    mockUpdateConfig.mockImplementation(async () => {
+      seen = getDatabaseContext();
+    });
+    await register(pluginToken());
+    expect(seen).toEqual({ kind: "organization", organizationId: ORG_ID });
+    expect(getDatabaseContext()).toBeUndefined();
+  });
+
+  it("runs nothing under the organization when it is not open to plugins", async () => {
+    mockFindOrg.mockResolvedValue({ isActive: true, suspendedAt: new Date() });
+    const seen: unknown[] = [];
+    mockFindByOrgAndPlugin.mockImplementation(async () => {
+      seen.push(getDatabaseContext());
+      return { id: "instance-1", config: {} };
+    });
+    await expect(register(pluginToken())).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(seen).toEqual([]);
   });
 });
 
@@ -236,16 +279,64 @@ describe("plugin API REST authentication", () => {
   });
 
   it("rejects a token with another scope", async () => {
-    const token = jwt.sign({ ...claims(["mcp"]), scope: "access" }, JWT_SECRET, {
+    const token = jwt.sign({ ...claims(["mcp"]), scope: "access" }, signingKey, {
       issuer: "hay-plugin-api",
       audience: "plugin",
     });
     expect((await health(token)).status).toBe(401);
   });
 
+  it("rejects a token once its worker has stopped", async () => {
+    const token = pluginToken();
+    expect((await health(token)).status).toBe(200);
+    await revokePluginApiToken(token);
+    expect((await health(token)).status).toBe(401);
+  });
+
+  const sendEmail = (token: string) =>
+    fetch(`${baseUrl}/send-email`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ subject: "Hello", body: "Hi" }),
+    });
+
+  it("refuses send-email to a token without the email capability", async () => {
+    const response = await sendEmail(pluginToken(["messages", "mcp", "customers"]));
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ success: false });
+  });
+
+  it("lets a token with the email capability past the capability check", async () => {
+    const response = await sendEmail(pluginToken(["email"]));
+    expect(response.status).not.toBe(403);
+  });
+
   it("rejects a suspended organization", async () => {
     mockFindOrg.mockResolvedValue({ isActive: true, suspendedAt: new Date() });
     expect((await health(pluginToken())).status).toBe(403);
+  });
+
+  describe("database context", () => {
+    const seen: unknown[] = [];
+    beforeEach(() => {
+      seen.length = 0;
+      jest.spyOn(PluginAPIService.prototype, "sendEmail").mockImplementation(async () => {
+        seen.push(getDatabaseContext());
+        return { success: true } as never;
+      });
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it("runs the route handler in the token's organization", async () => {
+      expect((await sendEmail(pluginToken(["email"]))).status).toBe(200);
+      expect(seen).toEqual([{ kind: "organization", organizationId: ORG_ID }]);
+    });
+
+    it("runs nothing under the organization when it is not open to plugins", async () => {
+      mockFindOrg.mockResolvedValue({ isActive: true, suspendedAt: new Date() });
+      expect((await sendEmail(pluginToken(["email"]))).status).toBe(403);
+      expect(seen).toEqual([]);
+    });
   });
 
   it("no longer exposes MCP registration over REST", async () => {

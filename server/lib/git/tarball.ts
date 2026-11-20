@@ -5,7 +5,8 @@ import fs from "fs/promises";
 import os from "os";
 import path from "path";
 import { createLogger } from "@server/lib/logger";
-import { parsePluginPackageJson, type UploadedPluginManifest } from "@server/lib/plugin-archive";
+import { describePackedPlugin, type UploadedPluginManifest } from "@server/lib/plugin-archive";
+import { copyPackedFiles, verifyPackedTree } from "@server/lib/plugin-pack";
 
 const logger = createLogger("tarball");
 
@@ -53,7 +54,7 @@ function byteLimit(maxBytes: number): Transform {
 }
 
 /**
- * Extract a tar.gz buffer to a directory.
+ * Extract a tar.gz buffer to a directory, as it is.
  *
  * GitHub tarballs contain a single top-level directory (e.g., "owner-repo-sha/").
  * This extracts the contents of that directory directly into `destDir`,
@@ -63,7 +64,7 @@ function byteLimit(maxBytes: number): Transform {
  * accepted, within entry-count and unpacked-size caps; anything else fails
  * the extraction and removes `destDir`.
  */
-export async function extractTarball(buffer: Buffer, destDir: string): Promise<void> {
+async function extractRawTarball(buffer: Buffer, destDir: string): Promise<void> {
   // Dynamic import — tar is available as a transitive dependency
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const tar = require("tar") as TarModule;
@@ -113,9 +114,27 @@ export async function extractTarball(buffer: Buffer, destDir: string): Promise<v
 }
 
 /**
- * Validate a tar.gz buffer contains a valid Hay plugin.
- * Extracts to a fresh temp dir, checks for package.json with hay-plugin field,
- * then cleans up.
+ * Install the plugin pack held by a tar.gz buffer into `destDir`, which must
+ * not exist yet. The repository must contain a `hay-pack.json` (see
+ * `hay plugin pack`); only the files it lists are copied, each checked against
+ * its checksum, and `destDir` is removed again on any failure.
+ */
+export async function extractTarball(buffer: Buffer, destDir: string): Promise<void> {
+  const staging = await fs.mkdtemp(path.join(os.tmpdir(), "hay-plugin-extract-"));
+  try {
+    await extractRawTarball(buffer, path.join(staging, "repo"));
+    await copyPackedFiles(path.join(staging, "repo"), destDir);
+  } catch (error) {
+    await fs.rm(destDir, { recursive: true, force: true }).catch(() => {});
+    throw error;
+  } finally {
+    await fs.rm(staging, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/**
+ * Validate a tar.gz buffer contains a valid, packed Hay plugin: it extracts to
+ * a fresh temp dir, its manifest and pack are checked, and the dir is removed.
  *
  * Returns the parsed manifest and pluginId.
  */
@@ -126,11 +145,12 @@ export async function validateTarball(buffer: Buffer): Promise<{
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "hay-plugin-validate-"));
 
   try {
-    await extractTarball(buffer, tmpDir);
-    const packageContent = await fs.readFile(path.join(tmpDir, "package.json"), "utf-8");
-    return parsePluginPackageJson(packageContent);
+    const dest = path.join(tmpDir, "plugin");
+    await extractTarball(buffer, dest);
+    const pack = await verifyPackedTree(dest);
+    const packageContent = await fs.readFile(path.join(dest, "package.json"), "utf-8");
+    return describePackedPlugin(packageContent, pack);
   } finally {
-    // Clean up temp dir
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
 }

@@ -12,7 +12,8 @@
     "category": "integration",
     "marketplaceCategory": "commerce",
     "capabilities": [
-      "mcp"
+      "mcp",
+      "credentials"
     ],
     "setup": {
       "businessTypes": [
@@ -32,7 +33,29 @@
           "fromConfig": "baseUrl"
         }
       ]
-    }
+    },
+    "credentials": [
+      {
+        "name": "apiToken",
+        "source": "config",
+        "capability": "mcp",
+        "hosts": [
+          {
+            "fromConfig": "baseUrl"
+          }
+        ]
+      },
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "mcp",
+        "hosts": [
+          {
+            "fromConfig": "baseUrl"
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "build": "tsc",

@@ -22,7 +22,7 @@
     },
     "capabilities": [
       "messages",
-      "customers"
+      "credentials"
     ],
     "env": [
       "META_APP_ID",
@@ -41,6 +41,16 @@
       "www.instagram.com",
       "api.instagram.com",
       "graph.instagram.com"
+    ],
+    "credentials": [
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "messages",
+        "hosts": [
+          "graph.instagram.com"
+        ]
+      }
     ]
   },
   "scripts": {

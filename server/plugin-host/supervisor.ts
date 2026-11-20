@@ -12,11 +12,15 @@ import path from "path";
 import { randomBytes, randomInt } from "crypto";
 import type { ChildProcess } from "child_process";
 import { log } from "./log";
+import { socketConfirmedGone } from "./socket-probe";
 import { removeWorkerDir, type Launcher, type LaunchSpec } from "./launcher";
 import {
+  CORE_SOCKET_PATTERN,
   WORKER_ID_PATTERN,
   TIER_NAMES,
+  type EgressDecisions,
   type HostStatus,
+  type ReapResponse,
   type StartWorkerRequest,
   type StartWorkerResponse,
   type WorkerEvent,
@@ -45,6 +49,8 @@ export interface SupervisorOptions {
   controlSocket: string;
   /** Group core runs in; owns the control socket when the supervisor runs as root. */
   coreGid: number;
+  /** Delay between the two probes that must both fail before a worker's core counts as gone. */
+  probeRecheckMs?: number;
 }
 
 /** What the supervisor needs from the egress proxy. */
@@ -56,7 +62,8 @@ export interface EgressRegistrar {
     worker: { pluginId: string; orgId: string; allow: string[] },
   ): Promise<void>;
   revoke(token: string): Promise<void>;
-  isReachable(): Promise<boolean>;
+  /** The proxy's decision counts, or null when it cannot be reached. */
+  decisions(): Promise<EgressDecisions | null>;
 }
 
 interface RunningWorker {
@@ -108,15 +115,39 @@ export class Supervisor {
   }
 
   async status(): Promise<HostStatus> {
+    const egressDecisions = (await this.options.egress?.decisions()) ?? null;
     return {
       tier: this.options.launcher.tier,
       tierName: TIER_NAMES[this.options.launcher.tier],
       reason: this.options.tierReason,
       mode: this.options.mode,
-      egress:
-        this.options.egress && (await this.options.egress.isReachable()) ? "ready" : "unavailable",
+      egress: egressDecisions ? "ready" : "unavailable",
+      egressDecisions,
       workers: this.workers.size,
     };
+  }
+
+  /**
+   * Stop the workers whose core is gone: a worker's token is known only to the
+   * core process that started it, so once that core's plugin API socket is gone
+   * (refused or missing) nothing can use the worker. Workers of a core that is still up
+   * (a deploy swap starts the new core before the old one stops) are left alone.
+   * The stopped workers' API tokens go back to the caller, which revokes them
+   * because the core that would have done so is gone.
+   */
+  async reap(): Promise<ReapResponse> {
+    const orphans: RunningWorker[] = [];
+    await Promise.all(
+      [...this.workers.values()].map(async (worker) => {
+        // Only a socket that is gone on two probes a few seconds apart counts; a core
+        // under load can be slow to accept without being gone.
+        if (await socketConfirmedGone(worker.spec.apiSocket, this.options.probeRecheckMs))
+          orphans.push(worker);
+      }),
+    );
+    const apiTokens = orphans.flatMap((worker) => worker.spec.env.HAY_API_TOKEN ?? []);
+    await Promise.all(orphans.map((worker) => this.stopWorker(worker.id)));
+    return { stopped: orphans.length, apiTokens };
   }
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -130,6 +161,9 @@ export class Supervisor {
       const body = (await readJson(req)) as StartWorkerRequest;
       const result = await this.startWorker(body);
       return sendJson(res, result.status, result.body);
+    }
+    if (req.method === "POST" && url.pathname === "/reap") {
+      return sendJson(res, 200, await this.reap());
     }
     if (parts[0] === "workers" && parts.length >= 2 && WORKER_ID_PATTERN.test(parts[1])) {
       const id = parts[1];
@@ -173,10 +207,10 @@ export class Supervisor {
     const workerDir = path.join(this.options.workersDir, request.id);
     const bridgePorts = [this.allocateBridgePort(), this.allocateBridgePort()];
     let egressToken: string | null = null;
+    let spec: LaunchSpec | undefined;
     try {
-      const prepared = await this.prepare(request, workerDir, bridgePorts);
-      const spec = prepared.spec;
-      egressToken = prepared.egressToken;
+      spec = this.buildSpec(request, workerDir, bridgePorts);
+      egressToken = await this.prepare(request, spec, bridgePorts);
       if (egressToken) {
         await this.options.egress!.register(egressToken, {
           pluginId: request.pluginId,
@@ -205,6 +239,14 @@ export class Supervisor {
     } catch (error) {
       this.releasePorts(bridgePorts);
       if (egressToken) await this.options.egress?.revoke(egressToken).catch(() => undefined);
+      // Releases the worker's user id (tier 2) and anything it left in its directory.
+      if (spec) {
+        try {
+          await launcher.cleanup(spec);
+        } catch (cleanupError) {
+          log.warn("Worker cleanup failed", { id: request.id, err: String(cleanupError) });
+        }
+      }
       removeWorkerDir(workerDir);
       log.error("Failed to start worker", { id: request.id, err: String(error) });
       return { status: 500, body: { error: `Failed to start worker: ${String(error)}` } };
@@ -218,6 +260,13 @@ export class Supervisor {
     if (typeof request.pluginPath !== "string" || typeof request.orgId !== "string") {
       return { status: 400, error: "Invalid request" };
     }
+    if (
+      typeof request.apiSocket !== "string" ||
+      path.dirname(request.apiSocket) !== path.dirname(this.options.apiSocket) ||
+      !CORE_SOCKET_PATTERN.test(path.basename(request.apiSocket))
+    ) {
+      return { status: 400, error: "Invalid plugin API socket" };
+    }
     let real: string;
     try {
       real = realpathSync(request.pluginPath);
@@ -230,31 +279,40 @@ export class Supervisor {
     return null;
   }
 
-  /** Create the worker directory and the complete environment its process will get. */
-  private async prepare(
+  private buildSpec(
     request: StartWorkerRequest,
     workerDir: string,
     bridgePorts: number[],
-  ): Promise<{ spec: LaunchSpec; egressToken: string | null }> {
-    const { launcher, rootDir, apiSocket, egress } = this.options;
-    const runnerPath = path.join(rootDir, "packages/plugin-sdk/dist/runner/index.js");
-    const spec: LaunchSpec = {
+  ): LaunchSpec {
+    const { rootDir, egress } = this.options;
+    const pluginPath = realpathSync(request.pluginPath);
+    return {
       id: request.id,
       workerDir,
       workerSocket: path.join(workerDir, "worker.sock"),
-      pluginPath: realpathSync(request.pluginPath),
+      pluginPath,
       rootDir,
-      runnerPath,
+      runnerPath: path.join(rootDir, "packages/plugin-sdk/dist/runner/index.js"),
       args: [
-        `--plugin-path=${realpathSync(request.pluginPath)}`,
+        `--plugin-path=${pluginPath}`,
         `--org-id=${request.orgId}`,
         `--port=${bridgePorts[0]}`,
         "--mode=production",
       ],
       env: {},
-      apiSocket,
+      apiSocket: request.apiSocket,
       egressSocket: egress?.socketPath ?? null,
     };
+  }
+
+  /** Create the worker directory and the complete environment its process will get. Returns the egress token, if any. */
+  private async prepare(
+    request: StartWorkerRequest,
+    spec: LaunchSpec,
+    bridgePorts: number[],
+  ): Promise<string | null> {
+    const { launcher } = this.options;
+    const workerDir = spec.workerDir;
     await launcher.prepareDir(spec);
     const sockets = launcher.sockets(spec);
 
@@ -285,7 +343,7 @@ export class Supervisor {
       });
     }
     spec.env = env;
-    return { spec, egressToken };
+    return egressToken;
   }
 
   private watch(worker: RunningWorker): void {

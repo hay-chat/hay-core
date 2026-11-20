@@ -23,6 +23,7 @@ import type { UserInput } from "@server/lib/scim/patch";
 import { createLogger } from "@server/lib/logger";
 import { auditLogService } from "@server/services/audit-log.service";
 import { websocketService } from "@server/services/websocket.service";
+import { runAsSystem, runInOrganization } from "@server/database/organization-context";
 
 const logger = createLogger("scim");
 
@@ -195,19 +196,22 @@ export class ScimService {
   async authenticate(token: string): Promise<{ organizationId: string; tokenId: string } | null> {
     if (!token.startsWith(TOKEN_PREFIX) || token.length > 200) return null;
     try {
-      const row = await AppDataSource.getRepository(ScimToken).findOne({
-        where: { tokenHash: sha256(token) },
-        relations: { organization: true },
-      });
+      const tokenHash = sha256(token);
+      // The token is what reveals the organization, so only this lookup runs without one.
+      const row = await runAsSystem("scim token lookup by token hash", () =>
+        AppDataSource.getRepository(ScimToken).findOne({
+          where: { tokenHash },
+          relations: { organization: true },
+        }),
+      );
       if (!row) return null;
       // The same rule as API tokens: a deactivated or suspended organization is out of reach.
       if (!row.organization?.isActive || row.organization.suspendedAt) return null;
       const stale =
         !row.lastUsedAt || Date.now() - row.lastUsedAt.getTime() > LAST_USED_RESOLUTION_MS;
       if (stale) {
-        await AppDataSource.getRepository(ScimToken).update(
-          { id: row.id },
-          { lastUsedAt: new Date() },
+        await runInOrganization(row.organizationId, () =>
+          AppDataSource.getRepository(ScimToken).update({ id: row.id }, { lastUsedAt: new Date() }),
         );
       }
       return { organizationId: row.organizationId, tokenId: row.id };

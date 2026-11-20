@@ -24,6 +24,12 @@ export interface StartWorkerRequest {
   custom: boolean;
   /** Environment for the worker. The supervisor adds the sockets, proxy and API URL. */
   env: Record<string, string>;
+  /**
+   * The plugin API socket of the core process that starts this worker (a
+   * `core-<id>.sock` in the plugin API directory). The worker's token is known to
+   * that core only, and the host stops the worker once that socket is dead.
+   */
+  apiSocket: string;
   /** Destinations the worker may reach through the egress proxy (see egress-policy.ts). */
   egressAllow: string[];
 }
@@ -34,6 +40,18 @@ export interface StartWorkerResponse {
   pid: number | null;
 }
 
+export interface ReapResponse {
+  stopped: number;
+  /** API tokens of the stopped workers, for the caller to revoke. */
+  apiTokens: string[];
+}
+
+/** What the egress proxy has decided since it started. */
+export interface EgressDecisions {
+  allowed: number;
+  denied: number;
+}
+
 export interface HostStatus {
   tier: IsolationTier;
   tierName: string;
@@ -41,11 +59,16 @@ export interface HostStatus {
   reason: string | null;
   mode: "strict" | "degraded";
   egress: "ready" | "unavailable";
+  /** Null when the proxy is not configured or cannot be reached. */
+  egressDecisions: EgressDecisions | null;
   workers: number;
 }
 
 export type WorkerEvent =
   | { type: "log"; stream: "stdout" | "stderr"; line: string }
   | { type: "exit"; code: number | null; signal: string | null };
+
+/** Name of a core process's plugin API socket. */
+export const CORE_SOCKET_PATTERN = /^core-[0-9a-f]{12}\.sock$/;
 
 export const WORKER_ID_PATTERN = /^[a-z0-9]{1,24}$/;

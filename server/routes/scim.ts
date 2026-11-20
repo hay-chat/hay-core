@@ -11,6 +11,7 @@ import {
 } from "@server/lib/scim/patch";
 import { auditLogService } from "@server/services/audit-log.service";
 import { rateLimitService } from "@server/services/rate-limit.service";
+import { runInOrganization } from "@server/database/organization-context";
 import {
   SCIM_GROUP_SCHEMA,
   SCIM_MAX_PAGE,
@@ -52,7 +53,12 @@ type Handler = (req: Request, res: Response) => Promise<void>;
 /** Hands a rejected handler promise to the error middleware below, in the SCIM shape. */
 function handle(handler: Handler) {
   return (req: Request, res: Response, next: NextFunction) => {
-    handler(req, res).catch(next);
+    // Once a token is accepted the actor's organization is known; its work runs in it.
+    const actor = res.locals.scim as ScimActor | undefined;
+    const run = actor
+      ? runInOrganization(actor.organizationId, () => handler(req, res))
+      : handler(req, res);
+    run.catch(next);
   };
 }
 

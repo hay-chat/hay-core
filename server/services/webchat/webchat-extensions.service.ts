@@ -415,7 +415,6 @@ export class WebchatExtensionsService {
       );
       const config = resolveConfigForWorker(
         instance.config,
-        instance.authState,
         configSchemaOf(instance),
         configEnvAllowList(instance.plugin),
       );

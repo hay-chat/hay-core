@@ -22,6 +22,11 @@ jest.mock("@server/database/data-source", () => ({
 }));
 
 import { SchedulerService } from "@server/services/scheduler.service";
+import {
+  getDatabaseContext,
+  runAsSystem,
+  runInOrganization,
+} from "@server/database/organization-context";
 
 function lockResponse(locked: boolean) {
   return (sql: string) =>
@@ -118,5 +123,63 @@ describe("SchedulerService cluster lock", () => {
 
     expect(handler).toHaveBeenCalledTimes(1);
     expect(query).not.toHaveBeenCalled();
+  });
+
+  it("runs the handler in a system context named after the job, with the lock still taken", async () => {
+    query.mockImplementation(lockResponse(true));
+    let seen: ReturnType<typeof getDatabaseContext>;
+    let nested: ReturnType<typeof getDatabaseContext>;
+    register("context-job", async () => {
+      seen = getDatabaseContext();
+      runInOrganization("11111111-1111-4111-8111-111111111111", () => {
+        nested = getDatabaseContext();
+      });
+    });
+
+    await scheduler.runJob("context-job");
+
+    expect(seen).toEqual({ kind: "system", reason: "scheduled job: context-job" });
+    expect(nested).toEqual({
+      kind: "organization",
+      organizationId: "11111111-1111-4111-8111-111111111111",
+    });
+    expect(getDatabaseContext()).toBeUndefined();
+    const sql = query.mock.calls.map(([statement]) => statement);
+    expect(sql[0]).toContain("pg_try_advisory_lock");
+    expect(sql[1]).toContain("pg_advisory_unlock");
+  });
+
+  it("uses one context on the shared lock connection whatever context triggers the run", async () => {
+    const contexts: Array<ReturnType<typeof getDatabaseContext>> = [];
+    query.mockImplementation((sql) => {
+      contexts.push(getDatabaseContext());
+      return lockResponse(true)(sql);
+    });
+    register("any-context-job", async () => undefined);
+
+    await scheduler.runJob("any-context-job");
+    await runInOrganization("11111111-1111-4111-8111-111111111111", () =>
+      scheduler.runJob("any-context-job"),
+    );
+    await runAsSystem("another reason", () => scheduler.runJob("any-context-job"));
+
+    expect(contexts).toHaveLength(6);
+    for (const context of contexts) {
+      expect(context).toEqual({ kind: "system", reason: "scheduler bookkeeping" });
+    }
+  });
+
+  it("still reports a throwing handler as failed and releases the lock", async () => {
+    query.mockImplementation(lockResponse(true));
+    register("throwing-job", async () => {
+      throw new Error("boom");
+    });
+
+    await scheduler.runJob("throwing-job");
+
+    const status = scheduler.getJobStatus("throwing-job");
+    expect(status?.lastStatus).toBe("failed");
+    expect(status?.lastError).toBe("boom");
+    expect(query.mock.calls.map(([statement]) => statement)[1]).toContain("pg_advisory_unlock");
   });
 });

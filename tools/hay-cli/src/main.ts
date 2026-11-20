@@ -26,6 +26,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { configDir, loadConfig, resolveTargetName } from "./config";
 import { demoImages, demoSeed } from "./demo";
+import { pluginPack } from "./plugin-pack";
 
 /** Gitignored test-account credentials (HAY_EMAIL, HAY_PASSWORD, HAY_TARGET); see .env.example. */
 const ENV_FILE = join(__dirname, "..", ".env");
@@ -45,6 +46,9 @@ Usage: hay <command> [options]   (global: --target prod|local, --org <id>, --jso
   conv show <id> [--limit 200] [--logs]
   logs [<conversationId>] [--since 15m] [--log-limit 300]
   plugins list [--all] | tools [<plugin>] | test <plugin> | call (not available)
+  plugin pack [dir] [--out <file.zip>]
+                                  bundle a built plugin with its dependencies into the archive
+                                  Hay installs (hay-pack.json lists every file with its sha256)
   demo seed [all|hay|shopify|woocommerce|nuvemshop]
                                   load the Casa Aurora demo (tools/demo-account) into the stores
                                   and Hay.chat; store keys in tools/demo-account/.env
@@ -66,6 +70,7 @@ const COMMANDS: Record<string, Handler | Record<string, Handler>> = {
   logs,
   chat: { send: chatSend },
   conv: { list: convList, show: convShow },
+  plugin: { pack: pluginPack },
   plugins: { list: pluginsList, tools: pluginsTools, test: pluginsTest, call: pluginsCall },
   demo: { seed: demoSeed, images: demoImages },
 };

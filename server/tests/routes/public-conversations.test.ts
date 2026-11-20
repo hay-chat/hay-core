@@ -162,6 +162,7 @@ import {
   publicMetadata,
   withVisitorContext,
 } from "@server/routes/v1/public-conversations";
+import { getDatabaseContext } from "@server/database/organization-context";
 import { MessageType } from "@server/database/entities/message.entity";
 import { conversationRepository } from "@server/repositories/conversation.repository";
 
@@ -227,6 +228,38 @@ describe("publicConversations.create allowed domains", () => {
     await expect(
       callerFor({ origin: "https://app.hay.chat" }).create(createInput),
     ).resolves.toMatchObject({ id: "conv-1" });
+  });
+
+  it("creates the conversation in the validated organization's database context", async () => {
+    const seen: unknown[] = [];
+    mockCreateConversation.mockImplementationOnce(async () => {
+      seen.push(getDatabaseContext());
+      return { id: "conv-1", created_at: new Date(), addMessage: jest.fn(async () => undefined) };
+    });
+    mockRunGates.mockImplementationOnce(async () => {
+      seen.push(getDatabaseContext());
+      return { decision: "allow", results: [] };
+    });
+    await callerFor({ origin: "https://shop.example.com" }).create(createInput);
+    const inOrg = { kind: "organization", organizationId: ORG_ID };
+    expect(seen).toEqual([inOrg, inOrg]);
+    expect(getDatabaseContext()).toBeUndefined();
+  });
+
+  it.each([
+    ["missing", null],
+    ["suspended", { id: ORG_ID, suspendedAt: new Date(), settings: {} }],
+  ])("runs nothing under a %s organization", async (_label, organization) => {
+    mockFindOrganization.mockResolvedValue(organization);
+    const seen: unknown[] = [];
+    mockIsEnabled.mockImplementation(async () => {
+      seen.push(getDatabaseContext());
+      return true;
+    });
+    await expect(
+      callerFor({ origin: "https://shop.example.com" }).create(createInput),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(seen).toEqual([]);
   });
 
   it("rejects unknown, suspended or webchat-disabled organizations", async () => {
@@ -506,6 +539,42 @@ describe("publicConversations.submitCsat guards", () => {
       code: "UNAUTHORIZED",
     });
     expect(conversationRepository.updateById).not.toHaveBeenCalled();
+  });
+
+  describe("database context", () => {
+    const ended = { id: csatInput.conversationId, organization_id: ORG_ID, status: "closed" };
+
+    it("looks the conversation up in a system context and stores the rating in its organization", async () => {
+      mockRateLimited.mockResolvedValue(false);
+      mockVerifyProof.mockResolvedValueOnce({ success: true, newNonce: "n" });
+      const seen: unknown[] = [];
+      mockConversation.mockImplementationOnce(() => {
+        seen.push(getDatabaseContext());
+        return ended;
+      });
+      jest.mocked(conversationRepository.updateById).mockImplementationOnce((async () => {
+        seen.push(getDatabaseContext());
+      }) as never);
+      await expect(callerFor().submitCsat(csatInput)).resolves.toMatchObject({ saved: true });
+      expect(seen).toEqual([
+        {
+          kind: "system",
+          reason:
+            "public conversation: find the organization of a conversation the caller holds the key for",
+        },
+        { kind: "organization", organizationId: ORG_ID },
+      ]);
+    });
+
+    it("runs nothing under any organization for an unknown conversation", async () => {
+      mockRateLimited.mockResolvedValue(false);
+      mockVerifyProof.mockResolvedValueOnce({ success: true, newNonce: "n" });
+      mockConversation.mockReturnValueOnce(null);
+      await expect(callerFor().submitCsat(csatInput)).rejects.toMatchObject({
+        code: "NOT_FOUND",
+      });
+      expect(conversationRepository.updateById).not.toHaveBeenCalled();
+    });
   });
 
   it.each([0, 6, 3.5])("rejects a rating of %p", async (rating) => {

@@ -1,4 +1,5 @@
 import { t, publicProcedure } from "@server/trpc";
+import { runAsSystem, runInOrganization } from "@server/database/organization-context";
 import {
   requestHostname,
   isDashboardHost,
@@ -254,168 +255,176 @@ export const publicConversationsRouter = t.router({
         throw tooManyRequests();
       }
 
+      // The organization comes from the client: it must exist before it
+      // becomes the context for the rest of the request.
       const organization = await organizationRepository.findById(organizationId);
-      if (
-        !organization ||
-        organization.suspendedAt ||
-        !(await webchatSettingsService.isEnabled(organizationId))
-      ) {
+      if (!organization || organization.suspendedAt) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Webchat is not available" });
       }
 
-      // Origin is set by the browser and cannot be changed by page scripts, so
-      // this stops an org ID from being copied onto another site. It does not
-      // stop non-browser clients, which can send any header.
-      const hostname = requestHostname(ctx.req.headers);
-      if (
-        !isDashboardHost(hostname) &&
-        !(await webchatSettingsService.isDomainAllowed(organizationId, hostname))
-      ) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "This website is not allowed to use this chat",
-        });
-      }
+      return await runInOrganization(organizationId, async () => {
+        if (!(await webchatSettingsService.isEnabled(organizationId))) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Webchat is not available" });
+        }
 
-      // Validate the JWK is for ES256
-      if (input.publicJwk.kty !== "EC" || input.publicJwk.crv !== "P-256") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Public key must be ECDSA P-256",
-        });
-      }
-
-      // Validate playground mode is allowed for this organization
-      if (input.isPlayground) {
-        if (!organization.settings?.isPlayground) {
+        // Origin is set by the browser and cannot be changed by page scripts, so
+        // this stops an org ID from being copied onto another site. It does not
+        // stop non-browser clients, which can send any header.
+        const hostname = requestHostname(ctx.req.headers);
+        if (
+          !isDashboardHost(hostname) &&
+          !(await webchatSettingsService.isDomainAllowed(organizationId, hostname))
+        ) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message: "Playground mode is not enabled for this organization",
+            message: "This website is not allowed to use this chat",
           });
         }
-      }
 
-      // Every address trying to create counts towards the under-attack trigger
-      // (D9-10), including the ones the gates then refuse.
-      const underAttack = await recordCreateAttempt(organizationId, clientIp(ctx.ipAddress));
+        // Validate the JWK is for ES256
+        if (input.publicJwk.kty !== "EC" || input.publicJwk.crv !== "P-256") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Public key must be ECDSA P-256",
+          });
+        }
 
-      // Plugin gates (e.g. a bot challenge) run before the conversation exists.
-      const gate = await webchatExtensionsService.runGates(organizationId, "conversation.create", {
-        token: input.challengeToken,
-        contributionError: input.challengeError,
-        pageHostname: hostname,
-        frameHostname: challengeFrameHostname(),
-        ip: clientIp(ctx.ipAddress),
-        underAttack,
-      });
-      if (gate.decision === "deny") throw verificationFailed();
+        // Validate playground mode is allowed for this organization
+        if (input.isPlayground) {
+          if (!organization.settings?.isPlayground) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Playground mode is not enabled for this organization",
+            });
+          }
+        }
 
-      // A signed customerExternalId links the store's customer. Unsigned or
-      // wrongly signed, the visitor is anonymous (a fresh customer).
-      const customerExternalId = await verifiedCustomerExternalId(
-        organizationId,
-        input.customerExternalId,
-        input.customerExternalIdSignature,
-      );
-      if (input.customerExternalId && !customerExternalId) {
-        logger.info({ organizationId }, "Ignored an unsigned or invalid customerExternalId");
-      }
-      const signedCustomer = customerExternalId
-        ? await customerRepository.findByExternalId(customerExternalId, organizationId)
-        : null;
+        // Every address trying to create counts towards the under-attack trigger
+        // (D9-10), including the ones the gates then refuse.
+        const underAttack = await recordCreateAttempt(organizationId, clientIp(ctx.ipAddress));
 
-      // The form is the organization's own; a client only sends the answers.
-      // Checked first so a bad response leaves nothing behind.
-      const preChatValidated = input.preChatForm
-        ? await validatePreChatResponse(organizationId, input.preChatForm.response)
-        : null;
-
-      // An email typed in a form is a claim, so it never links an existing
-      // customer: only the store's signature does. The claim gets its own
-      // record, and duplicates surface in the customer merge suggestions.
-      const preChatCustomerFields = preChatValidated
-        ? extractCustomerFields(
-            preChatValidated.schema,
-            preChatValidated.response as Record<string, string | number | boolean | null>,
-          )
-        : null;
-      const claimedCustomer =
-        !signedCustomer && preChatCustomerFields?.email
-          ? await customerRepository.create({
-              organization_id: organizationId,
-              email: preChatCustomerFields.email,
-              name: preChatCustomerFields.name ?? null,
-              phone: preChatCustomerFields.phone ?? null,
-            } as never)
-          : null;
-      const customer = signedCustomer ?? claimedCustomer;
-      const customerLinkSource = signedCustomer
-        ? CUSTOMER_LINK_SOURCE.signature
-        : claimedCustomer
-          ? CUSTOMER_LINK_SOURCE.preChatEmail
-          : null;
-
-      // Create the conversation with the public JWK
-      const conversation = await conversationService.createConversation(organizationId, {
-        status: "open",
-        customer_id: customer?.id ?? null,
-        language: input.language || null,
-        metadata: {
-          ...publicMetadata(input.metadata),
-          channel: "web",
-          createdAt: new Date().toISOString(),
-          ...(input.isPlayground ? { isPlayground: true } : {}),
-          ...(gate.results.length > 0 ? { botCheck: botCheckRecord(gate) } : {}),
-          ...(customerLinkSource ? { [CUSTOMER_LINK_SOURCE_KEY]: customerLinkSource } : {}),
-        },
-      });
-
-      // The initial visitor context: the page's context, then the pre-chat
-      // form answers (they win on conflict). Both come from the visitor, so
-      // both are bounded and shown to the AI as unverified.
-      const visitorContext = withVisitorContext(null, {
-        ...(input.context ?? {}),
-        ...(preChatValidated?.response ?? {}),
-      });
-
-      // Update the conversation with web-specific fields
-      await conversationRepository.updateById(conversation.id, {
-        channel: "web",
-        publicJwk: input.publicJwk,
-        lastMessageAt: new Date(),
-        ...(visitorContext ? { context: visitorContext } : {}),
-      });
-
-      // Persist a FORM message recording what was collected, so the transcript
-      // and the LLM history both surface the structured data clearly.
-      if (preChatValidated) {
-        const renderedContent = renderFormResponseAsText(
-          preChatValidated.schema,
-          preChatValidated.response as Record<string, string | number | boolean | null>,
+        // Plugin gates (e.g. a bot challenge) run before the conversation exists.
+        const gate = await webchatExtensionsService.runGates(
+          organizationId,
+          "conversation.create",
+          {
+            token: input.challengeToken,
+            contributionError: input.challengeError,
+            pageHostname: hostname,
+            frameHostname: challengeFrameHostname(),
+            ip: clientIp(ctx.ipAddress),
+            underAttack,
+          },
         );
-        await conversation.addMessage({
-          content: renderedContent,
-          type: MessageType.FORM,
+        if (gate.decision === "deny") throw verificationFailed();
+
+        // A signed customerExternalId links the store's customer. Unsigned or
+        // wrongly signed, the visitor is anonymous (a fresh customer).
+        const customerExternalId = await verifiedCustomerExternalId(
+          organizationId,
+          input.customerExternalId,
+          input.customerExternalIdSignature,
+        );
+        if (input.customerExternalId && !customerExternalId) {
+          logger.info({ organizationId }, "Ignored an unsigned or invalid customerExternalId");
+        }
+        const signedCustomer = customerExternalId
+          ? await customerRepository.findByExternalId(customerExternalId, organizationId)
+          : null;
+
+        // The form is the organization's own; a client only sends the answers.
+        // Checked first so a bad response leaves nothing behind.
+        const preChatValidated = input.preChatForm
+          ? await validatePreChatResponse(organizationId, input.preChatForm.response)
+          : null;
+
+        // An email typed in a form is a claim, so it never links an existing
+        // customer: only the store's signature does. The claim gets its own
+        // record, and duplicates surface in the customer merge suggestions.
+        const preChatCustomerFields = preChatValidated
+          ? extractCustomerFields(
+              preChatValidated.schema,
+              preChatValidated.response as Record<string, string | number | boolean | null>,
+            )
+          : null;
+        const claimedCustomer =
+          !signedCustomer && preChatCustomerFields?.email
+            ? await customerRepository.create({
+                organization_id: organizationId,
+                email: preChatCustomerFields.email,
+                name: preChatCustomerFields.name ?? null,
+                phone: preChatCustomerFields.phone ?? null,
+              } as never)
+            : null;
+        const customer = signedCustomer ?? claimedCustomer;
+        const customerLinkSource = signedCustomer
+          ? CUSTOMER_LINK_SOURCE.signature
+          : claimedCustomer
+            ? CUSTOMER_LINK_SOURCE.preChatEmail
+            : null;
+
+        // Create the conversation with the public JWK
+        const conversation = await conversationService.createConversation(organizationId, {
+          status: "open",
+          customer_id: customer?.id ?? null,
+          language: input.language || null,
           metadata: {
-            ui: {
-              kind: "form",
-              schema: preChatValidated.schema as unknown as Record<string, unknown>,
-              status: "SUBMITTED",
-              response: preChatValidated.response,
-              submittedAt: new Date().toISOString(),
-            },
+            ...publicMetadata(input.metadata),
+            channel: "web",
+            createdAt: new Date().toISOString(),
+            ...(input.isPlayground ? { isPlayground: true } : {}),
+            ...(gate.results.length > 0 ? { botCheck: botCheckRecord(gate) } : {}),
+            ...(customerLinkSource ? { [CUSTOMER_LINK_SOURCE_KEY]: customerLinkSource } : {}),
           },
         });
-      }
 
-      // Generate initial nonce for this conversation
-      const nonce = await dpopCacheService.generateNonce(conversation.id);
+        // The initial visitor context: the page's context, then the pre-chat
+        // form answers (they win on conflict). Both come from the visitor, so
+        // both are bounded and shown to the AI as unverified.
+        const visitorContext = withVisitorContext(null, {
+          ...(input.context ?? {}),
+          ...(preChatValidated?.response ?? {}),
+        });
 
-      return {
-        id: conversation.id,
-        nonce,
-        createdAt: conversation.created_at,
-      };
+        // Update the conversation with web-specific fields
+        await conversationRepository.updateById(conversation.id, {
+          channel: "web",
+          publicJwk: input.publicJwk,
+          lastMessageAt: new Date(),
+          ...(visitorContext ? { context: visitorContext } : {}),
+        });
+
+        // Persist a FORM message recording what was collected, so the transcript
+        // and the LLM history both surface the structured data clearly.
+        if (preChatValidated) {
+          const renderedContent = renderFormResponseAsText(
+            preChatValidated.schema,
+            preChatValidated.response as Record<string, string | number | boolean | null>,
+          );
+          await conversation.addMessage({
+            content: renderedContent,
+            type: MessageType.FORM,
+            metadata: {
+              ui: {
+                kind: "form",
+                schema: preChatValidated.schema as unknown as Record<string, unknown>,
+                status: "SUBMITTED",
+                response: preChatValidated.response,
+                submittedAt: new Date().toISOString(),
+              },
+            },
+          });
+        }
+
+        // Generate initial nonce for this conversation
+        const nonce = await dpopCacheService.generateNonce(conversation.id);
+
+        return {
+          id: conversation.id,
+          nonce,
+          createdAt: conversation.created_at,
+        };
+      });
     } catch (error) {
       if (error instanceof TRPCError) {
         throw error;
@@ -459,42 +468,54 @@ export const publicConversationsRouter = t.router({
         });
       }
 
-      // Get the conversation to check if it's being processed
-      const conversation = await conversationRepository.findById(input.conversationId);
+      return await inConversationOrganization(
+        input.conversationId,
+        async (conversation) => {
+          // Check if conversation is currently being processed (locked)
+          const isTyping =
+            conversation.processing_locked_until &&
+            new Date(conversation.processing_locked_until) > new Date() &&
+            conversation.needs_processing === true;
 
-      // Check if conversation is currently being processed (locked)
-      const isTyping = conversation
-        ? conversation.processing_locked_until &&
-          new Date(conversation.processing_locked_until) > new Date() &&
-          conversation.needs_processing === true
-        : false;
+          // The widget only ever sees customer-facing messages, playground or not.
+          const messages = await conversationRepository.getWidgetMessages(input.conversationId);
 
-      // The widget only ever sees customer-facing messages, playground or not.
-      const messages = await conversationRepository.getWidgetMessages(input.conversationId);
+          // Filter to only return customer-facing messages; files get signed links
+          const filteredMessages = await Promise.all(
+            messages.slice(input.offset, input.offset + input.limit).map(async (msg) =>
+              toPublicMessage(msg, {
+                attachments: await toPublicAttachments(
+                  msg.attachments,
+                  conversation.organization_id,
+                ),
+              }),
+            ),
+          );
 
-      // Filter to only return customer-facing messages; files get signed links
-      const organizationId = conversation?.organization_id;
-      const filteredMessages = await Promise.all(
-        messages.slice(input.offset, input.offset + input.limit).map(async (msg) =>
-          toPublicMessage(msg, {
-            attachments: organizationId
-              ? await toPublicAttachments(msg.attachments, organizationId)
-              : [],
-          }),
-        ),
+          return {
+            messages: filteredMessages,
+            nonce: verified.newNonce,
+            hasMore: filteredMessages.length === input.limit,
+            typing: isTyping,
+            status: conversation.status || "open",
+            isClosed: ["closed", "resolved", "unresolved"].includes(conversation.status ?? ""),
+            csatRating: conversation.csat_rating ?? null,
+            error: null,
+            errorMessage: null,
+          };
+        },
+        () => ({
+          messages: [],
+          nonce: verified.newNonce,
+          hasMore: false,
+          typing: false,
+          status: "open" as const,
+          isClosed: false,
+          csatRating: null,
+          error: null,
+          errorMessage: null,
+        }),
       );
-
-      return {
-        messages: filteredMessages,
-        nonce: verified.newNonce,
-        hasMore: filteredMessages.length === input.limit,
-        typing: isTyping,
-        status: conversation?.status || "open",
-        isClosed: ["closed", "resolved", "unresolved"].includes(conversation?.status ?? ""),
-        csatRating: conversation?.csat_rating ?? null,
-        error: null,
-        errorMessage: null,
-      };
     } catch (error) {
       if (error instanceof TRPCError) {
         throw error;
@@ -551,65 +572,59 @@ export const publicConversationsRouter = t.router({
         throw tooManyRequests();
       }
 
-      // Get the conversation instance to use the addMessage method
-      const conversation = await conversationRepository.findById(input.conversationId);
-      if (!conversation) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Conversation not found",
+      // The conversation instance carries the addMessage method.
+      return await inConversationOrganization(input.conversationId, async (conversation) => {
+        if (
+          await isPublicWidgetRateLimited([
+            { rule: "messagePerOrg", id: conversation.organization_id },
+            { rule: "messagePerOrgHourly", id: conversation.organization_id },
+          ])
+        ) {
+          throw tooManyRequests();
+        }
+
+        const gate = await webchatExtensionsService.runGates(
+          conversation.organization_id,
+          "message.send",
+          {
+            pageHostname: requestHostname(ctx.req.headers),
+            frameHostname: challengeFrameHostname(),
+            ip: clientIp(ctx.ipAddress),
+            underAttack: await isUnderAttack(conversation.organization_id),
+          },
+        );
+        if (gate.decision === "deny") throw verificationFailed();
+
+        // Before the message: adding it starts the AI's turn, which reads the page.
+        if (input.pageUrl && input.pageUrl !== conversation.metadata?.url) {
+          await conversationRepository.mergeMetadata(conversation.id, { url: input.pageUrl });
+        }
+
+        // Add the message using the entity method which handles cooldown
+        const message = await conversation.addMessage({
+          content: input.content,
+          type: MessageType.CUSTOMER,
+          metadata: {
+            direction: MessageDirection.IN,
+            timestamp: new Date().toISOString(),
+            ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
+          },
         });
-      }
 
-      if (
-        await isPublicWidgetRateLimited([
-          { rule: "messagePerOrg", id: conversation.organization_id },
-          { rule: "messagePerOrgHourly", id: conversation.organization_id },
-        ])
-      ) {
-        throw tooManyRequests();
-      }
+        // Merge incoming context into conversation context if provided
+        const context = withVisitorContext(conversation.context, input.context);
+        if (context) await conversationRepository.updateById(conversation.id, { context });
 
-      const gate = await webchatExtensionsService.runGates(
-        conversation.organization_id,
-        "message.send",
-        {
-          pageHostname: requestHostname(ctx.req.headers),
-          frameHostname: challengeFrameHostname(),
-          ip: clientIp(ctx.ipAddress),
-          underAttack: await isUnderAttack(conversation.organization_id),
-        },
-      );
-      if (gate.decision === "deny") throw verificationFailed();
+        await acknowledgeVisitorMessage(conversation, message);
 
-      // Before the message: adding it starts the AI's turn, which reads the page.
-      if (input.pageUrl && input.pageUrl !== conversation.metadata?.url) {
-        await conversationRepository.mergeMetadata(conversation.id, { url: input.pageUrl });
-      }
-
-      // Add the message using the entity method which handles cooldown
-      const message = await conversation.addMessage({
-        content: input.content,
-        type: MessageType.CUSTOMER,
-        metadata: {
-          direction: MessageDirection.IN,
-          timestamp: new Date().toISOString(),
-          ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
-        },
+        return {
+          messageId: message.id,
+          nonce: verified.newNonce,
+          createdAt: message.created_at,
+          error: null,
+          errorMessage: null,
+        };
       });
-
-      // Merge incoming context into conversation context if provided
-      const context = withVisitorContext(conversation.context, input.context);
-      if (context) await conversationRepository.updateById(conversation.id, { context });
-
-      await acknowledgeVisitorMessage(conversation, message);
-
-      return {
-        messageId: message.id,
-        nonce: verified.newNonce,
-        createdAt: message.created_at,
-        error: null,
-        errorMessage: null,
-      };
     } catch (error) {
       if (error instanceof TRPCError) {
         throw error;
@@ -667,78 +682,76 @@ export const publicConversationsRouter = t.router({
       throw tooManyRequests();
     }
 
-    const conversation = await conversationRepository.findById(input.conversationId);
-    if (!conversation) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
-    }
-    const organizationId = conversation.organization_id;
-    // Broadest last, so one conversation's flood only spends its own budget first.
-    if (
-      await isPublicWidgetRateLimited([{ rule: "attachmentPerOrg", id: organizationId }], {
-        failClosed: true,
-      })
-    ) {
-      throw tooManyRequests();
-    }
-
-    // Same gate as starting a chat: the organization must still offer webchat.
-    const organization = await organizationRepository.findById(organizationId);
-    if (
-      !organization ||
-      organization.suspendedAt ||
-      !(await webchatSettingsService.isEnabled(organizationId))
-    ) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Webchat is not available" });
-    }
-
-    const buffer = decodeBase64(input.data);
-    if (!buffer) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid file data" });
-    }
-
-    let attachment;
-    try {
-      attachment = await storeWidgetAttachment({
-        organizationId,
-        buffer,
-        mimeType: input.mimeType,
-        filename: input.filename,
-      });
-    } catch (error) {
-      if (error instanceof WidgetAttachmentRejectedError) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+    return await inConversationOrganization(input.conversationId, async (conversation) => {
+      const organizationId = conversation.organization_id;
+      // Broadest last, so one conversation's flood only spends its own budget first.
+      if (
+        await isPublicWidgetRateLimited([{ rule: "attachmentPerOrg", id: organizationId }], {
+          failClosed: true,
+        })
+      ) {
+        throw tooManyRequests();
       }
-      logger.error({ err: error }, "Error storing widget attachment");
-      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to send file" });
-    }
 
-    const caption = input.caption?.trim();
-    const message = await conversation.addMessage({
-      content: caption || describeCustomerAttachments([attachment]),
-      type: MessageType.CUSTOMER,
-      attachments: [attachment],
-      metadata: {
-        direction: MessageDirection.IN,
-        timestamp: new Date().toISOString(),
-        ...(caption ? {} : { mediaPlaceholder: true }),
-        ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
-      },
+      // Same gate as starting a chat: the organization must still offer webchat.
+      const organization = await organizationRepository.findById(organizationId);
+      if (
+        !organization ||
+        organization.suspendedAt ||
+        !(await webchatSettingsService.isEnabled(organizationId))
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Webchat is not available" });
+      }
+
+      const buffer = decodeBase64(input.data);
+      if (!buffer) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid file data" });
+      }
+
+      let attachment;
+      try {
+        attachment = await storeWidgetAttachment({
+          organizationId,
+          buffer,
+          mimeType: input.mimeType,
+          filename: input.filename,
+        });
+      } catch (error) {
+        if (error instanceof WidgetAttachmentRejectedError) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+        }
+        logger.error({ err: error }, "Error storing widget attachment");
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to send file" });
+      }
+
+      const caption = input.caption?.trim();
+      const message = await conversation.addMessage({
+        content: caption || describeCustomerAttachments([attachment]),
+        type: MessageType.CUSTOMER,
+        attachments: [attachment],
+        metadata: {
+          direction: MessageDirection.IN,
+          timestamp: new Date().toISOString(),
+          ...(caption ? {} : { mediaPlaceholder: true }),
+          ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
+        },
+      });
+
+      const context = withVisitorContext(conversation.context, input.context);
+      if (context) await conversationRepository.updateById(conversation.id, { context });
+
+      await acknowledgeVisitorMessage(conversation, message);
+
+      const [publicAttachment] = await toPublicAttachments([attachment], organizationId);
+      return {
+        messageId: message.id,
+        nonce: verified.newNonce,
+        createdAt: message.created_at,
+        attachment: publicAttachment ?? null,
+        error: null,
+        errorMessage: null,
+      };
     });
-
-    const context = withVisitorContext(conversation.context, input.context);
-    if (context) await conversationRepository.updateById(conversation.id, { context });
-
-    await acknowledgeVisitorMessage(conversation, message);
-
-    const [publicAttachment] = await toPublicAttachments([attachment], organizationId);
-    return {
-      messageId: message.id,
-      nonce: verified.newNonce,
-      createdAt: message.created_at,
-      attachment: publicAttachment ?? null,
-      error: null,
-      errorMessage: null,
-    };
   }),
 
   // D5-8: the shopper leaves an email at hand-off so the team's reply can reach
@@ -773,15 +786,12 @@ export const publicConversationsRouter = t.router({
         });
       }
 
-      const conversation = await conversationRepository.findById(input.conversationId);
-      if (!conversation) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
-      }
+      return await inConversationOrganization(input.conversationId, async (conversation) => {
+        const { saveHandoffEmail } = await import("@server/services/web-follow-up.service");
+        await saveHandoffEmail(conversation, input.email);
 
-      const { saveHandoffEmail } = await import("@server/services/web-follow-up.service");
-      await saveHandoffEmail(conversation, input.email);
-
-      return { saved: true, nonce: verified.newNonce, error: null };
+        return { saved: true, nonce: verified.newNonce, error: null };
+      });
     }),
 
   // The shopper rates the support once the conversation has ended (requires
@@ -791,7 +801,7 @@ export const publicConversationsRouter = t.router({
     if (await isPublicWidgetRateLimited([{ rule: "messagePerIp", id: clientIp(ctx.ipAddress) }])) {
       throw tooManyRequests();
     }
-    await recordWebchatConsent(input);
+    await runInOrganization(input.organizationId, () => recordWebchatConsent(input));
     return { recorded: true };
   }),
 
@@ -815,23 +825,21 @@ export const publicConversationsRouter = t.router({
       });
     }
 
-    const conversation = await conversationRepository.findById(input.conversationId);
-    if (!conversation) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
-    }
-    if (!["closed", "resolved", "unresolved"].includes(conversation.status)) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Conversation has not ended",
+    return await inConversationOrganization(input.conversationId, async (conversation) => {
+      if (!["closed", "resolved", "unresolved"].includes(conversation.status)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Conversation has not ended",
+        });
+      }
+
+      await conversationRepository.updateById(conversation.id, {
+        csat_rating: input.rating,
+        csat_rated_at: new Date(),
       });
-    }
 
-    await conversationRepository.updateById(conversation.id, {
-      csat_rating: input.rating,
-      csat_rated_at: new Date(),
+      return { saved: true, nonce: verified.newNonce, error: null };
     });
-
-    return { saved: true, nonce: verified.newNonce, error: null };
   }),
 
   // A shopper opened a recommended product or followed its buy link. No DPoP
@@ -982,18 +990,20 @@ export const publicConversationsRouter = t.router({
           });
         }
 
-        // Update the conversation with the new public key
-        await conversationRepository.updateById(input.conversationId, {
-          publicJwk: input.newPublicJwk,
+        return await inConversationOrganization(input.conversationId, async (conversation) => {
+          // Update the conversation with the new public key
+          await conversationRepository.updateById(conversation.id, {
+            publicJwk: input.newPublicJwk,
+          });
+
+          // Generate new nonce for the rotated key
+          const nonce = await dpopCacheService.generateNonce(conversation.id);
+
+          return {
+            success: true,
+            nonce,
+          };
         });
-
-        // Generate new nonce for the rotated key
-        const nonce = await dpopCacheService.generateNonce(input.conversationId);
-
-        return {
-          success: true,
-          nonce,
-        };
       } catch (error) {
         if (error instanceof TRPCError) {
           throw error;
@@ -1038,85 +1048,82 @@ export const publicConversationsRouter = t.router({
           });
         }
 
-        const conversation = await conversationRepository.findById(input.conversationId);
-        if (!conversation) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
-        }
+        return await inConversationOrganization(input.conversationId, async (conversation) => {
+          const { MessageRepository } = await import("../../../repositories/message.repository");
+          const messageRepository = new MessageRepository();
+          const message = await messageRepository.findById(input.messageId);
+          if (!message || message.conversation_id !== conversation.id) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Form message not found" });
+          }
+          if (message.type !== MessageType.FORM) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Message is not a form" });
+          }
+          const ui = message.metadata?.ui;
+          if (!ui || ui.kind !== "form" || !ui.schema) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Form message has no schema" });
+          }
+          if (ui.status === "SUBMITTED") {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Form already submitted" });
+          }
 
-        const { MessageRepository } = await import("../../../repositories/message.repository");
-        const messageRepository = new MessageRepository();
-        const message = await messageRepository.findById(input.messageId);
-        if (!message || message.conversation_id !== conversation.id) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Form message not found" });
-        }
-        if (message.type !== MessageType.FORM) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Message is not a form" });
-        }
-        const ui = message.metadata?.ui;
-        if (!ui || ui.kind !== "form" || !ui.schema) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Form message has no schema" });
-        }
-        if (ui.status === "SUBMITTED") {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Form already submitted" });
-        }
+          const schemaParsed = formSchemaSchema.safeParse(ui.schema);
+          if (!schemaParsed.success) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Stored form schema is invalid",
+            });
+          }
+          const schema = schemaParsed.data as FormSchema;
 
-        const schemaParsed = formSchemaSchema.safeParse(ui.schema);
-        if (!schemaParsed.success) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Stored form schema is invalid",
-          });
-        }
-        const schema = schemaParsed.data as FormSchema;
+          const validated = validateResponse(schema, input.response);
+          if (!validated.success) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `Invalid form response: ${JSON.stringify(validated.errors)}`,
+            });
+          }
 
-        const validated = validateResponse(schema, input.response);
-        if (!validated.success) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Invalid form response: ${JSON.stringify(validated.errors)}`,
-          });
-        }
+          // The answers come from the visitor, so they sit with the other
+          // visitor-supplied context and reach the AI as unverified.
+          const context = withVisitorContext(conversation.context, validated.data);
+          if (context) await conversationRepository.updateById(conversation.id, { context });
 
-        // The answers come from the visitor, so they sit with the other
-        // visitor-supplied context and reach the AI as unverified.
-        const context = withVisitorContext(conversation.context, validated.data);
-        if (context) await conversationRepository.updateById(conversation.id, { context });
+          await fillClaimedCustomer(conversation, schema, validated.data);
 
-        await fillClaimedCustomer(conversation, schema, validated.data);
-
-        // Mutate the FORM message in place.
-        const renderedContent = renderFormResponseAsText(
-          schema,
-          validated.data as Record<string, string | number | boolean | null>,
-        );
-        await messageRepository.update(message.id, {
-          content: renderedContent,
-          metadata: {
-            ...(message.metadata ?? {}),
-            ui: {
-              kind: "form",
-              schema: ui.schema,
-              status: "SUBMITTED",
-              response: validated.data,
-              submittedAt: new Date().toISOString(),
+          // Mutate the FORM message in place.
+          const renderedContent = renderFormResponseAsText(
+            schema,
+            validated.data as Record<string, string | number | boolean | null>,
+          );
+          await messageRepository.update(message.id, {
+            content: renderedContent,
+            metadata: {
+              ...(message.metadata ?? {}),
+              ui: {
+                kind: "form",
+                schema: ui.schema,
+                status: "SUBMITTED",
+                response: validated.data,
+                submittedAt: new Date().toISOString(),
+              },
             },
-          },
-        } as never);
+          } as never);
 
-        // Re-enqueue orchestrator so it resumes with the new context.
-        const { orchestratorQueueService } =
-          await import("../../../services/orchestrator-queue.service");
-        await orchestratorQueueService.enqueue(
-          conversation.id,
-          conversation.organization_id,
-          "form_submission",
-        );
+          // Re-enqueue orchestrator so it resumes with the new context.
+          const { orchestratorQueueService } =
+            await import("../../../services/orchestrator-queue.service");
+          await orchestratorQueueService.enqueue(
+            conversation.id,
+            conversation.organization_id,
+            "form_submission",
+          );
 
-        return {
-          messageId: message.id,
-          nonce: verified.newNonce,
-          submittedAt: new Date().toISOString(),
-        };
+          return {
+            messageId: message.id,
+            nonce: verified.newNonce,
+            submittedAt: new Date().toISOString(),
+          };
+        });
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         logger.error({ err: error }, "Error submitting form");
@@ -1177,6 +1184,27 @@ async function fillClaimedCustomer(
   if (Object.keys(updates).length > 0) {
     await customerRepository.update(customer.id, conversation.organization_id, updates as never);
   }
+}
+
+/**
+ * Load the conversation a caller has already proven they hold, then continue
+ * in that conversation's organization. Only the lookup runs in a system
+ * context, because the row is what reveals the organization. An unknown id
+ * runs `missing` (default: NOT_FOUND) and nothing else.
+ */
+async function inConversationOrganization<T>(
+  conversationId: string,
+  work: (conversation: Conversation) => Promise<T>,
+  missing: () => NoInfer<T> = () => {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+  },
+): Promise<T> {
+  const conversation = await runAsSystem(
+    "public conversation: find the organization of a conversation the caller holds the key for",
+    () => conversationRepository.findById(conversationId),
+  );
+  if (!conversation) return missing();
+  return runInOrganization(conversation.organization_id, () => work(conversation));
 }
 
 function clientIp(ipAddress: string | undefined): string {

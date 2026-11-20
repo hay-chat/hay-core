@@ -13,7 +13,8 @@
     "marketplaceCategory": "crm",
     "capabilities": [
       "mcp",
-      "auth"
+      "auth",
+      "credentials"
     ],
     "network": {
       "egress": [
@@ -28,7 +29,29 @@
         "service"
       ],
       "group": "crm"
-    }
+    },
+    "credentials": [
+      {
+        "name": "apiKey",
+        "source": "config",
+        "capability": "mcp",
+        "hosts": [
+          {
+            "fromConfig": "baseUrl"
+          }
+        ]
+      },
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "mcp",
+        "hosts": [
+          {
+            "fromConfig": "baseUrl"
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "build": "tsc",

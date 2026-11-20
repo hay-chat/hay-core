@@ -20,6 +20,7 @@
 import crypto from "crypto";
 import type { Request, Response } from "express";
 import { z } from "zod";
+import { runInOrganization } from "@server/database/organization-context";
 import { createLogger } from "@server/lib/logger";
 import { getClientIp } from "@server/lib/client-ip";
 import { isDashboardHost } from "@server/lib/webchat-origin";
@@ -156,6 +157,56 @@ function refuse(res: Response, status: number, reason: string): void {
   res.send(reason);
 }
 
+async function serveChallenge(
+  res: Response,
+  org: string,
+  c: string,
+  pageOrigin: URL,
+  lang: string | undefined,
+): Promise<void> {
+  if (!(await webchatSettingsService.isEnabled(org))) {
+    return refuse(res, 404, "Not available");
+  }
+
+  const hostname = pageOrigin.hostname.toLowerCase();
+  if (
+    !isDashboardHost(hostname) &&
+    !(await webchatSettingsService.isDomainAllowed(org, hostname))
+  ) {
+    return refuse(res, 403, "This website is not allowed to use this chat");
+  }
+
+  const challenge = (
+    await webchatExtensionsService.resolveChallenges(org, {
+      underAttack: await isUnderAttack(org),
+    })
+  ).find((candidate) => candidate.id === c);
+  const providerOrigin = challenge && PROVIDER_ORIGINS[challenge.props.provider];
+  if (!challenge || !providerOrigin) return refuse(res, 404, "Not available");
+
+  const nonce = crypto.randomBytes(16).toString("base64");
+  res.status(200);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader(
+    "Content-Security-Policy",
+    contentSecurityPolicy(nonce, providerOrigin, pageOrigin.origin),
+  );
+  res.send(
+    renderChallengePage({
+      nonce,
+      provider: challenge.props.provider,
+      siteKey: challenge.props.siteKey,
+      action: challenge.props.action,
+      appearance: challenge.props.mode === "challenge_all" ? "always" : "interaction-only",
+      parentOrigin: pageOrigin.origin,
+      language: lang ?? "auto",
+    }),
+  );
+}
+
 export async function webchatChallengeHandler(req: Request, res: Response): Promise<void> {
   try {
     const parsed = querySchema.safeParse(req.query);
@@ -173,51 +224,14 @@ export async function webchatChallengeHandler(req: Request, res: Response): Prom
       return refuse(res, 429, "Too many requests");
     }
 
-    const [isEnabled, organization] = await Promise.all([
-      webchatSettingsService.isEnabled(org),
-      organizationRepository.findById(org),
-    ]);
-    if (!isEnabled || !organization || organization.suspendedAt) {
+    // The organization comes from the query: it must exist before it becomes
+    // the context for the rest of the request.
+    const organization = await organizationRepository.findById(org);
+    if (!organization || organization.suspendedAt) {
       return refuse(res, 404, "Not available");
     }
 
-    const hostname = pageOrigin.hostname.toLowerCase();
-    if (
-      !isDashboardHost(hostname) &&
-      !(await webchatSettingsService.isDomainAllowed(org, hostname))
-    ) {
-      return refuse(res, 403, "This website is not allowed to use this chat");
-    }
-
-    const challenge = (
-      await webchatExtensionsService.resolveChallenges(org, {
-        underAttack: await isUnderAttack(org),
-      })
-    ).find((candidate) => candidate.id === c);
-    const providerOrigin = challenge && PROVIDER_ORIGINS[challenge.props.provider];
-    if (!challenge || !providerOrigin) return refuse(res, 404, "Not available");
-
-    const nonce = crypto.randomBytes(16).toString("base64");
-    res.status(200);
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.setHeader("Cache-Control", "no-store");
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Referrer-Policy", "no-referrer");
-    res.setHeader(
-      "Content-Security-Policy",
-      contentSecurityPolicy(nonce, providerOrigin, pageOrigin.origin),
-    );
-    res.send(
-      renderChallengePage({
-        nonce,
-        provider: challenge.props.provider,
-        siteKey: challenge.props.siteKey,
-        action: challenge.props.action,
-        appearance: challenge.props.mode === "challenge_all" ? "always" : "interaction-only",
-        parentOrigin: pageOrigin.origin,
-        language: lang ?? "auto",
-      }),
-    );
+    await runInOrganization(org, () => serveChallenge(res, org, c, pageOrigin, lang));
   } catch (error) {
     logger.error({ err: error }, "Failed to serve the webchat challenge page");
     refuse(res, 500, "Error");

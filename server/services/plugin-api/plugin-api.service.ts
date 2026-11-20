@@ -99,9 +99,9 @@ export class PluginAPIService {
    * @param token - JWT token string
    * @returns Decoded token payload or null if invalid
    */
-  validateToken(token: string): PluginAPITokenPayload | null {
+  async validateToken(token: string): Promise<PluginAPITokenPayload | null> {
     try {
-      return verifyPluginApiToken(token);
+      return await verifyPluginApiToken(token);
     } catch (error) {
       logger.warn(
         { error: error instanceof Error ? error.message : "Unknown error" },

@@ -16,7 +16,8 @@
     "trpcRouter": "./dist/router.cjs",
     "capabilities": [
       "mcp",
-      "auth"
+      "auth",
+      "credentials"
     ],
     "setup": {
       "businessTypes": [
@@ -80,7 +81,33 @@
         "required": false,
         "helpText": "Required when Auth method is 'API Token'. Works for both Confluence and Jira. Create one at id.atlassian.com/manage-profile/security/api-tokens"
       }
-    }
+    },
+    "credentials": [
+      {
+        "name": "apiToken",
+        "source": "config",
+        "capability": "mcp",
+        "hosts": [
+          "api.atlassian.com",
+          {
+            "fromConfig": "siteUrl",
+            "suffix": ".atlassian.net"
+          }
+        ]
+      },
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "mcp",
+        "hosts": [
+          "api.atlassian.com",
+          {
+            "fromConfig": "siteUrl",
+            "suffix": ".atlassian.net"
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "build": "tsc && esbuild src/router.ts --bundle --platform=node --target=es2022 --format=cjs --external:@server/* --external:@hay/* --external:zod --external:fs --external:path --external:crypto --external:http --external:https --external:url --outfile=dist/router.cjs",

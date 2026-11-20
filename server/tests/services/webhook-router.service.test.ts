@@ -29,8 +29,19 @@ jest.mock("@server/lib/webhook-replay", () => ({
   WEBHOOK_RETRY_AFTER_SECONDS: 30,
   WebhookReplayUnavailableError: MockReplayUnavailable,
 }));
+const eraseProviderIdentity = jest.fn();
+const getConfirmationStatus = jest.fn();
+jest.mock("@server/services/provider-privacy.service", () => ({
+  providerPrivacyService: { eraseProviderIdentity, getConfirmationStatus },
+}));
+const parseSignedRequest = jest.fn();
+jest.mock("@server/lib/signed-request", () => ({
+  ...jest.requireActual<Record<string, unknown>>("@server/lib/signed-request"),
+  parseSignedRequest,
+}));
 import { verifyHmacSha256 } from "@server/lib/hmac-signature";
 
+import { getDatabaseContext } from "../../database/organization-context";
 import {
   webhookRouterService,
   __webhookRouterInternals,
@@ -757,5 +768,130 @@ describe("__webhookRouterInternals", () => {
     expect(extractDedupeKey({ source: "body-path", path: "a.name" }, req, raw, body)).toBeNull();
     expect(extractDedupeKey({ source: "body-path", path: "a.x" }, req, raw, body)).toBeNull();
     expect(extractDedupeKey({ source: "raw-body" }, req, raw, body)).toBe('{"a":{"id":7}}');
+  });
+});
+
+describe("webhook routing database contexts", () => {
+  beforeEach(() => jest.resetAllMocks());
+
+  it("reads the plugin and its installs in a system context, then starts the worker in the install's organization", async () => {
+    const seen: Record<string, unknown> = {};
+    findByPluginId.mockImplementation(async () => {
+      seen.registry = getDatabaseContext();
+      return { id: "reg-1", metadataState: "stale", metadata: {} };
+    });
+    findByPlugin.mockImplementation(async () => {
+      seen.installs = getDatabaseContext();
+      return [{ organizationId: "org-on", enabled: true }];
+    });
+    startPluginWorker.mockImplementation(async () => {
+      seen.worker = getDatabaseContext();
+    });
+    getPlugin.mockReturnValue({ metadataState: "fresh", metadata: { webhookRouting: routing } });
+
+    await webhookRouterService.getRoutingDescriptor("p");
+
+    expect(seen).toEqual({
+      registry: expect.objectContaining({
+        kind: "system",
+        reason: expect.stringContaining("webhook routing"),
+      }),
+      installs: expect.objectContaining({
+        kind: "system",
+        reason: expect.stringContaining("webhook routing"),
+      }),
+      worker: { kind: "organization", organizationId: "org-on" },
+    });
+  });
+
+  beforeEach(() => {
+    startPluginWorker.mockResolvedValue({ port: 1234, instanceId: "inst" });
+    updateActivityTimestamp.mockResolvedValue(undefined);
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+  });
+
+  it("resolves a routing key in a system context and forwards in the owner's organization", async () => {
+    const seen: Array<[string, unknown]> = [];
+    findByKey.mockImplementation(async (_plugin: string, key: string) => {
+      seen.push([`lookup:${key}`, getDatabaseContext()]);
+      return key === "k1" ? { organizationId: "org-1", pluginInstanceId: "inst-1" } : null;
+    });
+    startPluginWorker.mockImplementation(async () => {
+      seen.push(["worker", getDatabaseContext()]);
+      return { port: 1234, instanceId: "inst" };
+    });
+
+    await dispatch("p", instagramRouting, { entry: [{ id: "k1" }, { id: "unknown" }] }, fakeReq);
+
+    const system = { kind: "system", reason: "webhook routing: find the owner of a routing key" };
+    expect(seen).toEqual([
+      ["lookup:k1", system],
+      ["lookup:unknown", system],
+      ["worker", { kind: "organization", organizationId: "org-1" }],
+    ]);
+    expect(startPluginWorker).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("provider data deletion database context", () => {
+  const response = () => {
+    const res = { status: jest.fn(), json: jest.fn(), send: jest.fn(), type: jest.fn() };
+    res.status.mockReturnValue(res);
+    res.type.mockReturnValue(res);
+    return res;
+  };
+  const code = "11111111-1111-4111-8111-111111111111";
+
+  beforeEach(() => jest.resetAllMocks());
+
+  it("erases in a system context, because the search spans organizations", async () => {
+    let seen: ReturnType<typeof getDatabaseContext>;
+    eraseProviderIdentity.mockImplementation(async () => {
+      seen = getDatabaseContext();
+      return code;
+    });
+    parseSignedRequest.mockReturnValue({ user_id: "person-1" });
+    findByKey.mockResolvedValue(null);
+    jest
+      .spyOn(
+        webhookRouterService as unknown as { pluginEnvValue: () => Promise<string> },
+        "pluginEnvValue",
+      )
+      .mockResolvedValue("secret");
+
+    const res = response();
+    await webhookRouterService.handleDeauthorization(
+      { method: "POST", body: { signed_request: "x" } } as never,
+      res as never,
+      "p",
+      { secretEnv: "SECRET", param: "signed_request", keyPath: "user_id" } as never,
+      "data-deletion",
+    );
+
+    expect(eraseProviderIdentity).toHaveBeenCalledWith("p", "person-1");
+    expect(seen).toMatchObject({
+      kind: "system",
+      reason: expect.stringContaining("provider data deletion"),
+    });
+  });
+
+  it("reads a confirmation code's status in a system context", async () => {
+    let seen: ReturnType<typeof getDatabaseContext>;
+    getConfirmationStatus.mockImplementation(async () => {
+      seen = getDatabaseContext();
+      return "completed";
+    });
+
+    const res = response();
+    await webhookRouterService.handleDataDeletionStatus(
+      { query: { code } } as never,
+      res as never,
+      "p",
+    );
+
+    expect(seen).toMatchObject({
+      kind: "system",
+      reason: expect.stringContaining("provider data deletion"),
+    });
   });
 });

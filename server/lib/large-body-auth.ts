@@ -2,6 +2,10 @@ import type { Request } from "express";
 import { authenticate } from "@server/lib/auth/middleware";
 import { DEFAULT_BODY_LIMIT_BYTES } from "@server/lib/body-limits";
 import { verifyPluginApiToken } from "@server/lib/plugin-api-token";
+import type { PluginApiCapability } from "@server/lib/plugin-capabilities";
+
+/** Plugin capabilities whose calls carry media, attachments or catalogs. */
+const BULK_BODY_CAPABILITIES: readonly PluginApiCapability[] = ["messages", "email", "products"];
 
 /**
  * Whether a request may send an upload-sized body. Parsing runs before the
@@ -16,8 +20,8 @@ export async function mayParseLargeBody(req: Request): Promise<boolean> {
 
   if (header.startsWith("Bearer ")) {
     try {
-      verifyPluginApiToken(header.slice("Bearer ".length));
-      return true;
+      const { capabilities } = await verifyPluginApiToken(header.slice("Bearer ".length));
+      return BULK_BODY_CAPABILITIES.some((capability) => capabilities.includes(capability));
     } catch {
       // Not a plugin token: try the staff credentials below.
     }

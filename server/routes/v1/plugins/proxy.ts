@@ -7,6 +7,7 @@ import { getPluginRunnerService } from "@server/services/plugin-runner.service";
 import { WORKER_HOST, workerFetch } from "@server/lib/worker-client";
 import type { RouteDescriptor } from "@server/types/plugin-sdk.types";
 import { isValidUuid } from "@server/lib/validation/uuid";
+import { runInOrganization } from "@server/database/organization-context";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("plugin-proxy");
@@ -81,88 +82,10 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // Only orgs that enabled this plugin can reach its worker.
-    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
-    if (!instance?.enabled) {
-      res.status(404).json({ error: "Not found" });
-      return;
-    }
-
-    // Only routes the plugin declared public with register.route() are
-    // reachable. Check up front when the cached metadata is current, so a bad
-    // path wakes nothing; otherwise the check after start decides.
-    const cachedPlugin = pluginManagerService.getPlugin(pluginId);
-    if (
-      cachedPlugin?.metadataState === "fresh" &&
-      !isPublicRoute(cachedPlugin.metadata?.routes ?? [], req.method, path)
-    ) {
-      res.status(404).json({ error: "Not found" });
-      return;
-    }
-
-    if (!getPluginRunnerService().isRunning(organizationId, pluginId)) {
-      if (!takeColdStartSlot(pluginId, organizationId, req.ip ?? "unknown")) {
-        res.setHeader("Retry-After", String(Math.ceil(COLD_START_WINDOW_MS / 1000)));
-        res.status(429).json({ error: "Too many requests" });
-        return;
-      }
-    }
-
-    // Get or start worker for this org+plugin combination
-    let worker;
-    try {
-      worker = await pluginManagerService.startPluginWorker(organizationId, pluginId);
-    } catch (error) {
-      logger.error({ err: error, organizationId, pluginId }, "Failed to start worker");
-      res.status(503).json({
-        error: "Plugin unavailable",
-        message: "Failed to start plugin worker",
-      });
-      return;
-    }
-
-    const declaredRoutes = pluginManagerService.getPlugin(pluginId)?.metadata?.routes ?? [];
-    if (!isPublicRoute(declaredRoutes, req.method, path)) {
-      res.status(404).json({ error: "Not found" });
-      return;
-    }
-
-    // Proxy request to worker
-    const workerPath = `${path}${req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : ""}`;
-
-    logger.debug({ port: worker.port, path }, "Forwarding request to worker");
-
-    try {
-      const { headers, body } = buildWorkerForward(req, worker.port);
-
-      const response = await workerFetch(worker.port, workerPath, {
-        method: req.method,
-        headers,
-        body,
-        signal: AbortSignal.timeout(WORKER_FORWARD_TIMEOUT_MS),
-      });
-
-      // Copy status
-      res.status(response.status);
-
-      // A worker's response is served from the API origin, so only inert
-      // headers carry over and it can never render as an active document.
-      response.headers.forEach((value, key) => {
-        if (FORWARDED_RESPONSE_HEADERS.has(key.toLowerCase())) res.setHeader(key, value);
-      });
-      res.setHeader("X-Content-Type-Options", "nosniff");
-      res.setHeader("Content-Security-Policy", "sandbox");
-
-      // Stream body
-      const data = await response.text();
-      res.send(data);
-    } catch (error) {
-      logger.error({ err: error }, "Error forwarding to worker");
-      res.status(502).json({
-        error: "Bad gateway",
-        message: "Failed to communicate with plugin worker",
-      });
-    }
+    // The organization is validated above; the rest of the request runs in it.
+    await runInOrganization(organizationId, () =>
+      forwardToOrganizationWorker(req, res, pluginId, path, organizationId),
+    );
   } catch (error) {
     logger.error({ err: error }, "Unexpected error in plugin proxy");
     res.status(500).json({
@@ -171,6 +94,98 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response): Promise<vo
     });
   }
 });
+
+/** Serve a request for `pluginId` from the worker of one validated organization. */
+async function forwardToOrganizationWorker(
+  req: Request,
+  res: Response,
+  pluginId: string,
+  path: string,
+  organizationId: string,
+): Promise<void> {
+  // Only orgs that enabled this plugin can reach its worker.
+  const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
+  if (!instance?.enabled) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  // Only routes the plugin declared public with register.route() are
+  // reachable. Check up front when the cached metadata is current, so a bad
+  // path wakes nothing; otherwise the check after start decides.
+  const cachedPlugin = pluginManagerService.getPlugin(pluginId);
+  if (
+    cachedPlugin?.metadataState === "fresh" &&
+    !isPublicRoute(cachedPlugin.metadata?.routes ?? [], req.method, path)
+  ) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  if (!getPluginRunnerService().isRunning(organizationId, pluginId)) {
+    if (!takeColdStartSlot(pluginId, organizationId, req.ip ?? "unknown")) {
+      res.setHeader("Retry-After", String(Math.ceil(COLD_START_WINDOW_MS / 1000)));
+      res.status(429).json({ error: "Too many requests" });
+      return;
+    }
+  }
+
+  // Get or start worker for this org+plugin combination
+  let worker;
+  try {
+    worker = await pluginManagerService.startPluginWorker(organizationId, pluginId);
+  } catch (error) {
+    logger.error({ err: error, organizationId, pluginId }, "Failed to start worker");
+    res.status(503).json({
+      error: "Plugin unavailable",
+      message: "Failed to start plugin worker",
+    });
+    return;
+  }
+
+  const declaredRoutes = pluginManagerService.getPlugin(pluginId)?.metadata?.routes ?? [];
+  if (!isPublicRoute(declaredRoutes, req.method, path)) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  // Proxy request to worker
+  const workerPath = `${path}${req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : ""}`;
+
+  logger.debug({ port: worker.port, path }, "Forwarding request to worker");
+
+  try {
+    const { headers, body } = buildWorkerForward(req, worker.port);
+
+    const response = await workerFetch(worker.port, workerPath, {
+      method: req.method,
+      headers,
+      body,
+      signal: AbortSignal.timeout(WORKER_FORWARD_TIMEOUT_MS),
+    });
+
+    // Copy status
+    res.status(response.status);
+
+    // A worker's response is served from the API origin, so only inert
+    // headers carry over and it can never render as an active document.
+    response.headers.forEach((value, key) => {
+      if (FORWARDED_RESPONSE_HEADERS.has(key.toLowerCase())) res.setHeader(key, value);
+    });
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Security-Policy", "sandbox");
+
+    // Stream body
+    const data = await response.text();
+    res.send(data);
+  } catch (error) {
+    logger.error({ err: error }, "Error forwarding to worker");
+    res.status(502).json({
+      error: "Bad gateway",
+      message: "Failed to communicate with plugin worker",
+    });
+  }
+}
 
 /**
  * Whether `method path` matches a route the plugin declared with

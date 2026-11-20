@@ -50,7 +50,7 @@ jest.mock("@server/services/oauth-state.service", () => ({
 }));
 jest.mock("@server/lib/config-resolver", () => ({
   resolveConfigWithEnv,
-  stripServerOnlyFields: (config: Record<string, unknown>) => config,
+  resolveConfigForWorker: (config: Record<string, unknown> | undefined) => config ?? {},
 }));
 
 import {
@@ -166,12 +166,27 @@ describe("oauthService.completeWithCode", () => {
     expect(hookUrl).toBe("http://127.0.0.1:4321/on-connected");
     const body = JSON.parse((hookInit as { body: string }).body);
     expect(body.extras).toEqual({ waba_id: "WABA1", phone_number_id: "PN1" });
-    expect(body.authState).toBeDefined();
+    // The worker pulls the connected account's credentials; core does not push them.
+    expect(body).not.toHaveProperty("authState");
 
     expect(claimRoutes).toHaveBeenCalledWith("p", "org-1", "inst-1", ["WABA1", "PN1"], {
       allowTransfer: false,
     });
     expect(result).toEqual({ success: true, onConnected: { ok: true, routingKeyCount: 2 } });
+  });
+
+  it("stops a running worker before running onConnected, so the next start sees the new account", async () => {
+    stopPluginWorker.mockResolvedValue(undefined);
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ access_token: "biz-token" }))
+      .mockResolvedValueOnce(jsonResponse({ routingKeys: [] }));
+
+    await oauthService.completeWithCode("org-1", "p", "the-code");
+
+    expect(stopPluginWorker).toHaveBeenCalledWith("org-1", "p");
+    expect(stopPluginWorker.mock.invocationCallOrder[0]).toBeLessThan(
+      fetchMock.mock.invocationCallOrder[1],
+    );
   });
 
   it("returns onConnected.ok=false when the worker hook fails", async () => {
@@ -605,5 +620,38 @@ describe("oauthService.handleCallback exchange encoding", () => {
 
     const stored = updateAuthState.mock.calls[0][2].credentials as Record<string, unknown>;
     expect(stored.accessToken).toBe("real");
+  });
+});
+
+describe("oauthService.refreshToken", () => {
+  it("lets concurrent refreshes spend the refresh token once and skips one that is no longer due", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const stored = instance({
+      authState: {
+        methodId: "p-oauth",
+        credentials: { accessToken: "old", refreshToken: "refresh-1", expiresAt: now + 30 },
+      },
+    });
+    findByOrgAndPlugin.mockImplementation(async () => stored);
+    updateAuthState.mockImplementation(async (_id: string, _org: string, authState: never) => {
+      stored.authState = authState;
+    });
+    fetchMock.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return jsonResponse({ access_token: "new", refresh_token: "refresh-2", expires_in: 3600 });
+    });
+
+    const results = await Promise.all([
+      oauthService.refreshToken("org-1", "p", { onlyIfExpiringWithinSeconds: 300 }),
+      oauthService.refreshToken("org-1", "p", { onlyIfExpiringWithinSeconds: 300 }),
+      oauthService.refreshToken("org-1", "p", { onlyIfExpiringWithinSeconds: 300 }),
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(results.filter((tokens) => tokens !== null)).toHaveLength(1);
+    expect(stored.authState.credentials).toMatchObject({
+      accessToken: "new",
+      refreshToken: "refresh-2",
+    });
   });
 });

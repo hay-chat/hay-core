@@ -10,14 +10,14 @@ import type {
 describe("stdioServerEnv", () => {
   it("passes the basics and explicit values, not the worker credentials", () => {
     vi.stubEnv("PATH", "/usr/bin");
-    vi.stubEnv("HAY_ORG_AUTH", "worker-credentials");
+    vi.stubEnv("HAY_ORG_SETTINGS", "worker-credentials");
     vi.stubEnv("META_APP_SECRET", "host-secret");
 
     const env = stdioServerEnv({ API_KEY: "k" });
 
     expect(env.PATH).toBe("/usr/bin");
     expect(env.API_KEY).toBe("k");
-    expect(env.HAY_ORG_AUTH).toBeUndefined();
+    expect(env.HAY_ORG_SETTINGS).toBeUndefined();
     expect(env.META_APP_SECRET).toBeUndefined();
     vi.unstubAllEnvs();
   });

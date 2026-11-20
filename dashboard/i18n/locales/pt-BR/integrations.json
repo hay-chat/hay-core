@@ -144,7 +144,7 @@
     "backToMarketplace": "Voltar ao Marketplace",
     "card": {
       "title": "Enviar ZIP da Integração",
-      "description": "Envie um arquivo ZIP contendo sua integração personalizada. O ZIP deve incluir um arquivo manifest.json na raiz."
+      "description": "Envie o ZIP gerado por \"hay plugin pack\". Ele reúne seu plugin com as dependências e um hay-pack.json que lista cada arquivo com seu checksum."
     },
     "file": {
       "label": "Arquivo da Integração",
@@ -179,8 +179,8 @@
         "description": "O nome do pacote no package.json deve ser um nome npm válido (letras minúsculas, números, hífens, escopo opcional)"
       },
       "zipFormat": {
-        "title": "Formato ZIP",
-        "description": "O arquivo deve estar no formato ZIP com tamanho máximo de 50MB"
+        "title": "Empacotado com hay plugin pack",
+        "description": "O ZIP deve conter hay-pack.json. O Hay não instala nada: todo arquivo deve estar listado ali com seu sha256 e sem alterações."
       },
       "noPathTraversal": {
         "title": "Sem travessia de caminho",

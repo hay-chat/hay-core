@@ -81,6 +81,7 @@ jest.mock("@server/services/public-widget-limits", () => ({
 }));
 
 import * as jwt from "jsonwebtoken";
+import { getDatabaseContext } from "@server/database/organization-context";
 import { WebSocketService } from "@server/services/websocket.service";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -114,6 +115,8 @@ interface ServiceInternals {
   handleConnection(ws: unknown, req: unknown): void;
   handleMessage(clientId: string, data: string): Promise<void>;
   checkHeartbeats(): void;
+  handleSubscribe(clientId: string, message: unknown): Promise<void>;
+  handleRedisEvent(event: unknown): void;
   conversationClients: Map<string, Set<string>>;
 }
 
@@ -509,6 +512,44 @@ describe("WebSocket dashboard authentication", () => {
 
     expect(orgMembers(service).get(ORG_ID)?.has(clientId)).toBe(true);
     expect(ws.last()).toEqual({ type: "authenticated" });
+  });
+
+  it("handles each frame of a confirmed dashboard socket in its organization's context", async () => {
+    const { send, internals, clientId } = connect(service);
+    const seen: unknown[] = [];
+    jest.spyOn(internals, "handleSubscribe").mockImplementation(async () => {
+      seen.push(getDatabaseContext());
+    });
+    await send({ type: "subscribe", conversationId: "c-1" });
+    expect(seen).toEqual([undefined]);
+
+    await send({ type: "auth", token: sign({}) });
+    await send({ type: "subscribe", conversationId: "c-1" });
+    expect(seen).toEqual([undefined, { kind: "organization", organizationId: ORG_ID }]);
+    expect(orgMembers(service).get(ORG_ID)?.has(clientId)).toBe(true);
+  });
+
+  it("declares nothing for a socket whose authentication failed", async () => {
+    mockUserOrgFindOne.mockResolvedValue(null);
+    const { send, internals } = connect(service);
+    const seen: unknown[] = [];
+    jest.spyOn(internals, "handleSubscribe").mockImplementation(async () => {
+      seen.push(getDatabaseContext());
+    });
+    await send({ type: "auth", token: sign({}) });
+    await send({ type: "subscribe", conversationId: "c-1" });
+    expect(seen).toEqual([undefined]);
+  });
+
+  it("broadcasts an organization's event in that organization's context", () => {
+    const { internals } = connect(service);
+    const seen: unknown[] = [];
+    jest.spyOn(service, "sendToOrganization").mockImplementation(() => {
+      seen.push(getDatabaseContext());
+      return 0;
+    });
+    internals.handleRedisEvent({ type: "conversation_updated", organizationId: ORG_ID });
+    expect(seen).toEqual([{ kind: "organization", organizationId: ORG_ID }]);
   });
 
   describe("re-validation of open sockets", () => {

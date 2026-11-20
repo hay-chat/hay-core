@@ -218,6 +218,8 @@ Inside `plugin-host`, workers are separated from each other in the strongest way
 
 `PLUGIN_ISOLATION=strict` refuses to start custom (uploaded) plugins at tier 3; bundled plugins still run, with the error logged. `PLUGIN_ISOLATION=degraded` runs custom plugins at tier 3 too. Leave `PLUGIN_ISOLATION` unset to keep today's behaviour.
 
+The egress proxy's allow and deny counts are exposed as `hay_plugin_egress_decisions_total{decision="allowed|denied"}` (refreshed once a minute).
+
 To see what your host allows before enabling it, start the isolated containers and read the tier: `docker compose logs plugin-host | head`. If it reports tier 3, the log line carries the exact error from the kernel or from bubblewrap.
 
 Start-up verifies a real sandbox: bubblewrap must start a worker with its own mount namespace and the seccomp filter must refuse a nested user namespace. If either fails, the plugin host does not claim tier 1; it logs the exact error at ERROR level and uses the next tier. Workers run without `/proc`, so a fresh `/proc` mount is not required of the host.
@@ -232,6 +234,23 @@ Limits to know about:
 - Workers on the same tier share the container's memory and CPU limits; there is no per-plugin cap.
 - Private-network targets (a self-hosted service on your LAN) are refused by the proxy. Reach them through a public host name.
 - Plugins that open raw TCP connections (not HTTP) have no route. None of the bundled plugins do.
+
+## Custom plugins
+
+Hay never installs a plugin's dependencies. An uploaded (or git-installed) plugin arrives as a **pack**: a plugin built with `tools/hay-cli/bin/hay plugin pack`, which bundles the entry file (and the `main` of `mcp/package.json`) together with every dependency it uses. `@hay/plugin-sdk` stays external because Hay provides it. The pack lists every file with its sha256 in `hay-pack.json`.
+
+```bash
+cd my-plugin && npm run build           # produces the entry named in hay-plugin.entry
+tools/hay-cli/bin/hay plugin pack .     # writes my-plugin-1.0.0.zip and prints its sha256
+```
+
+Upload the ZIP in the dashboard, or `POST /v1/plugins/upload` with the file in the `plugin` field (and, optionally, the printed digest in a `sha256` field, which the server checks). On upload, Hay checks the archive against `hay-pack.json` (every file present, unchanged and listed; no links, no `..` or absolute paths, no native `.node` addons, at most 5,000 files, 25 MB per file and 100 MB unpacked) and that the manifest only names capabilities Hay knows. Before each worker starts it checks the extracted files against the same list, so a plugin runs only as the pack it was installed from. No package manager and no install script runs, on upload or at start. Plugins that load native addons are not supported.
+
+A plugin's `hay-plugin.capabilities` is also its permission list: the plugin's API token carries those capabilities and nothing more, and each plugin API call is refused without the capability it needs. Tokens stop working when the worker stops.
+
+Git-installed plugins follow the same rule: the repository must contain `hay-pack.json` and the files it lists (commit the output of `hay plugin pack`); other files in the repository are ignored.
+
+Plugins uploaded before packs existed no longer start. Hay keeps their record, reports "no hay-pack.json" on the plugin, and does not run them until the author uploads a pack built with `hay plugin pack`.
 
 ## Upgrading
 

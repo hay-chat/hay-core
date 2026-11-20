@@ -9,6 +9,14 @@
     }
   },
   "config": {
+    "inboundDomain": {
+      "label": "Inbound email domain",
+      "description": "Managed by the platform."
+    },
+    "fromEmail": {
+      "label": "Sender address",
+      "description": "Managed by the platform."
+    },
     "supportAddress": {
       "label": "Your support address",
       "description": "The address your customers already write to, e.g. support{'@'}yourstore.com. You will forward this mailbox to the Hay.chat address shown below."

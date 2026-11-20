@@ -3,6 +3,7 @@ import dns from "dns/promises";
 import { TRPCError } from "@trpc/server";
 import { QueryFailedError } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
+import { runAsSystem, runInOrganization } from "@server/database/organization-context";
 import {
   SSO_ASSIGNABLE_ROLES,
   SsoConnection,
@@ -242,6 +243,13 @@ export class SsoService {
   }
   private get domains() {
     return AppDataSource.getRepository(SsoDomain);
+  }
+
+  /** A callback carries only the connection id; the row reveals the organization. */
+  private connectionById(id: string) {
+    return runAsSystem("sso connection lookup by id", () =>
+      this.connections.findOne({ where: { id } }),
+    );
   }
 
   // ---- Configuration (organization owners) ----
@@ -588,15 +596,20 @@ export class SsoService {
     const domain = emailDomain(email);
     if (!domain) return null;
     try {
-      const row = await this.domains
-        .createQueryBuilder("domain")
-        .where("domain.domain = :domain", { domain })
-        .andWhere("domain.verified_at IS NOT NULL")
-        .getOne();
+      // The domain is what reveals the organization, so only this lookup runs without one.
+      const row = await runAsSystem("sso domain lookup by verified domain", () =>
+        this.domains
+          .createQueryBuilder("domain")
+          .where("domain.domain = :domain", { domain })
+          .andWhere("domain.verified_at IS NOT NULL")
+          .getOne(),
+      );
       if (!row) return null;
-      const connection = await this.connections.findOne({
-        where: { organizationId: row.organizationId, enabled: true },
-      });
+      const connection = await runInOrganization(row.organizationId, () =>
+        this.connections.findOne({
+          where: { organizationId: row.organizationId, enabled: true },
+        }),
+      );
       return connection ?? null;
     } catch (error) {
       // Migrations run after deploy; until then nobody has SSO.
@@ -700,9 +713,11 @@ export class SsoService {
   /** SP metadata for a SAML connection, for owners who import it at the provider. */
   async samlMetadata(organizationId: string): Promise<string | null> {
     try {
-      const connection = await this.connections.findOne({
-        where: { organizationId, protocol: "saml" },
-      });
+      const connection = await runInOrganization(organizationId, () =>
+        this.connections.findOne({
+          where: { organizationId, protocol: "saml" },
+        }),
+      );
       return connection ? samlServiceProviderMetadata(this.samlConfig(connection)) : null;
     } catch (error) {
       if (isPgError(error, POSTGRES_UNDEFINED_TABLE)) return null;
@@ -745,7 +760,7 @@ export class SsoService {
     }
     assertSameBrowser(state, params.binding);
 
-    const connection = await this.connections.findOne({ where: { id: state.connectionId } });
+    const connection = await this.connectionById(state.connectionId);
     if (
       !connection?.enabled ||
       connection.protocol !== "oidc" ||
@@ -793,8 +808,10 @@ export class SsoService {
       throw error;
     }
 
-    const user = await this.provision(connection, claims);
-    return this.issueTicket(user, connection.organizationId);
+    return runInOrganization(connection.organizationId, async () => {
+      const user = await this.provision(connection, claims);
+      return this.issueTicket(user, connection.organizationId);
+    });
   }
 
   private async issueTicket(user: User, organizationId: string): Promise<string> {
@@ -830,7 +847,7 @@ export class SsoService {
       throw new SsoLoginError("state_invalid", "Unknown or already used state");
     }
 
-    const connection = await this.connections.findOne({ where: { id: state.connectionId } });
+    const connection = await this.connectionById(state.connectionId);
     if (
       !connection?.enabled ||
       connection.protocol !== "saml" ||
@@ -889,7 +906,7 @@ export class SsoService {
     const pending = JSON.parse(raw) as SamlPendingLogin;
     assertSameBrowser(pending, params.binding);
 
-    const connection = await this.connections.findOne({ where: { id: pending.connectionId } });
+    const connection = await this.connectionById(pending.connectionId);
     if (
       !connection?.enabled ||
       connection.protocol !== "saml" ||
@@ -916,8 +933,10 @@ export class SsoService {
       given_name: identity.firstName,
       family_name: identity.lastName,
     };
-    const user = await this.provision(connection, claims);
-    return this.issueTicket(user, connection.organizationId);
+    return runInOrganization(connection.organizationId, async () => {
+      const user = await this.provision(connection, claims);
+      return this.issueTicket(user, connection.organizationId);
+    });
   }
 
   /** Spends a ticket. The person must still be active and a member when it is redeemed. */

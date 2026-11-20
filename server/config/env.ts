@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import path from "path";
+import { ROLE_NAME } from "../database/app-role";
 import { configuredEncryptionKeys } from "../lib/auth/utils/encryption-keys";
 
 // Load environment variables
@@ -23,6 +24,11 @@ dotenv.config({ path: envPath || path.resolve(__dirname, "../../../../.env"), qu
  * separately (getApiUrl/getProtocol); accepting a full URL here would otherwise
  * yield doubled schemes like "http://http://localhost:3001".
  */
+function validRoleName(value: string): string {
+  if (!ROLE_NAME.test(value)) throw new Error(`Invalid database role name: ${value}`);
+  return value;
+}
+
 function stripScheme(value: string): string {
   return value.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
 }
@@ -188,6 +194,10 @@ export const config = {
     synchronize: false, // Never use synchronize in production
     logging: process.env.DB_LOGGING === "true",
     maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || "10", 10),
+    // Apply the database context's organization to every query and transaction (off by default).
+    orgContextHook: process.env.DB_ORG_CONTEXT_HOOK === "true",
+    // NOLOGIN role that system work (runAsSystem) runs as when the hook is on; policies grant it row access.
+    systemRole: validRoleName(process.env.DB_SYSTEM_ROLE || "hay_system"),
     // DB_PORT/DB_NAME point at a transaction pooler (PgBouncer, e.g. a
     // DigitalOcean connection pool). Session state does not survive a
     // transaction there, so per-connection settings are not sent at startup

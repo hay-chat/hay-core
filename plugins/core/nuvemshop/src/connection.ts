@@ -22,14 +22,14 @@ interface ConfigReader {
 }
 
 /** Default when the merchant has not picked a mode: OAuth when this server has the partner app. */
-export function defaultAuthMode(env: NodeJS.ProcessEnv = process.env): AuthMode {
-  return env.NUVEMSHOP_OAUTH_CLIENT_ID?.trim() ? "oauth" : "token";
+export function defaultAuthMode(config: ConfigReader): AuthMode {
+  return text(config.getOptional("clientId")) ? "oauth" : "token";
 }
 
-export function getAuthMode(config: ConfigReader, env: NodeJS.ProcessEnv = process.env): AuthMode {
+export function getAuthMode(config: ConfigReader): AuthMode {
   const mode = config.getOptional<string>("authMode");
   if (mode === "oauth" || mode === "token") return mode;
-  return defaultAuthMode(env);
+  return defaultAuthMode(config);
 }
 
 function text(value: unknown): string | undefined {
@@ -52,13 +52,10 @@ export function oauthStoreId(config: ConfigReader): string | undefined {
 }
 
 /** Credentials for the active mode, or null when the store is not connected yet. */
-export function readCredentials(
-  config: ConfigReader,
-  env: NodeJS.ProcessEnv = process.env,
-): NuvemshopCredentials | null {
+export function readCredentials(config: ConfigReader): NuvemshopCredentials | null {
   const accessToken = text(config.getOptional("accessToken"));
   const storeId =
-    getAuthMode(config, env) === "oauth"
+    getAuthMode(config) === "oauth"
       ? oauthStoreId(config)
       : text(config.getOptional("storeId"));
   if (!storeId || !accessToken) return null;
