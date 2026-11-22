@@ -92,6 +92,25 @@ export interface HayChatConfig {
    * content, and never calls the server, stores anything or opens a socket.
    */
   preview?: PreviewOptions;
+  /**
+   * The chat is the whole page, as in a mobile app's WebView (see
+   * packages/react-native): no button and no teaser, always the full-screen
+   * sheet, open from the start. Show or hide it with `window.HayChat.open()`
+   * and `window.HayChat.close()`.
+   */
+  embedded?: EmbeddedOptions;
+}
+
+/** What an embedding app hears from the chat. Pass `{}` when it needs none of it. */
+export interface EmbeddedOptions {
+  /** Load with the chat closed; the app shows it later with `window.HayChat.open()`. */
+  startClosed?: boolean;
+  /** The chat is on screen and ready for a question. */
+  onReady?: () => void;
+  /** The visitor closed the chat: the app should take its screen away. */
+  onClose?: () => void;
+  /** Replies that arrived while the chat was closed. */
+  onUnread?: (count: number) => void;
 }
 
 export type AssistantAvatarPreset = "sparkle" | "sparkles" | "robot";
@@ -376,6 +395,10 @@ declare global {
        * visitor dismissed an earlier one, but not while the chat is open.
        */
       setTeaserMessage?: (message: string) => void;
+      /** Embedded chat only (`config.embedded`): show the chat. */
+      open?: () => void;
+      /** Embedded chat only (`config.embedded`): hide the chat; replies count as unread. */
+      close?: () => void;
     };
   }
   interface Navigator {

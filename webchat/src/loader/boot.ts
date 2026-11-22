@@ -1,5 +1,11 @@
 import { resolveLocale } from "@/i18n/resolve";
-import type { ChatHandle, ChatMountOptions, HayChatConfig, PublicConfig } from "@/types";
+import type {
+  ChatHandle,
+  ChatMountOptions,
+  HayChatConfig,
+  LauncherBridge,
+  PublicConfig,
+} from "@/types";
 import { installHostApi } from "./hostApi";
 import { launcherLabels } from "./labels";
 import { buttonIcon, createLauncher } from "./launcher";
@@ -46,6 +52,7 @@ export function boot(
   if (!config.organizationId) console.error("[Hay Webchat] organizationId is required in config");
   if (!config.baseUrl) console.error("[Hay Webchat] baseUrl is required in config");
   if (config.preview) return bootPreview(config, loadChat);
+  if (config.embedded) return bootEmbedded(config, loadChat);
 
   const hostCalls = installHostApi();
   const launcher = createLauncher(config, launcherLabels[resolveLocale(config.locale)]);
@@ -160,6 +167,73 @@ export function boot(
   // "interaction": nothing is fetched until the visitor reaches for the button.
 
   return { chatReady: () => chat ?? Promise.resolve(null) };
+}
+
+/**
+ * The chat as a whole page (`config.embedded`), for a mobile app's WebView:
+ * nothing waits for a button, so the settings and the chat load side by side
+ * and the chat opens as a full-screen sheet. The app is told about a close and
+ * the unread count, and shows or hides the chat with window.HayChat.open/close.
+ */
+function bootEmbedded(
+  config: HayChatConfig,
+  loadChat: () => Promise<ChatModule>,
+): { chatReady: () => Promise<ChatHandle | null> } {
+  const events = config.embedded ?? {};
+  const hostCalls = installHostApi();
+  const launcher = createLauncher(config, launcherLabels[resolveLocale(config.locale)]);
+  launcher.root.setAttribute("data-embedded", "");
+
+  let handle: ChatHandle | null = null;
+  let isOpen = false;
+  // What the app last asked for; applied at mount when it asked before that.
+  let wantOpen = !events.startClosed;
+  const show = (open: boolean) => {
+    wantOpen = open;
+    if (handle && isOpen !== open) handle.toggle();
+  };
+  const hayChat = (window.HayChat ??= {});
+  hayChat.open = () => show(true);
+  hayChat.close = () => show(false);
+
+  const bridge: LauncherBridge = {
+    setOpen(open) {
+      const wasOpen = isOpen;
+      isOpen = open;
+      wantOpen = open;
+      if (wasOpen && !open) events.onClose?.();
+    },
+    setUnread: (count) => events.onUnread?.(count),
+    setSheet: launcher.setSheet,
+    focus() {},
+  };
+
+  const chat = Promise.all([loadChat(), fetchPublicConfig(config)])
+    .then(async ([module, settings]) => {
+      if (settings?.enabled === false) {
+        launcher.remove();
+        return null;
+      }
+      launcher.setAppearance(
+        config.brandColor ?? settings?.brandColor,
+        config.themeMode ?? settings?.themeMode,
+      );
+      handle = await module.mountChat({
+        container: launcher.chatContainer,
+        config,
+        publicConfig: settings,
+        launcher: bridge,
+        hostCalls,
+        open: wantOpen,
+      });
+      events.onReady?.();
+      return handle;
+    })
+    .catch((error) => {
+      console.error("[Hay Webchat] Failed to load the chat:", error);
+      return null;
+    });
+  return { chatReady: () => chat };
 }
 
 /**
