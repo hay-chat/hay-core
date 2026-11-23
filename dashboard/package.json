@@ -46,7 +46,7 @@
     "@tiptap/suggestion": "^3.33.0",
     "@tiptap/vue-3": "^3.33.1",
     "@trpc/client": "^11.28.0",
-    "@vueuse/core": "^13.9.0",
+    "@vueuse/core": "^15.0.0",
     "canvas-confetti": "^1.9.4",
     "chart.js": "^4.6.1",
     "class-variance-authority": "^0.7.0",
