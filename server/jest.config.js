@@ -39,7 +39,7 @@ module.exports = {
   },
   // The optional prefix also matches a copy nested under another package.
   transformIgnorePatterns: [
-    "/node_modules/(?!(.*/node_modules/)?(linkedom|cssomnom|uhyphen|css-select|css-what|boolbase|nth-check|html-escaper|htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities|file-type|marked|strtok3|token-types|@tokenizer|@borewit|uint8array-extras|uuid|web-push|https-proxy-agent|agent-base|proxy-agent-negotiate)/)",
+    "/node_modules/(?!(.*/node_modules/)?(linkedom|cssomnom|uhyphen|css-select|css-what|boolbase|nth-check|html-escaper|htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities|file-type|marked|strtok3|token-types|@tokenizer|@borewit|uint8array-extras|uuid|web-push|https-proxy-agent|agent-base|proxy-agent-negotiate|archiver|is-stream|zip-stream|compress-commons|crc32-stream)/)",
   ],
   collectCoverageFrom: [
     "services/**/*.ts",
