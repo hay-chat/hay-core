@@ -81,7 +81,7 @@
     "nodemailer": "^10.5.0",
     "openai": "^7.56.0",
     "pdf-parse": "^2.4.5",
-    "pdfkit": "^0.20.2",
+    "pdfkit": "^0.21.0",
     "pg": "^8.23.1",
     "pino": "^10.4.0",
     "posthog-node": "^6.0.6",
