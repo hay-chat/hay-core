@@ -8,8 +8,6 @@ module.exports = {
     "^@plugins/(.*)$": "<rootDir>/../plugins/$1",
     // ESM-only; see tests/helpers/puppeteer-stub.ts.
     "^(puppeteer-core|@puppeteer/browsers)$": "<rootDir>/tests/helpers/puppeteer-stub.ts",
-    // Its Node entry is exposed only through import/module-sync conditions.
-    "^file-type$": "<rootDir>/node_modules/file-type/index.js",
   },
   transform: {
     "^.+\\.ts$": [
