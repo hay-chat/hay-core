@@ -68,6 +68,6 @@
     "vue-chartjs": "^5.3.4",
     "vue-json-pretty": "^2.5.0",
     "vue-router": "^5.5.1",
-    "vue-shepherd": "^6.0.0"
+    "vue-shepherd": "^7.0.0"
   }
 }
