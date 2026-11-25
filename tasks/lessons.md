@@ -40,3 +40,9 @@
 - **Failure mode**: PR #244 documented a new redirect URL (`/oauth/callback/<pluginId>`) for Nuvemshop, on the README's claim that the extra authorize params core appends "are ignored". Nuvemshop compares `redirect_uri` with the registered URL, so once the portal was changed every connect link answered "Erro ao carregar os dados".
 - **Detection signal**: an authorize page that loads with `?state=` alone and errors with the full link; any plan that changes a registered redirect URL without changing what `getRedirectUri` sends.
 - **Prevention**: the redirect URL registered with a provider and the `redirect_uri` core sends are one value; change them together (manifest `oauthProviderInstall`), and try the real authorize link on a test store before telling anyone to edit the provider's settings.
+
+## Parallel `git fetch` into `FETCH_HEAD`
+
+- Failure mode: several `git fetch origin <branch> && git worktree add ... FETCH_HEAD` run in parallel all checked out the same commit, because every fetch overwrites the one `FETCH_HEAD`. The wrong dependency versions were then inspected for four Dependabot branches.
+- Detection signal: `git log -1` in each worktree shows the same subject; an installed package is at the old version on a branch that bumps it.
+- Prevention rule: fetch into a named ref (`git fetch origin <branch>:refs/remotes/origin/<name>`) and check out that ref; confirm each worktree's HEAD against `git ls-remote` before trusting it.

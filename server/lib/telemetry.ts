@@ -74,12 +74,15 @@ export function captureException(error: unknown, context: ExceptionContext = {})
   }
 
   try {
-    client.captureException(redactedError(error), context.userId ?? undefined, {
-      ...context.properties,
-      // Distinguishes backend issues from browser ones in the shared project.
-      source: "server",
-      environment: config.env,
-      ...(context.organizationId ? { organization_id: context.organizationId } : {}),
+    client.captureException(redactedError(error), {
+      distinctId: context.userId ?? undefined,
+      properties: {
+        ...context.properties,
+        // Distinguishes backend issues from browser ones in the shared project.
+        source: "server",
+        environment: config.env,
+        ...(context.organizationId ? { organization_id: context.organizationId } : {}),
+      },
     });
   } catch (telemetryError) {
     logger.warn({ err: telemetryError }, "Failed to report exception to PostHog");

@@ -50,7 +50,7 @@ export const useDocumentImportTour = () => {
       `,
       attachTo: {
         element: '[data-tour="import-sources"]',
-        on: "top",
+        on: "top" as const,
       },
       buttons: [
         {
@@ -74,7 +74,7 @@ export const useDocumentImportTour = () => {
       `,
       attachTo: {
         element: '[data-tour="upload-option"]',
-        on: "bottom",
+        on: "bottom" as const,
       },
       buttons: [
         {
@@ -98,7 +98,7 @@ export const useDocumentImportTour = () => {
       `,
       attachTo: {
         element: '[data-tour="web-option"]',
-        on: "bottom",
+        on: "bottom" as const,
       },
       buttons: [
         {
@@ -122,7 +122,7 @@ export const useDocumentImportTour = () => {
       `,
       attachTo: {
         element: '[data-tour="progress-steps"]',
-        on: "bottom",
+        on: "bottom" as const,
       },
       buttons: [
         {

@@ -4,7 +4,7 @@
  * SHA-256 of every other file.
  */
 import { createHash } from "crypto";
-import * as archiver from "archiver";
+import { ZipArchive } from "archiver";
 import { formatZonedDateTime } from "@server/utils/zoned-datetime";
 import { evidenceCopy, fillCopy, type EvidenceTemplate } from "./copy";
 import type { EvidenceResult } from "./dispute-evidence.service";
@@ -57,7 +57,7 @@ export async function buildEvidenceZip(
     })),
   };
 
-  const archive = archiver.default("zip", { zlib: { level: 9 } });
+  const archive = new ZipArchive({ zlib: { level: 9 } });
   const chunks: Buffer[] = [];
   const done = new Promise<Buffer>((resolve, reject) => {
     archive.on("data", (chunk: Buffer) => chunks.push(chunk));

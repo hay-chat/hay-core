@@ -95,8 +95,8 @@ describe("bundled plugin manifests", () => {
     );
   });
 
-  it("finds all 21 core plugins", () => {
-    expect(plugins.map((p) => p.name)).toHaveLength(21);
+  it("finds all 23 core plugins", () => {
+    expect(plugins.map((p) => p.name)).toHaveLength(23);
   });
 
   it.each(plugins.map((p) => [p.name, p] as const))(
