@@ -10,6 +10,6 @@
   "dependencies": {
     "@hay/plugin-sdk": "file:../../../../packages/plugin-sdk",
     "@modelcontextprotocol/sdk": "^1.25.2",
-    "zod": "^3.25.76"
+    "zod": "^4.6.7"
   }
 }
