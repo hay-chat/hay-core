@@ -71,6 +71,10 @@ export default defineNuxtConfig({
         module: "esnext",
         experimentalDecorators: true,
         emitDecoratorMetadata: true,
+        // Nuxt 4 turns this on by default. The dashboard typecheck follows tRPC
+        // types into ../server, which is not written for it.
+        // TODO: enable once dashboard and server code handle unchecked indexes.
+        noUncheckedIndexedAccess: false,
         paths: {
           "@server/*": ["../server/*"],
           "@/*": ["./*"],
