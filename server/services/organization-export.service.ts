@@ -21,7 +21,7 @@ import { createWriteStream, type WriteStream } from "fs";
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
-import * as archiver from "archiver";
+import { ZipArchive } from "archiver";
 import { AppDataSource } from "@server/database/data-source";
 import { Job, JobPriority, JobStatus } from "@server/entities/job.entity";
 import { auditLogService } from "./audit-log.service";
@@ -547,7 +547,7 @@ function safeFileName(name: string): string {
 function zipFiles(dir: string, files: string[], zipPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const output = createWriteStream(zipPath);
-    const archive = archiver.default("zip", { zlib: { level: 9 } });
+    const archive = new ZipArchive({ zlib: { level: 9 } });
     output.on("close", () => resolve());
     output.on("error", reject);
     archive.on("error", reject);

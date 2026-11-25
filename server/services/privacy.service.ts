@@ -28,7 +28,7 @@ import { createWriteStream } from "fs";
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
-import * as archiver from "archiver";
+import { ZipArchive } from "archiver";
 import { config, getDashboardUrl } from "@server/config/env";
 import { IsNull } from "typeorm";
 import type { ExportPackageData } from "@server/types/privacy.types";
@@ -1549,7 +1549,7 @@ export class PrivacyService {
       const zipPath = path.join(dir, "export.zip");
       await new Promise<void>((resolve, reject) => {
         const output = createWriteStream(zipPath);
-        const archive = archiver.default("zip", { zlib: { level: 9 } });
+        const archive = new ZipArchive({ zlib: { level: 9 } });
         output.on("close", () => resolve());
         output.on("error", reject);
         archive.on("error", reject);

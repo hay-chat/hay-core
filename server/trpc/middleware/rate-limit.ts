@@ -108,7 +108,7 @@ export const rateLimitMiddleware = (options: RateLimitOptions) => {
       // Check if limit is exceeded
       if (requestCount >= max) {
         // Get the oldest request in the window to calculate retry-after
-        const oldestRequests = await redis.zrange(key, 0, 0, "WITHSCORES");
+        const oldestRequests = await redis.zrange(key, 0, "0", "WITHSCORES");
         const oldestTimestamp = oldestRequests[1] ? parseInt(oldestRequests[1]) : now;
         const retryAfter = Math.ceil((oldestTimestamp + windowMs - now) / 1000);
 
