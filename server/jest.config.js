@@ -1,3 +1,5 @@
+const path = require("path");
+
 module.exports = {
   preset: "ts-jest",
   testEnvironment: "node",
@@ -8,8 +10,12 @@ module.exports = {
     "^@plugins/(.*)$": "<rootDir>/../plugins/$1",
     // ESM-only; see tests/helpers/puppeteer-stub.ts.
     "^(puppeteer-core|@puppeteer/browsers)$": "<rootDir>/tests/helpers/puppeteer-stub.ts",
-    // Its Node entry is exposed only through import/module-sync conditions.
-    "^file-type$": "<rootDir>/node_modules/file-type/index.js",
+    // pdfkit's font data loader reads import.meta.url in its Node build, which
+    // cannot compile to CommonJS; the browser build carries the same data inline.
+    "^#binary-trie$": path.join(
+      path.dirname(require.resolve("unicode-properties")),
+      "binaryTrie.browser.js",
+    ),
   },
   transform: {
     "^.+\\.ts$": [
@@ -39,7 +45,7 @@ module.exports = {
   },
   // The optional prefix also matches a copy nested under another package.
   transformIgnorePatterns: [
-    "/node_modules/(?!(.*/node_modules/)?(linkedom|cssomnom|uhyphen|css-select|css-what|boolbase|nth-check|html-escaper|htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities|file-type|marked|strtok3|token-types|@tokenizer|@borewit|uint8array-extras|uuid)/)",
+    "/node_modules/(?!(.*/node_modules/)?(linkedom|cssomnom|uhyphen|css-select|css-what|boolbase|nth-check|html-escaper|htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities|file-type|marked|strtok3|token-types|@tokenizer|@borewit|uint8array-extras|uuid|web-push|https-proxy-agent|agent-base|proxy-agent-negotiate|archiver|is-stream|zip-stream|compress-commons|crc32-stream|@noble|fontkit|brotli|dfa|restructure|unicode-properties|unicode-trie|linebreak|png-js)/)",
   ],
   collectCoverageFrom: [
     "services/**/*.ts",

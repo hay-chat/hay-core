@@ -13,7 +13,8 @@
     "marketplaceCategory": "payments",
     "capabilities": [
       "mcp",
-      "auth"
+      "auth",
+      "credentials"
     ],
     "setup": {
       "businessTypes": [
@@ -26,7 +27,25 @@
       "egress": [
         "api.correios.com.br"
       ]
-    }
+    },
+    "credentials": [
+      {
+        "name": "accessCode",
+        "source": "config",
+        "capability": "mcp",
+        "hosts": [
+          "api.correios.com.br"
+        ]
+      },
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "mcp",
+        "hosts": [
+          "api.correios.com.br"
+        ]
+      }
+    ]
   },
   "scripts": {
     "build": "tsc",

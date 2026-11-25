@@ -13,7 +13,8 @@
     "marketplaceCategory": "payments",
     "capabilities": [
       "mcp",
-      "auth"
+      "auth",
+      "credentials"
     ],
     "setup": {
       "businessTypes": [
@@ -33,6 +34,24 @@
     },
     "oauthHosts": [
       "melhorenvio.com.br"
+    ],
+    "credentials": [
+      {
+        "name": "accessToken",
+        "source": "config",
+        "capability": "mcp",
+        "hosts": [
+          "melhorenvio.com.br"
+        ]
+      },
+      {
+        "name": "auth",
+        "source": "auth",
+        "capability": "mcp",
+        "hosts": [
+          "melhorenvio.com.br"
+        ]
+      }
     ]
   },
   "scripts": {

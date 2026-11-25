@@ -806,7 +806,6 @@ describe("webhook routing database contexts", () => {
 
   beforeEach(() => {
     startPluginWorker.mockResolvedValue({ port: 1234, instanceId: "inst" });
-    updateActivityTimestamp.mockResolvedValue(undefined);
     global.fetch = jest.fn().mockResolvedValue({ ok: true });
   });
 
